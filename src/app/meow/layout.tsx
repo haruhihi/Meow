@@ -43,7 +43,9 @@ const Bottom: FC = () => {
       (window as any).eruda.init();
     }
   }, []);
-
+  if (pathname === '/meow/texas') {
+    return null;
+  }
   return (
     <TabBar activeKey={pathname} onChange={(value) => router.push(value)} safeArea className={styles.tabBarWrap}>
       {tabs.map((item) => (

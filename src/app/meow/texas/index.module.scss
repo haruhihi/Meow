@@ -1,0 +1,88 @@
+.wrap {
+  --header-height: 60px;
+  --footer-height: 100px;
+  --player-width: 40px;
+  .header {
+    height: var(--header-height);
+  }
+  .tableContainer {
+    position: relative;
+    border: 1px solid red;
+    width: calc(100vw);
+    --container-height: calc(100vh - var(--header-height) - var(--footer-height));
+    height: var(--container-height);
+    .alignContainer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0);
+      .table {
+        border: 1px solid #000;
+        border-radius: 40px;
+        background: green;
+        width: calc(100% - 80px);
+        height: 100%;
+      }
+      .commonCards {
+        width: calc(100% - 100px);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        gap: 8px;
+        .card {
+          width: calc((100% - 16px) / 3);
+        }
+      }
+      .players {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        .player {
+          width: var(--player-width);
+          position: absolute;
+          .avatar {
+            border-radius: 50%;
+            overflow: hidden;
+            background-color: #111;
+            color: #fff;
+            width: var(--player-width);
+            height: var(--player-width);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .bet {
+            text-align: center;
+            font-size: 9px;
+          }
+          .cards {
+            width: 100%;
+            position: relative;
+            --card-shift: 10px;
+            img {
+              width: calc(var(--player-width) - var(--card-shift));
+              position: absolute;
+            }
+            img:nth-child(1) {
+              left: 0;
+            }
+            img:nth-child(2) {
+              left: var(--card-shift);
+            }
+          }
+        }
+      }
+    }
+  }
+  .footer {
+    height: var(--footer-height);
+    display: flex;
+    flex-shrink: 0;
+    .cards {
+      width: 120px;
+    }
+  }
+}
