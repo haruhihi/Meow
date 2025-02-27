@@ -1,34 +1,38 @@
 'use client';
 import { Button } from 'antd-mobile';
-import { useUserInfo } from '@utils/user';
-import { getLabel, getPlayers } from './help';
+// import { useUserInfo } from '@utils/user';
+import { EPlayerStatus, getLabel, getPlayers } from './help';
 import styles from './index.module.scss';
 import { TopLoading } from '@components/loading';
 import { Card } from './card';
 import { observer } from 'mobx-react-lite';
 import { createContext, useContext } from 'react';
 import { Game } from './game';
+import classNames from 'classnames';
 
 const GameContext = createContext<Game | null>(null);
 
 const Texas = observer(() => {
   const game = useContext(GameContext);
-  const { user } = useUserInfo();
+  // const { user } = useUserInfo();
+  const user = { id: 1 };
 
   if (!game || !user) {
     return <TopLoading />;
   }
-  const { currentRound, records, players, commonCards } = game;
+  const { players, commonCards } = game;
 
   console.log(game);
   const { id: currentUID } = user;
 
   const { me, otherPlayers } = getPlayers(game, currentUID);
 
+  const isDisabled = me.status !== EPlayerStatus.Pending
+
   return (
     <div className={styles.wrap}>
       <div className={styles.header}>
-        <h2>{game.getRound()}</h2>
+        {/* <h2>{game.getRound()}</h2> */}
       </div>
       <div className={styles.tableContainer}>
         <div className={styles.alignContainer}>
@@ -44,12 +48,14 @@ const Texas = observer(() => {
         <div className={styles.alignContainer}>
           <div className={styles.players}>
             {otherPlayers.map((player, index) => {
-              const { name, cards } = player;
+              const { name, cards, chips } = player;
               const label = getLabel(player, players, game);
               return (
                 <div
                   key={player.uid}
-                  className={styles.player}
+                  className={classNames(styles.player, {
+                    [styles.actionPlayer]: player.status === EPlayerStatus.Pending,
+                  })}
                   style={{
                     left: index >= 3 ? 0 : 'auto',
                     right: index >= 3 ? 'auto' : 0,
@@ -60,7 +66,7 @@ const Texas = observer(() => {
                   }}
                 >
                   <div className={styles.avatar}>{name}</div>
-                  <div className={styles.bet}>{label} 5000</div>
+                  <div className={styles.bet}>{label} {chips}</div>
                   <div className={styles.cards}>
                     <img src={`/poker/${cards[0][0]}_of_${cards[0][1]}.svg`} alt="1" width="100%" />
                     <img src={`/poker/${cards[1][0]}_of_${cards[1][1]}.svg`} alt="1" width="100%" />
@@ -79,13 +85,13 @@ const Texas = observer(() => {
             })}
           </div>
         </div>
-        {me.name}
-        {getLabel(me, players, game)}
-        <div className={styles.actions}>
-          <Button>下一轮</Button>
-          <Button>加注</Button>
-          <Button>跟注</Button>
-          <Button onClick={() => {}}>弃牌</Button>
+        <div>{me.name}
+        {getLabel(me, players, game)} {me.chips}</div>
+        <div className={classNames(styles.actions, { [styles.inAction]: isDisabled })}>
+          <Button disabled={isDisabled}>下一轮</Button>
+          <Button  disabled={isDisabled}>加注</Button>
+          <Button  disabled={isDisabled}>跟注</Button>
+          <Button disabled={isDisabled} onClick={() => {}}>弃牌</Button>
         </div>
       </div>
     </div>

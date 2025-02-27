@@ -47,6 +47,12 @@ export enum EPlayerType {
   Man = 'man',
 }
 
+export enum EPlayerStatus {
+  Normal,
+  Pending,
+  Finished
+}
+
 export const getPlayers = (game: Game, currentUID: number) => {
   const { players } = game;
   const allPlayers = [...players];
@@ -85,3 +91,19 @@ export const getLabel = (player: Game['players'][0], players: Game['players'], g
   }
   return null;
 };
+
+export const SMALL_BLIND_ANTE = 10;
+
+export const BIG_BLIND_ANTE = 2 * SMALL_BLIND_ANTE;
+
+export interface INotification {
+  content: string;
+}
+
+export const delay = (time = 2000) => {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, time);
+  });
+}

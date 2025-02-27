@@ -73,6 +73,9 @@
               left: var(--card-shift);
             }
           }
+          &.actionPlayer {
+            border: 1px dotted #000;
+          }
         }
       }
     }
@@ -83,6 +86,11 @@
     flex-shrink: 0;
     .cards {
       width: 120px;
+    }
+    .actions {
+      &.inAction {
+        border: 1px dotted #000;
+      }
     }
   }
 }
