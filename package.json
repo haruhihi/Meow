@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "./node_modules/next/dist/bin/next start",
     "lint": "next lint",
-    "update-db": "prisma migrate dev --name update && prisma generate",
+    "update-db": "prisma format && prisma migrate dev --name update && prisma generate",
     "view": "prisma studio",
     "p": "prisma"
   },

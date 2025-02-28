@@ -1,9 +1,9 @@
 import React from 'react';
 import styles from './index.module.scss';
-import { data } from '../mock';
 import { Icon } from '../icon';
+import { AI_Tool } from '@prisma/client';
 
-export const Card: React.FC<{ item: (typeof data)[0] }> = (props) => {
+export const Card: React.FC<{ item: AI_Tool }> = (props) => {
   const {
     item: { icon, name, link, desc },
   } = props;
