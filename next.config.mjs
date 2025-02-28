@@ -6,8 +6,15 @@ const nextConfig = {
       return [
         // Basic redirect
         {
-          source: "/",
+          source: "/meow",
           destination: "/meow/bill",
+          // Do not set permanent true, or it will be cached which will cause confusing when you build a new app under this path.
+          permanent: false,
+        },
+        // Basic redirect
+        {
+          source: "/ai-hub",
+          destination: "/ai-hub/home",
           // Do not set permanent true, or it will be cached which will cause confusing when you build a new app under this path.
           permanent: false,
         },
@@ -23,6 +30,13 @@ const nextConfig = {
     // },
     env: {
       NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV,
+    },
+    webpack(config) {
+      config.module.rules.push({
+        test: /\.svg$/,
+        use: ["@svgr/webpack"],
+      });
+      return config;
     },
   };
   
