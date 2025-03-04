@@ -21,7 +21,6 @@ const App: React.FC = () => {
         });
         try {
           const res = (await post('/api/ai-hub-manage/add', values)) as any;
-          console.log(res);
           messageApi.open({
             key,
             type: 'success',
