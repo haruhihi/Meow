@@ -15,7 +15,7 @@ export default async function middleware(req: NextRequest) {
   // 3. Decrypt the session from the cookie
   const session = await getSession();
 
-  if (path.includes('/user/sign')) {
+  if (path.includes('/user/sign') || path === '/') {
     return NextResponse.next();
   }
 
@@ -38,5 +38,5 @@ export default async function middleware(req: NextRequest) {
 
 // Routes Middleware should not run on
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+  matcher: ['/((?!api|ai-hub|_next/static|_next/image|.*\\.png$).*)'],
 };

@@ -1,0 +1,33 @@
+.wrap {
+  padding: 24px;
+  display: block;
+  width: 100%;
+
+  .title {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    .iconWrap {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(23, 23, 23, 0.1);
+      border-radius: 8px;
+      margin-right: 16px;
+      flex-shrink: 0;
+      .icon {
+        width: 20px;
+        height: 20px;
+      }
+    }
+  }
+
+  .desc {
+    font-size: 14px;
+    color: rgb(115, 115, 115);
+    line-height: 20px;
+    margin-top: 16px;
+  }
+}

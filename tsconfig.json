@@ -23,6 +23,7 @@
       "@app/*": ["./src/app/*"],
       "@utils/*": ["./src/utils/*"],
       "@components/*": ["./src/components/*"],
+      "@static/*": ["./src/static/*"],
     },
     "target": "ES2017"
   },

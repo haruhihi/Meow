@@ -77,3 +77,13 @@ model Trek {
 
   user User @relation(fields: [userId], references: [id])
 }
+
+model AI_Tool {
+  id        String   @id @default(uuid()) // UUID as primary key
+  link      String
+  name      String
+  desc      String // description
+  icon      String // icon svg content
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt //
+}
