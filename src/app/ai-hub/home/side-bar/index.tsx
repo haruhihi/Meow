@@ -14,8 +14,8 @@ export const SideBar: React.FC<{ tools: AI_Tool[] }> = (props) => {
         Popular Tools <UpOutlined width={16} height={16} />
       </div>
       <div>
-        {tools.map((item, index) => {
-          return <ListItem key={index} icon={item.icon} text={item.name} link={item.link} />;
+        {tools.map((tool, index) => {
+          return <ListItem key={index} icon={tool.icon} text={tool.name} link={tool.link} tool={tool} />;
         })}
       </div>
     </div>
@@ -27,11 +27,12 @@ const ListItem: React.FC<{
   text: string;
   appendix?: React.ReactNode;
   link?: string;
+  tool?: AI_Tool;
 }> = (props) => {
-  const { icon, text, appendix, link } = props;
+  const { icon, text, appendix, link, tool } = props;
   return (
     <a className={styles.itemWrap} href={link} target="_blank">
-      <Icon source={icon} className={styles.icon} />
+      <Icon source={icon} className={styles.icon} category1={tool?.category1} />
       <div className={styles.text}>{text}</div>
       <div className={styles.appendix}>{appendix}</div>
     </a>
