@@ -1,6 +1,6 @@
 'use client';
 import { post } from '@libs/fetch';
-import { Button, Radio, Form, Input, message, Slider } from 'antd';
+import { Button, Radio, Form, Input, message, Slider, Select } from 'antd';
 import React from 'react';
 
 const App: React.FC = () => {
@@ -63,7 +63,7 @@ const App: React.FC = () => {
             <Input placeholder="Please input the category2" />
           </Form.Item>
           <Form.Item label="Tags" name="tags" rules={[{ required: true, message: 'Please input the tags' }]}>
-            <Input placeholder="Please input the tags, use comma to split" />
+            <Select mode="tags" style={{ width: '100%' }} placeholder="Please input the tags" />
           </Form.Item>
           <Form.Item label="Registration" name="registration">
             <Radio.Group

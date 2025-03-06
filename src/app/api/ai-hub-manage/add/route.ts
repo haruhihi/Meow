@@ -11,7 +11,7 @@ export async function POST(request: Request) {
         link?: string;
         category1: string;
         category2?: string;
-        tags?: string;
+        tags?: string[];
         registration?: boolean;
         free?: boolean;
         pro?: boolean;
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         link,
         category1,
         category2,
-        tags: tags?.split(',') ?? [],
+        tags,
         registration,
         free,
         pro,
