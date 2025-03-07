@@ -1,6 +1,11 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 
-export { prisma }
+const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
-export * from "@prisma/client";
+console.log('create prisma client');
+
+export const prisma = globalForPrisma.prisma || new PrismaClient();
+
+globalForPrisma.prisma = prisma;
+
+export * from '@prisma/client';

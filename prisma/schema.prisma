@@ -79,11 +79,19 @@ model Trek {
 }
 
 model AI_Tool {
-  id        String   @id @default(uuid()) // UUID as primary key
-  link      String
-  name      String
-  desc      String // description
-  icon      String // icon svg content
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt //
+  id           String   @id @unique @default(uuid()) // UUID as primary key
+  link         String
+  name         String
+  desc         String // description
+  icon         String? // icon svg content
+  category1    String
+  category2    String?
+  tags         String[]
+  registration Boolean?
+  free         Boolean? // Has free version?
+  pro          Boolean? // Has pro version? null is unknown
+  pro_price    String? // price of pro version: null(unknown) | Exact price (如 "9.99")
+  score        Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

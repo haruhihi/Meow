@@ -8,6 +8,7 @@ import { AI_Tool } from '@prisma/client';
 
 export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
   const { tools } = props;
+  console.log('tools', tools);
   const [query, setQuery] = useState('');
   return (
     <div className={styles.wrap}>

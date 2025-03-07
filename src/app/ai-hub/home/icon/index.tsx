@@ -1,8 +1,32 @@
 import React from 'react';
+import {
+  EditOutlined,
+  FileTextOutlined,
+  FileImageOutlined,
+  VideoCameraAddOutlined,
+  CodeOutlined,
+  BulbOutlined,
+} from '@ant-design/icons';
+// Text, Document, Image, Video, Audio, Code, Others
+const iconMap = {
+  Text: <EditOutlined />,
+  Document: <FileTextOutlined />,
+  Image: <FileImageOutlined />,
+  Video: <VideoCameraAddOutlined />,
+  Code: <CodeOutlined />,
+  Others: <BulbOutlined />,
+};
+export const Icon: React.FC<{
+  source: string | React.ReactNode;
+  size?: string;
+  className?: string;
+  category1?: string;
+}> = (props) => {
+  const { source, className, category1 } = props;
+  const defaultIcon = (iconMap as any)[category1 ?? ''] ?? <BulbOutlined />;
 
-export const Icon: React.FC<{ source: string | React.ReactNode; size?: string; className?: string }> = (props) => {
-  const { source, className } = props;
-  // console.log(typeof source === 'string' ? source.replace(/(<svg\b[^>]*?)\swidth="\d+"\s?/i, '$1') : '-');
+  const isEnableDefaultSvg = global?.location?.href?.indexOf('endfticon') > -1;
+
   const result =
     typeof source === 'string' ? (
       <div
@@ -13,6 +37,8 @@ export const Icon: React.FC<{ source: string | React.ReactNode; size?: string; c
             .replace(/(<svg\b[^>]*?)\s?height="\d+"/i, '$1'),
         }}
       />
+    ) : isEnableDefaultSvg && !source ? (
+      defaultIcon
     ) : (
       <div className={className}>{source}</div>
     );
