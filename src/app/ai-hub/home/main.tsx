@@ -45,7 +45,6 @@ export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
     <div className={styles.wrap}>
       <aside className={styles.sideBarWrap}>
         <SideBar
-          tools={tools}
           onClickItem={(v) => {
             setTools([]);
             setPage(0);
@@ -91,12 +90,12 @@ export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
                   </div>
                 );
               })}
-              {loading && (
-                <div className={styles.loadingWrap}>
-                  <Spin />
-                </div>
-              )}
             </div>
+            {loading && (
+              <div className={styles.loadingWrap}>
+                <Spin />
+              </div>
+            )}
           </div>
         </main>
       </div>
