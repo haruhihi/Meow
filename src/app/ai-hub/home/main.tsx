@@ -22,7 +22,7 @@ export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
         category = { category2: categories[0], category1: categories[1] };
       }
       const res = await window
-        .fetch('/api/ai-hub-manage/list', {
+        .fetch('https://aitoolstest-fwbqd0hwcsepd9bs.eastasia-01.azurewebsites.net/search', {
           method: 'POST',
           body: JSON.stringify({ query, page, pageSize: 24, ...category }),
         })
