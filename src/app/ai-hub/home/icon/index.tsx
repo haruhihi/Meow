@@ -32,9 +32,7 @@ export const Icon: React.FC<{
       <div
         className={className}
         dangerouslySetInnerHTML={{
-          __html: source
-            .replace(/(<svg\b[^>]*?)\s?width="\d+"\s?/i, '$1')
-            .replace(/(<svg\b[^>]*?)\s?height="\d+"/i, '$1'),
+          __html: source.replace(/\s*(width|height)="\d+"/g, ''),
         }}
       />
     ) : isEnableDefaultSvg && !source ? (
