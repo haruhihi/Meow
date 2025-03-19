@@ -16,6 +16,7 @@
     "@ant-design/nextjs-registry": "^1.0.2",
     "@prisma/client": "^6.1.0",
     "@svgr/webpack": "^8.1.0",
+    "@tailwindcss/typography": "^0.5.16",
     "antd": "^5.24.2",
     "antd-mobile": "^5.38.1",
     "classnames": "^2.5.1",
@@ -28,6 +29,7 @@
     "next": "^14.2.22",
     "react": "^18.0.2",
     "react-dom": "^18.0.2",
+    "react-markdown": "^10.1.0",
     "sass": "^1.83.0"
   },
   "devDependencies": {

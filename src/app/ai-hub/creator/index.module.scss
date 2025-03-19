@@ -1,0 +1,165 @@
+.wrap {
+  --sidebar-background: 0 0% 98%;
+  --border: 0 0% 89.8%;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --background: 0 0% 100%;
+  --content-padding: 40px;
+  color: rgb(10, 10, 10);
+  display: flex;
+  height: 100vh;
+  background-color: hsl(var(--sidebar-background));
+  .sideBarWrap {
+    height: 100%;
+    background-color: hsl(var(--sidebar-background));
+    width: 256px;
+    flex-shrink: 0;
+    padding: 8px;
+    box-sizing: border-box;
+    overflow: auto;
+  }
+  .mainWrap {
+    flex: 1;
+    border-color: hsl(var(--border));
+    background-color: hsl(var(--background));
+    margin: 8px;
+    margin-right: 0;
+    border-radius: 12px;
+    height: 100%;
+    overflow: auto;
+    --tw-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  }
+  .main {
+    height: 100%;
+    --pad-bottom: 24px;
+    --input-height: 80px;
+    .chat {
+      position: relative;
+      margin: 0 auto;
+      width: 702px;
+      height: 100%;
+      border: 1px solid #e5e5e5;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: var(--pad-bottom);
+      .chatContent {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        .bubble {
+          background: #ddd9ff;
+          border-radius: 18px 3px 18px 18px;
+          color: #201452;
+          font-size: 16px;
+          line-height: 28px;
+          margin: 10px 0 3px 76px;
+          padding: 9px 13px;
+        }
+        .bubbleLeft {
+          border-radius: 3px 18px 18px 18px;
+          margin: 10px 76px 3px 0;
+        }
+      }
+      .inputWrap {
+        height: var(--input-height);
+        border: 1px solid red;
+      }
+      .items {
+        position: absolute;
+        bottom: calc(var(--input-height) + var(--pad-bottom) + 8px);
+        background: #fff;
+        border: 0.5px solid #dbdce0;
+        box-shadow: 0 2px 20px 0 rgba(0, 0, 0, 0.08);
+        opacity: 0;
+        overflow: hidden;
+        transition: transform 0.24s ease-in-out, opacity 0.24s ease-in-out;
+        width: 100%;
+        border-radius: 18px;
+        padding: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        .item {
+          border: 0.5px solid #edeef0;
+          border-radius: 9px;
+          box-sizing: border-box;
+          color: #333;
+          cursor: pointer;
+          display: flex;
+          flex: 0 0 auto;
+          flex-direction: column;
+          height: 105px;
+          padding: calc(15px - 0.5px);
+          padding-right: 0;
+          width: 160px;
+          &:hover {
+            background-color: rgba(0, 0, 0, 0.03);
+          }
+          &:active {
+            background-color: #e6f4ff;
+            border-color: #1677ff;
+          }
+          .icon {
+            svg {
+              width: 18px;
+              height: 18px;
+            }
+          }
+          .name {
+            font-size: 14px;
+            margin-top: 19px;
+            line-height: 18px;
+          }
+          .extra {
+            color: #9195a3;
+            font-size: 13px;
+            margin-top: 4.5px;
+            line-height: 18px;
+          }
+        }
+      }
+      .inputWrap {
+        border-radius: 18px;
+        padding: 8px 11px 5.5px 11px;
+        border: 1.5px solid #b6adff;
+        position: relative;
+        .inputCustom {
+          background-color: rgba(110, 75, 250, 0.09);
+          border-radius: 9px;
+          color: #6e4bfa;
+          line-height: 28px;
+          max-width: calc(100% - 27px);
+          padding: 0 9px;
+          display: inline-block;
+          margin: 0 3px;
+          &:focus {
+            outline: 0;
+          }
+        }
+        .send {
+          background: #6e4bfa;
+          position: absolute;
+          right: 11px;
+          bottom: 5.5px;
+          border-radius: 100%;
+          overflow: hidden;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.24s ease-in-out, opacity 0.24s ease-in-out;
+          &:hover {
+            cursor: pointer;
+            opacity: 0.8;
+          }
+          svg {
+            fill: #fff;
+          }
+        }
+      }
+    }
+  }
+}
