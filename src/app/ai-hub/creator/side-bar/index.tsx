@@ -17,7 +17,7 @@ export const SideBar: React.FC<{
   onClickItem: (v: string[]) => void;
 }> = (props) => {
   const { onClickItem } = props;
-  const [stateOpenKeys, setStateOpenKeys] = useState<string[]>(['Creator']);
+  const [stateOpenKeys, setStateOpenKeys] = useState<string[]>(['Bing AI Writing']);
 
   const getLevelKeys = (items1: LevelKeysProps[]) => {
     const key: Record<string, number> = {};
@@ -60,17 +60,17 @@ export const SideBar: React.FC<{
   return (
     <Menu
       mode="inline"
-      defaultSelectedKeys={['Creator']}
+      defaultSelectedKeys={['Bing AI Writing']}
       openKeys={stateOpenKeys}
       onOpenChange={onOpenChange}
       style={{ width: 256 }}
       items={[
         {
-          key: 'Creator',
-          label: 'Creator',
+          key: 'Bing AI Writing',
+          label: 'Bing AI Writing',
           icon: <Tool width="16px" height="16px" />,
+          children: items,
         },
-        ...items,
       ]}
       onClick={(item) => {
         onClickItem(item.keyPath);

@@ -1,5 +1,3 @@
-import { MenuProps } from 'antd';
-
 import Article from '@static/article.svg';
 import Essay from '@static/essay.svg';
 import Email from '@static/email.svg';
@@ -14,8 +12,6 @@ import Novel from '@static/novel.svg';
 import Script from '@static/script.svg';
 import Code from '@static/code.svg';
 import Questionnaire from '@static/questionnaire.svg';
-
-// type MenuItem = Exclude<Required<MenuProps>['items'][number], null> & { desc: string };
 
 export const items = [
   {
@@ -35,6 +31,12 @@ export const items = [
     label: 'Email',
     icon: <Email width="16px" height="16px" />,
     desc: 'Draft emails',
+  },
+  {
+    key: 'Poem',
+    label: 'Poem',
+    icon: <Poem width="16px" height="16px" />,
+    desc: 'Write poems',
   },
   {
     key: 'Market report',
@@ -65,12 +67,6 @@ export const items = [
     label: 'Social post',
     icon: <SocialPost width="16px" height="16px" />,
     desc: 'Create social posts',
-  },
-  {
-    key: 'Poem',
-    label: 'Poem',
-    icon: <Poem width="16px" height="16px" />,
-    desc: 'Write poems',
   },
   {
     key: 'Story',
