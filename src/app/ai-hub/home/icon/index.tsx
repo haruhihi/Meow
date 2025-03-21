@@ -7,15 +7,9 @@ import {
   CodeOutlined,
   BulbOutlined,
 } from '@ant-design/icons';
-// Text, Document, Image, Video, Audio, Code, Others
-const iconMap = {
-  Text: <EditOutlined />,
-  Document: <FileTextOutlined />,
-  Image: <FileImageOutlined />,
-  Video: <VideoCameraAddOutlined />,
-  Code: <CodeOutlined />,
-  Others: <BulbOutlined />,
-};
+import { items } from '../side-bar/config';
+import Tool from '@static/tool.svg'
+
 export const Icon: React.FC<{
   source: string | React.ReactNode;
   size?: string;
@@ -23,12 +17,12 @@ export const Icon: React.FC<{
   category1?: string;
 }> = (props) => {
   const { source, className, category1 } = props;
-  const defaultIcon = (iconMap as any)[category1 ?? ''] ?? <BulbOutlined />;
+  const defaultIcon = items.find(item => item.key === category1)?.icon ?? <Tool />;
 
   const isEnableDefaultSvg = global?.location?.href?.indexOf('endfticon') > -1;
-
+console.log("isEnableDefaultSvg", isEnableDefaultSvg, source)
   const result =
-    typeof source === 'string' ? (
+    (typeof source === 'string' && source !== "") ? (
       <div
         className={className}
         dangerouslySetInnerHTML={{
