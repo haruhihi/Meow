@@ -25,6 +25,9 @@ export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
         .fetch('https://aitoolstest-fwbqd0hwcsepd9bs.eastasia-01.azurewebsites.net/search', {
           method: 'POST',
           body: JSON.stringify({ query, page, pageSize: 24, ...category }),
+          headers: {
+            'Content-Type': 'application/json',
+          }
         })
         .then((res) => res.json());
       if (res && res.success) {

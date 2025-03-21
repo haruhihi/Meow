@@ -69,7 +69,7 @@ model Trek {
   id        Int      @id @default(autoincrement())
   userId    Int // User ID
   type      String // 打卡类型
-  date      DateTime @unique // check in time
+  date      DateTime // check in time
   count     Int
   note      String? // note
   createdAt DateTime @default(now())

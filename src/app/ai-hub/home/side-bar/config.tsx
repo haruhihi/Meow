@@ -1,4 +1,3 @@
-import { MenuProps } from 'antd';
 import Tool from '@static/tool.svg';
 import {
   EditOutlined,
@@ -10,9 +9,7 @@ import {
   AudioOutlined,
 } from '@ant-design/icons';
 
-type MenuItem = Required<MenuProps>['items'][number];
-
-export const items: MenuItem[] = [
+export const items = [
   {
     key: 'All Tools',
     label: 'All Tools',
