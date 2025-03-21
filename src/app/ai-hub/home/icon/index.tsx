@@ -1,12 +1,4 @@
 import React from 'react';
-import {
-  EditOutlined,
-  FileTextOutlined,
-  FileImageOutlined,
-  VideoCameraAddOutlined,
-  CodeOutlined,
-  BulbOutlined,
-} from '@ant-design/icons';
 import { items } from '../side-bar/config';
 import Tool from '@static/tool.svg'
 

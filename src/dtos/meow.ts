@@ -70,3 +70,7 @@ export interface ITrekCreateReq {
 export interface ITrekCreateRes {
   trek: Trek;
 }
+
+export interface ITrekDeleteRes {
+  treks: Trek[];
+}

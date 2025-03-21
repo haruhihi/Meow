@@ -1,5 +1,5 @@
 import { prisma } from '@libs/prisma';
-import { ITrekCreateReq, ITrekCreateRes } from '@dtos/meow';
+import { ITrekCreateReq, ITrekDeleteRes } from '@dtos/meow';
 import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 
@@ -12,14 +12,15 @@ export async function POST(request: Request) {
       throw new Error(`非法的 params, date: ${date}, userId: ${userId}, type: ${type}`);
     }
 
-    const newTrek = await prisma.trek.delete({
+    await prisma.trek.deleteMany({
       where: {
         date: new Date(date),
         type,
       },
     });
 
-    return success<ITrekCreateRes>({ trek: newTrek });
+
+    return success<ITrekDeleteRes>({ treks: [] });
   } catch (error) {
     return fail(error);
   }
