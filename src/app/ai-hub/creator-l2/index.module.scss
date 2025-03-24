@@ -62,6 +62,9 @@
           border-radius: 18px 18px 18px 18px;
           margin: 10px 76px 3px 0;
         }
+        :global(.ant-upload-list-item-image) {
+          margin: 0;
+        }
       }
       .inputWrap {
         min-height: var(--input-height);

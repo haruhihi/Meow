@@ -3,12 +3,13 @@ import { useState, useEffect } from 'react';
 import styles from './index.module.scss';
 import { SideBar } from './side-bar';
 import { Button, Spin } from 'antd';
-import { items } from './side-bar/config';
 import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
 
 import classNames from 'classnames';
 import { typeConfigs } from './type-config';
+import PictureWall from './picture-wall';
+import { MultiPlatformButton } from './multi-platform-button';
 export const Main: React.FC<{ markdown: string }> = (props) => {
   const [isShowItems, setIsShowItems] = useState(false);
   const [isShowRightChat, setIsShowRightChat] = useState(false);
@@ -30,8 +31,10 @@ export const Main: React.FC<{ markdown: string }> = (props) => {
         <main className={styles.main}>
           <div className={styles.chat}>
             <div className={styles.chatContent}>
-              {isShowRightChat && <div className={styles.bubble}>Write a poem about spring with emoji.</div>}
-              {isShowLeftChat && <MarkDownWrap>{markdown}</MarkDownWrap>}
+              {isShowRightChat && <div className={styles.bubble}>请帮我写朋友圈文案，主题是冬日晨光，登临北京钟楼和鼓楼游，写作长度中，配一张鼓楼经典图和一张当前热门的给鼓楼穿毛衣的图片</div>}
+              {isShowLeftChat && <div>{markdown && <MarkDownWrap>{markdown}</MarkDownWrap>}
+                
+              </div>}
             </div>
             <div className={styles.inputWrap}>
               {isShowText && (
@@ -93,7 +96,7 @@ const MarkDownWrap: React.FC<{ children: string }> = (props) => {
         {isShow ? (
           <div>
             <Markdown>{props.children}</Markdown>
-            {/* Add two button */}
+            <PictureWall></PictureWall>
           </div>
         ) : (
           <div>
@@ -103,14 +106,9 @@ const MarkDownWrap: React.FC<{ children: string }> = (props) => {
       </div>
       {isShow && (
         <div>
-          <Button color="primary" variant="outlined" style={{ marginRight: 4 }}>
-            Make it shorter
-          </Button>
-          <Button color="primary" variant="outlined" style={{ marginRight: 4 }}>
-            Make it longer
-          </Button>
-          <Button color="primary" variant="outlined">
-            Create an image for it
+          <MultiPlatformButton />
+          <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
+            生成我的风格
           </Button>
         </div>
       )}
