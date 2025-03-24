@@ -64,7 +64,7 @@
         }
       }
       .inputWrap {
-        height: var(--input-height);
+        min-height: var(--input-height);
         border: 1px solid red;
         span:after {
           display: none;
@@ -74,10 +74,16 @@
           clear: both;
         }
         span.inputCustom1:after {
-          content: 'what topic';
+          content: '什么平台';
         }
         span.inputCustom2:after {
-          content: 'other requirements';
+          content: '什么内容';
+        }
+        span.inputCustom3:after {
+          content: '短/中/长';
+        }
+        span.inputCustom4:after {
+          content: '其他要求';
         }
       }
       .items {
@@ -136,7 +142,7 @@
       }
       .inputWrap {
         border-radius: 18px;
-        padding: 0 16px;
+        padding: 4px 16px;
         display: flex;
         align-items: center;
         border: 1.5px solid #b6adff;
@@ -147,7 +153,7 @@
           color: #6e4bfa;
           line-height: 28px;
           max-width: calc(100% - 27px);
-          padding: 0 9px;
+          // padding: 0 9px;
           display: inline-block;
           margin: 0 3px;
           &:focus {

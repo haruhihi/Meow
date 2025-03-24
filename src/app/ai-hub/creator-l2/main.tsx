@@ -8,6 +8,7 @@ import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
 
 import classNames from 'classnames';
+import { typeConfigs } from './type-config';
 export const Main: React.FC<{ markdown: string }> = (props) => {
   const [isShowItems, setIsShowItems] = useState(false);
   const [isShowRightChat, setIsShowRightChat] = useState(false);
@@ -35,8 +36,12 @@ export const Main: React.FC<{ markdown: string }> = (props) => {
             <div className={styles.inputWrap}>
               {isShowText && (
                 <div>
-                  Write a poem about <IIput className={styles.inputCustom1} /> with{' '}
-                  <IIput className={styles.inputCustom2} />.
+                  请帮我写
+                  <IIput className={styles.inputCustom1} />
+                  文案，主题是
+                  <IIput className={styles.inputCustom2} />
+                  ，写作长度
+                  <IIput className={styles.inputCustom3} />，<IIput className={styles.inputCustom4} />
                 </div>
               )}
               <div
@@ -60,7 +65,7 @@ export const Main: React.FC<{ markdown: string }> = (props) => {
                 setIsShowText(true);
               }}
             >
-              {items.map((item) => (
+              {typeConfigs.map((item) => (
                 <div key={item.key} className={styles.item}>
                   <div className={styles.icon}>{item.icon}</div>
                   <div className={styles.name}>{item.label}</div>
