@@ -1,6 +1,7 @@
 import React from 'react';
 import { items } from '../side-bar/config';
-import Tool from '@static/tool.svg'
+import Tool from '@static/tool.svg';
+import { upperCase } from 'lodash-es';
 
 export const Icon: React.FC<{
   source: string | React.ReactNode;
@@ -9,12 +10,12 @@ export const Icon: React.FC<{
   category1?: string;
 }> = (props) => {
   const { source, className, category1 } = props;
-  const defaultIcon = items.find(item => item.key === category1)?.icon ?? <Tool />;
+  const defaultIcon = items.find((item) => upperCase(item.key) === upperCase(category1))?.icon ?? <Tool />;
 
   const isEnableDefaultSvg = global?.location?.href?.indexOf('endfticon') > -1;
-console.log("isEnableDefaultSvg", isEnableDefaultSvg, source)
+  console.log('isEnableDefaultSvg', category1, isEnableDefaultSvg, source);
   const result =
-    (typeof source === 'string' && source !== "") ? (
+    typeof source === 'string' && source !== '' ? (
       <div
         className={className}
         dangerouslySetInnerHTML={{

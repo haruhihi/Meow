@@ -21,3 +21,9 @@ export const handleError = (err: unknown, props?: ToastShowProps) => {
     ...props,
   });
 };
+
+export const isUrlEnable = (key: string) => {
+  console.log('global.window', global.window);
+  if (global.window === undefined) return false;
+  return window.location.href.includes(`${key}=1`);
+};

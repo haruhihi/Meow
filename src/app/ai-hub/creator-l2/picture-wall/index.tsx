@@ -29,12 +29,6 @@ const PictureWall: React.FC = () => {
       status: 'done',
       url: 'https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png',
     },
-    {
-      uid: '-3',
-      name: 'image.png',
-      status: 'done',
-      url: 'https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png',
-    }
   ]);
 
   const handlePreview = async (file: UploadFile) => {
@@ -46,8 +40,7 @@ const PictureWall: React.FC = () => {
     setPreviewOpen(true);
   };
 
-  const handleChange: UploadProps['onChange'] = ({ fileList: newFileList }) =>
-    setFileList(newFileList);
+  const handleChange: UploadProps['onChange'] = ({ fileList: newFileList }) => setFileList(newFileList);
 
   const uploadButton = (
     <button style={{ border: 0, background: 'none' }} type="button">
@@ -58,7 +51,7 @@ const PictureWall: React.FC = () => {
   return (
     <>
       <Upload
-        action={"/api/ai-hub-manage/upload-mock"}
+        action={'/api/ai-hub-manage/upload-mock'}
         listType="picture-card"
         fileList={fileList}
         onPreview={handlePreview}

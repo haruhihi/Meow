@@ -66,29 +66,7 @@
           margin: 0;
         }
       }
-      .inputWrap {
-        min-height: var(--input-height);
-        border: 1px solid red;
-        span:after {
-          display: none;
-        }
-        span.empty:after {
-          display: block;
-          clear: both;
-        }
-        span.inputCustom1:after {
-          content: '什么平台';
-        }
-        span.inputCustom2:after {
-          content: '什么内容';
-        }
-        span.inputCustom3:after {
-          content: '短/中/长';
-        }
-        span.inputCustom4:after {
-          content: '其他要求';
-        }
-      }
+
       .items {
         position: absolute;
         bottom: calc(var(--input-height) + var(--pad-bottom) + 8px);
@@ -150,13 +128,33 @@
         align-items: center;
         border: 1.5px solid #b6adff;
         position: relative;
+        min-height: var(--input-height);
+        span:after {
+          display: none;
+        }
+        span.empty:after {
+          display: block;
+          clear: both;
+        }
+        span.inputCustom1:after {
+          content: '什么平台';
+        }
+        span.inputCustom2:after {
+          content: '什么内容';
+        }
+        span.inputCustom3:after {
+          content: '短/中/长';
+        }
+        span.inputCustom4:after {
+          content: '其他要求';
+        }
         .inputCustom {
           background-color: rgba(110, 75, 250, 0.09);
           border-radius: 9px;
           color: #6e4bfa;
           line-height: 28px;
           max-width: calc(100% - 27px);
-          // padding: 0 9px;
+          padding: 0 2px;
           display: inline-block;
           margin: 0 3px;
           &:focus {

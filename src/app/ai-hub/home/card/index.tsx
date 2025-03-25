@@ -7,6 +7,7 @@ export const Card: React.FC<{ item: AI_Tool }> = (props) => {
   const {
     item: { icon, name, link, desc, category1 },
   } = props;
+
   return (
     <a className={styles.wrap} href={link} target="_blank">
       <div className={styles.title}>
