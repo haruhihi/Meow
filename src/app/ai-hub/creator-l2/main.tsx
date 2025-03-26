@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import styles from './index.module.scss';
 import { SideBar } from './side-bar';
-import { Button, Spin } from 'antd';
+import { Button, message, Spin } from 'antd';
 import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
 
@@ -11,25 +11,24 @@ import { typeConfigs } from './type-config';
 import PictureWall from './picture-wall';
 import { MultiPlatformButton } from './multi-platform-button';
 import { isUrlEnable } from '@utils/tool';
+import { IRes, IRound } from './help';
 
 const isDev = isUrlEnable('dev');
 
-export const Main: React.FC<{ markdown: string }> = (props) => {
+export const Main: React.FC<{ markdown: string }> = () => {
   const [isShowItems, setIsShowItems] = useState(false);
-  const [isShowRightChat, setIsShowRightChat] = useState(isDev ? true : false);
-  const [isShowLeftChat, setIsShowLeftChat] = useState(isDev ? true : false);
-  const [isShowRound2, setIsShowRound2] = useState(isDev ? true : false);
-  const [isShowRound3, setIsShowRound3] = useState(isDev ? true : false);
+  const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowText, setIsShowText] = useState(isDev ? true : false);
+  const [texts, setTexts] = useState<string[]>(['', '', '', '']);
 
-  const { markdown } = props;
+  const query = `请帮我写${texts[0]}文案，主题是${texts[1]}，写作长度${texts[2]}，${texts[3]}`;
 
   const pillsProps = {
     onMultiPlatSubmit: () => {
-      setIsShowRound2(true);
+      // setIsShowRound2(true);
     },
     onMyStyle: () => {
-      setIsShowRound3(true);
+      // setIsShowRound3(true);
     },
   };
 
@@ -47,51 +46,45 @@ export const Main: React.FC<{ markdown: string }> = (props) => {
         <main className={styles.main}>
           <div className={styles.chat}>
             <div className={styles.chatContent}>
-              {isShowRightChat && (
-                <div className={styles.bubble}>
-                  请帮我写朋友圈文案，主题是冬日晨光，登临北京钟楼和鼓楼游，写作长度中，配一张鼓楼经典图和一张当前热门的给鼓楼穿毛衣的图片
-                </div>
-              )}
-              {isShowLeftChat && <div>{markdown && <MarkDownWrap {...pillsProps}>{markdown}</MarkDownWrap>}</div>}
-              {isShowRound2 && (
-                <>
-                  {['小红书', 'Instagram'].map((item) => {
-                    return (
-                      <div key={item}>
-                        {markdown && <MarkDownWrap {...pillsProps}>{`## ${item}风格：\n${markdown}`}</MarkDownWrap>}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-              {isShowRound3 && (
-                <>
-                  <div>
-                    {markdown && (
-                      <MarkDownWrap
-                        {...pillsProps}
-                      >{`> 思考中...用户的风格是写实风格，现在用户想要写朋友圈文案，主题是冬日晨光，登临北京钟楼和鼓楼游，写作长度中，配一张鼓楼经典图和一张当前热门的给鼓楼穿毛衣的图片\n${markdown}`}</MarkDownWrap>
-                    )}
+              {rounds.map((round, index) => {
+                if (round.position === 'right')
+                  return (
+                    <div key={index} className={styles.bubble}>
+                      {query}
+                    </div>
+                  );
+                return (
+                  <div key={index}>
+                    <MarkDownWrap {...pillsProps} round={round}></MarkDownWrap>
                   </div>
-                </>
-              )}
+                );
+              })}
             </div>
             <div className={styles.inputWrap}>
               {isShowText && (
                 <div>
                   请帮我写
-                  <IIput className={styles.inputCustom1} />
+                  <PromptInput texts={texts} setTexts={setTexts} order={0} />
                   文案，主题是
-                  <IIput className={styles.inputCustom2} />
+                  <PromptInput texts={texts} setTexts={setTexts} order={1} />
                   ，写作长度
-                  <IIput className={styles.inputCustom3} />，<IIput className={styles.inputCustom4} />
+                  <PromptInput texts={texts} setTexts={setTexts} order={2} />
+                  ，
+                  <PromptInput texts={texts} setTexts={setTexts} order={3} />
                 </div>
               )}
               <div
                 className={styles.send}
                 onClick={() => {
                   setIsShowText(false);
-                  setIsShowRightChat(true);
+                  setRounds([
+                    ...rounds,
+                    { position: 'right', content: query },
+                    {
+                      position: 'left',
+                      load: () => fetchContent('wording', { query: query }),
+                    },
+                  ]);
                   setTimeout(() => {
                     setIsShowLeftChat(true);
                   }, 500);
@@ -124,23 +117,34 @@ export const Main: React.FC<{ markdown: string }> = (props) => {
 };
 
 const MarkDownWrap: React.FC<{
-  children: string;
   onMultiPlatSubmit: (options: string[]) => void;
   onMyStyle: () => void;
+  round: IRound;
 }> = (props) => {
-  const [isShow, setIsShow] = useState(isDev ? true : false);
+  const [data, setData] = useState<IRes>();
+  const { round } = props;
+
   useEffect(() => {
-    setTimeout(() => {
-      setIsShow(true);
-    }, 5000);
+    if (round.load) {
+      round
+        .load()
+        .then((res) => {
+          setData(res);
+        })
+        .catch((err) => {
+          console.log(err);
+          message.error('内容生成数据失败');
+        });
+    }
   }, []);
+
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
-        {isShow ? (
+        {data ? (
           <div>
-            <Markdown>{props.children}</Markdown>
-            <PictureWall></PictureWall>
+            <Markdown>{data.wording}</Markdown>
+            <PictureWall initialImgs={data.imgs} />
           </div>
         ) : (
           <div>
@@ -148,7 +152,7 @@ const MarkDownWrap: React.FC<{
           </div>
         )}
       </div>
-      {isShow && (
+      {data && (
         <div>
           <MultiPlatformButton onSubmit={props.onMultiPlatSubmit} />
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small" onClick={props.onMyStyle}>
@@ -163,17 +167,36 @@ const MarkDownWrap: React.FC<{
   );
 };
 
-const IIput: React.FC<{ className: string }> = (props) => {
-  const [txt1, setTxt1] = useState('');
-  console.log('txt1', txt1);
+const PromptInput: React.FC<{
+  texts: string[];
+  setTexts: (fun: (texts: string[]) => string[]) => void;
+  order: number;
+}> = (props) => {
+  const { order, setTexts, texts } = props;
   return (
     <span
       contentEditable="true"
-      className={classNames(styles.inputCustom, props.className, { [styles.empty]: txt1 === '' })}
+      className={classNames(styles.inputCustom, styles[`inputCustom${order}`], { [styles.empty]: texts[order] === '' })}
       onInput={(ev) => {
-        setTxt1((ev.target as HTMLDivElement).innerText);
+        setTexts((texts) => {
+          texts[order] = (ev.target as HTMLDivElement).innerText;
+          return [...texts];
+        });
       }}
-      content={txt1}
-    ></span>
+      content={texts[order]}
+    />
   );
+};
+
+const fetchContent = (type: 'wording' | 'img', params: { query?: string; type?: string }) => {
+  return window
+    .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01.azurewebsites.net/${type}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    })
+    .then((res) => res.json())
+    .then((res) => res.result);
 };
