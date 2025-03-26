@@ -1,8 +1,21 @@
 import React from 'react';
-import { items } from '../side-bar/config';
-import Tool from '@static/tool.svg';
-import { upperCase } from 'lodash-es';
-
+import {
+  EditOutlined,
+  FileTextOutlined,
+  FileImageOutlined,
+  VideoCameraAddOutlined,
+  CodeOutlined,
+  BulbOutlined,
+} from '@ant-design/icons';
+// Text, Document, Image, Video, Audio, Code, Others
+const iconMap = {
+  Text: <EditOutlined />,
+  Document: <FileTextOutlined />,
+  Image: <FileImageOutlined />,
+  Video: <VideoCameraAddOutlined />,
+  Code: <CodeOutlined />,
+  Others: <BulbOutlined />,
+};
 export const Icon: React.FC<{
   source: string | React.ReactNode;
   size?: string;
@@ -10,12 +23,12 @@ export const Icon: React.FC<{
   category1?: string;
 }> = (props) => {
   const { source, className, category1 } = props;
-  const defaultIcon = items.find((item) => upperCase(item.key) === upperCase(category1))?.icon ?? <Tool />;
+  const defaultIcon = (iconMap as any)[category1 ?? ''] ?? <BulbOutlined />;
 
   const isEnableDefaultSvg = global?.location?.href?.indexOf('endfticon') > -1;
-  console.log('isEnableDefaultSvg', category1, isEnableDefaultSvg, source);
+
   const result =
-    typeof source === 'string' && source !== '' ? (
+    typeof source === 'string' ? (
       <div
         className={className}
         dangerouslySetInnerHTML={{

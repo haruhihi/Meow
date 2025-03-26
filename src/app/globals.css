@@ -32,3 +32,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   height: 100vh;
 }
+
+.prose blockquote {
+  quotes: none;
+  font-style: normal; /* 取消斜体 */
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.5rem;
+  border-left-color: #ddd; /* 可选：调整左边框颜色 */
+}
+
+.prose blockquote p::before,
+.prose blockquote p::after {
+  content: none; /* 去除引号 */
+}
