@@ -37,21 +37,21 @@ export const Main: React.FC<{ markdown: string }> = () => {
             position: 'left' as const,
             load: () => fetchContent('wording', { query: query, type: platform }),
             thinkPlaceholder: `正在生成${platform}文案...`,
-            header: platform,
+            platform,
           };
         }),
       ]);
     },
     onMyStyle: () => {
-      // setRounds([
-      //   ...rounds,
-      //   {
-      //     position: 'left' as const,
-      //     load: () => fetchContent('wording', { query: query, type: '生成个人风格' }),
-      //     thinkPlaceholder: `正在生成您的风格文案...`,
-      //     header: '您的风格',
-      //   },
-      // ]);
+      setRounds([
+        ...rounds,
+        {
+          position: 'left' as const,
+          load: () => fetchContent('wording', { query: query, type: '生成个人风格' }),
+          thinkPlaceholder: `正在生成符合您风格的文案...`,
+          platform: '个人风格',
+        },
+      ]);
     },
   };
 
@@ -154,7 +154,7 @@ const MarkDownWrap: React.FC<{
   const [data, setData] = useState<IRes>();
   const {
     round,
-    round: { thinkPlaceholder, loadImgs, header },
+    round: { thinkPlaceholder, loadImgs, platform },
     fileList,
     setFileList,
   } = props;
@@ -197,14 +197,31 @@ const MarkDownWrap: React.FC<{
         });
     }
   }, []);
-
+  const appendHeader = platform ? `## ${platform}\n` : '';
+  console.log(`{data.thinking}`);
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
-            <Markdown>{`${header ? `## ${header}\n` : ''}${data.wording}`}</Markdown>
-            <PictureWall fileList={fileList} setFileList={setFileList} />
+            {platform === '个人风格' ? (
+              <>
+                <Markdown>{`## 您的风格\n> ${
+                  data.thinking
+                    ? data.thinking
+                        .split('\n') // 按换行拆分每一行
+                        .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
+                        .join('\n')
+                    : '思考中...'
+                }\n${data.wording}`}</Markdown>
+                <PictureWall fileList={fileList} setFileList={setFileList} />
+              </>
+            ) : (
+              <>
+                <Markdown>{`${appendHeader}${data.wording}`}</Markdown>
+                <PictureWall fileList={fileList} setFileList={setFileList} />
+              </>
+            )}
           </div>
         ) : (
           <div>
@@ -225,6 +242,11 @@ const MarkDownWrap: React.FC<{
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
             生成名人风格
           </Button>
+          {platform && platform !== '个人风格' && (
+            <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
+              一键发布到{platform}
+            </Button>
+          )}
         </div>
       )}
     </>
