@@ -38,6 +38,7 @@ body {
   font-style: normal; /* 取消斜体 */
   font-size: 0.875rem; /* text-sm */
   line-height: 1.5rem;
+  color: #666;
   border-left-color: #ddd; /* 可选：调整左边框颜色 */
 }
 

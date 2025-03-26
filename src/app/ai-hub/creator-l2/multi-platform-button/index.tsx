@@ -7,8 +7,8 @@ export const MultiPlatformButton: React.FC<{
 }> = (props) => {
   const options = [
     { label: '微博', value: '微博' },
-    { label: '小红书', value: '小红书' },
     { label: '微信公众号', value: '微信公众号' },
+    { label: '小红书', value: '小红书' },
     { label: '微信朋友圈', value: '微信朋友圈' },
     { label: 'X', value: 'X' },
     { label: 'Tiktok', value: 'Tiktok' },

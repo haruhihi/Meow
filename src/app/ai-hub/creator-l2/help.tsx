@@ -4,7 +4,7 @@ export interface IRound {
   thinkPlaceholder?: string;
   load?: () => Promise<IRes>;
   loadImgs?: () => Promise<IRes>;
-  header?: string;
+  platform?: string;
 }
 
 export interface IRes {
