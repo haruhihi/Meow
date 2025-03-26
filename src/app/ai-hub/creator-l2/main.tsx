@@ -5,13 +5,14 @@ import { SideBar } from './side-bar';
 import { Button, message, Spin } from 'antd';
 import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
-
+import type { UploadFile } from 'antd';
 import classNames from 'classnames';
 import { typeConfigs } from './type-config';
 import PictureWall from './picture-wall';
 import { MultiPlatformButton } from './multi-platform-button';
 import { isUrlEnable } from '@utils/tool';
 import { IRes, IRound } from './help';
+import pako from 'pako';
 
 const isDev = isUrlEnable('dev');
 
@@ -20,15 +21,37 @@ export const Main: React.FC<{ markdown: string }> = () => {
   const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowText, setIsShowText] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
+  const [fileList, setFileList] = useState<UploadFile[]>();
+  const [platforms, setPlatforms] = useState<string[]>([]);
 
   const query = `请帮我写${texts[0]}文案，主题是${texts[1]}，写作长度${texts[2]}，${texts[3]}`;
 
   const pillsProps = {
+    platforms,
+    onPlatformsChange: (v: string[]) => setPlatforms(v),
     onMultiPlatSubmit: () => {
-      // setIsShowRound2(true);
+      setRounds([
+        ...rounds,
+        ...platforms.map((platform) => {
+          return {
+            position: 'left' as const,
+            load: () => fetchContent('wording', { query: query, type: platform }),
+            thinkPlaceholder: `正在生成${platform}文案...`,
+            header: platform,
+          };
+        }),
+      ]);
     },
     onMyStyle: () => {
-      // setIsShowRound3(true);
+      // setRounds([
+      //   ...rounds,
+      //   {
+      //     position: 'left' as const,
+      //     load: () => fetchContent('wording', { query: query, type: '生成个人风格' }),
+      //     thinkPlaceholder: `正在生成您的风格文案...`,
+      //     header: '您的风格',
+      //   },
+      // ]);
     },
   };
 
@@ -55,7 +78,12 @@ export const Main: React.FC<{ markdown: string }> = () => {
                   );
                 return (
                   <div key={index}>
-                    <MarkDownWrap {...pillsProps} round={round}></MarkDownWrap>
+                    <MarkDownWrap
+                      {...pillsProps}
+                      round={round}
+                      fileList={fileList}
+                      setFileList={setFileList}
+                    ></MarkDownWrap>
                   </div>
                 );
               })}
@@ -83,11 +111,9 @@ export const Main: React.FC<{ markdown: string }> = () => {
                     {
                       position: 'left',
                       load: () => fetchContent('wording', { query: query }),
+                      loadImgs: () => fetchContent('img', { query: query }),
                     },
                   ]);
-                  setTimeout(() => {
-                    setIsShowLeftChat(true);
-                  }, 500);
                 }}
               >
                 <ArrowUpOutlined />
@@ -117,12 +143,21 @@ export const Main: React.FC<{ markdown: string }> = () => {
 };
 
 const MarkDownWrap: React.FC<{
-  onMultiPlatSubmit: (options: string[]) => void;
+  onMultiPlatSubmit: () => void;
   onMyStyle: () => void;
+  platforms: string[];
+  onPlatformsChange: (value: string[]) => void;
   round: IRound;
+  fileList?: UploadFile[];
+  setFileList: (files: UploadFile[]) => void;
 }> = (props) => {
   const [data, setData] = useState<IRes>();
-  const { round } = props;
+  const {
+    round,
+    round: { thinkPlaceholder, loadImgs, header },
+    fileList,
+    setFileList,
+  } = props;
 
   useEffect(() => {
     if (round.load) {
@@ -136,6 +171,31 @@ const MarkDownWrap: React.FC<{
           message.error('内容生成数据失败');
         });
     }
+    if (loadImgs) {
+      loadImgs()
+        .then((res) => {
+          console.log('图片生成', res);
+          setFileList(
+            (res.imgs ?? []).map((url, index) => {
+              const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
+              const decompressedData = pako.inflate(compressedData);
+              const blob = new Blob([decompressedData], { type: 'image/jpeg' });
+              const imageUrl = URL.createObjectURL(blob);
+
+              return {
+                uid: `${index}.jpg`,
+                name: `${index}.jpg`,
+                status: 'done',
+                url: imageUrl,
+              };
+            })
+          );
+        })
+        .catch((err) => {
+          console.log(err);
+          message.error('图片生成失败');
+        });
+    }
   }, []);
 
   return (
@@ -143,18 +203,22 @@ const MarkDownWrap: React.FC<{
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
-            <Markdown>{data.wording}</Markdown>
-            <PictureWall initialImgs={data.imgs} />
+            <Markdown>{`${header ? `## ${header}\n` : ''}${data.wording}`}</Markdown>
+            <PictureWall fileList={fileList} setFileList={setFileList} />
           </div>
         ) : (
           <div>
-            Thinking... <Spin indicator={<LoadingOutlined spin />} size="small" />
+            {thinkPlaceholder ?? '正在生成'}... <Spin indicator={<LoadingOutlined spin />} size="small" />
           </div>
         )}
       </div>
       {data && (
         <div>
-          <MultiPlatformButton onSubmit={props.onMultiPlatSubmit} />
+          <MultiPlatformButton
+            onSubmit={() => props.onMultiPlatSubmit()}
+            platforms={props.platforms}
+            onPlatformChange={props.onPlatformsChange}
+          />
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small" onClick={props.onMyStyle}>
             生成我的风格
           </Button>

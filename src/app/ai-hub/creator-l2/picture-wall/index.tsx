@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
-import { Image, Upload } from 'antd';
+import { Image, Spin, Upload } from 'antd';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
 
 type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
@@ -13,19 +13,12 @@ const getBase64 = (file: FileType): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-const PictureWall: React.FC<{ initialImgs: string[] }> = ({ initialImgs }) => {
+const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: UploadFile[]) => void }> = ({
+  fileList,
+  setFileList,
+}) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
-  const [fileList, setFileList] = useState<UploadFile[]>(
-    initialImgs.map((img, index) => {
-      return {
-        uid: `${index}`,
-        name: 'image.png',
-        status: 'done',
-        url: img,
-      };
-    })
-  );
 
   const handlePreview = async (file: UploadFile) => {
     if (!file.url && !file.preview) {
@@ -44,6 +37,13 @@ const PictureWall: React.FC<{ initialImgs: string[] }> = ({ initialImgs }) => {
       <div style={{ marginTop: 8 }}>Upload</div>
     </button>
   );
+  if (fileList === undefined) {
+    return (
+      <div>
+        <Spin tip="正在生成图片..." /> 生成图片中...
+      </div>
+    );
+  }
   return (
     <>
       <Upload
@@ -53,7 +53,7 @@ const PictureWall: React.FC<{ initialImgs: string[] }> = ({ initialImgs }) => {
         onPreview={handlePreview}
         onChange={handleChange}
       >
-        {fileList.length >= 8 ? null : uploadButton}
+        {fileList.length >= 4 ? null : uploadButton}
       </Upload>
       {previewImage && (
         <Image
@@ -63,6 +63,7 @@ const PictureWall: React.FC<{ initialImgs: string[] }> = ({ initialImgs }) => {
             onVisibleChange: (visible) => setPreviewOpen(visible),
             afterOpenChange: (visible) => !visible && setPreviewImage(''),
           }}
+          alt="preview"
           src={previewImage}
         />
       )}

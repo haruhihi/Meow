@@ -1,10 +1,5 @@
-// import Tool from '@static/tool.svg';
 import React, { useState } from 'react';
-// import styles from './index.module.scss';
-// import { UpOutlined } from '@ant-design/icons';
-// import { Icon } from '../icon';
-// import { AI_Tool } from '@prisma/client';
-import { items } from './config';
+import { typeConfigs } from '../type-config';
 import { Menu, MenuProps } from 'antd';
 import Tool from '@static/tool.svg';
 
@@ -35,7 +30,7 @@ export const SideBar: React.FC<{
     return key;
   };
 
-  const levelKeys = getLevelKeys(items as LevelKeysProps[]);
+  const levelKeys = getLevelKeys(typeConfigs as LevelKeysProps[]);
 
   const onOpenChange: MenuProps['onOpenChange'] = (openKeys) => {
     const currentOpenKey = openKeys.find((key) => stateOpenKeys.indexOf(key) === -1);
@@ -67,9 +62,9 @@ export const SideBar: React.FC<{
       items={[
         {
           key: 'Bing AI Writing',
-          label: 'Bing AI Writing',
+          label: '必应AI写作',
           icon: <Tool width="16px" height="16px" />,
-          children: items,
+          children: typeConfigs,
         },
       ]}
       onClick={(item) => {

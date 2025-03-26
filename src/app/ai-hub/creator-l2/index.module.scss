@@ -65,6 +65,15 @@
         :global(.ant-upload-list-item-image) {
           margin: 0;
         }
+        :global(.ant-upload-list-item-container) {
+          width: 210px !important;
+          height: 210px !important;
+        }
+
+        :global(.ant-upload) {
+          width: 210px;
+          height: 210px;
+        }
       }
 
       .items {
