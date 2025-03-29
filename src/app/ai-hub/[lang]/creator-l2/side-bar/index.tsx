@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { typeConfigs } from '../type-config';
+import { getTypeConfigs } from '../type-config';
 import { Menu, MenuProps } from 'antd';
 import Tool from '@static/tool.svg';
+import { IDict } from '../dictionaries';
 
 interface LevelKeysProps {
   key?: string;
@@ -10,8 +11,10 @@ interface LevelKeysProps {
 
 export const SideBar: React.FC<{
   onClickItem: (v: string[]) => void;
+  typeConfigs: ReturnType<typeof getTypeConfigs>;
+  dict: IDict;
 }> = (props) => {
-  const { onClickItem } = props;
+  const { onClickItem, typeConfigs, dict } = props;
   const [stateOpenKeys, setStateOpenKeys] = useState<string[]>(['Bing AI Writing']);
 
   const getLevelKeys = (items1: LevelKeysProps[]) => {
@@ -62,7 +65,7 @@ export const SideBar: React.FC<{
       items={[
         {
           key: 'Bing AI Writing',
-          label: '必应AI写作',
+          label: dict.words['Bing AI Writing'],
           icon: <Tool width="16px" height="16px" />,
           children: typeConfigs,
         },

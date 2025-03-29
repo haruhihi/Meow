@@ -8,10 +8,10 @@ export default async function middleware(req: NextRequest) {
   if (path.startsWith(`/ai-hub`)) {
     // Use regx get the subPath after /ai-hub/xxx
     const subPath = path.replace(/^\/ai-hub/, '');
-    const locales = ['en-US', 'zh-CN'];
+    const locales = ['en', 'zh'];
     const pathnameHasLocale = locales.some((locale) => path.startsWith(`/ai-hub/${locale}`));
     if (!pathnameHasLocale) {
-      req.nextUrl.pathname = `/ai-hub/en-US/${subPath}`;
+      req.nextUrl.pathname = `/ai-hub/en/${subPath}`;
       return NextResponse.redirect(req.nextUrl);
     } else {
       return NextResponse.next();

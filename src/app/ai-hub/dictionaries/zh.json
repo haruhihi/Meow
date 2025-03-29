@@ -1,0 +1,33 @@
+{
+    "words": {
+        "Article": "文章",
+        "Essay": "论文",
+        "Email": "电子邮件",
+        "Poem": "诗歌",
+        "Market report": "市场报告",
+        "Weekly report": "周报",
+        "Proposal": "提案",
+        "Resume": "简历",
+        "Social post": "社交帖子",
+        "Story": "故事",
+        "Novel": "小说",
+        "Script": "剧本",
+        "Code": "代码",
+        "Questionnaire": "问卷调查",
+        "Write articles": "写文章",
+        "Compose essays": "撰写论文",
+        "Draft emails": "草拟电子邮件",
+        "Write poems": "写诗歌",
+        "Generate market reports": "生成市场报告",
+        "Create weekly reports": "创建周报",
+        "Write proposals": "撰写提案",
+        "Build resumes": "制作简历",
+        "Create social posts": "创建社交帖子",
+        "Compose stories": "撰写故事",
+        "Write novels": "写小说",
+        "Create scripts": "创建剧本",
+        "Generate code": "生成代码",
+        "Create questionnaires": "创建问卷调查",
+        "Bing AI Writing": "必应 AI 写作"
+    }
+  }

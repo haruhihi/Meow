@@ -1,0 +1,33 @@
+{
+  "words": {
+    "Article": "Article",
+    "Essay": "Essay",
+    "Email": "Email",
+    "Poem": "Poem",
+    "Market report": "Market report",
+    "Weekly report": "Weekly report",
+    "Proposal": "Proposal",
+    "Resume": "Resume",
+    "Social post": "Social post",
+    "Story": "Story",
+    "Novel": "Novel",
+    "Script": "Script",
+    "Code": "Code",
+    "Questionnaire": "Questionnaire",
+    "Write articles": "Write articles",
+    "Compose essays": "Compose essays",
+    "Draft emails": "Draft emails",
+    "Write poems": "Write poems",
+    "Generate market reports": "Generate market reports",
+    "Create weekly reports": "Create weekly reports",
+    "Write proposals": "Write proposals",
+    "Build resumes": "Build resumes",
+    "Create social posts": "Create social posts",
+    "Compose stories": "Compose stories",
+    "Write novels": "Write novels",
+    "Create scripts": "Create scripts",
+    "Generate code": "Generate code",
+    "Create questionnaires": "Create questionnaires",
+    "Bing AI Writing": "Bing AI Writing"
+  }
+}

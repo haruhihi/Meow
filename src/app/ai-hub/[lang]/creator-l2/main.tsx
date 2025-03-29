@@ -7,22 +7,24 @@ import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
 import type { UploadFile } from 'antd';
 import classNames from 'classnames';
-import { typeConfigs } from './type-config';
+import { getTypeConfigs } from './type-config';
 import PictureWall from './picture-wall';
 import { MultiPlatformButton } from './multi-platform-button';
 import { isUrlEnable } from '@utils/tool';
 import { IRes, IRound, StreamingMarkDown } from './help';
 import pako from 'pako';
+import { IDict } from './dictionaries';
 
 const isDev = isUrlEnable('dev');
 
-export const Main: React.FC<{ markdown: string }> = () => {
+export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
   const [isShowItems, setIsShowItems] = useState(false);
   const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowText, setIsShowText] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
   const [fileList, setFileList] = useState<UploadFile[]>();
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const typeConfigs = getTypeConfigs(dict);
 
   const query = `请帮我写${texts[0]}文案，主题是${texts[1]}，写作长度${texts[2]}，${texts[3]}`;
 
@@ -63,7 +65,7 @@ export const Main: React.FC<{ markdown: string }> = () => {
   return (
     <div className={styles.wrap}>
       <aside className={styles.sideBarWrap}>
-        <SideBar onClickItem={() => {}} />
+        <SideBar onClickItem={() => {}} typeConfigs={typeConfigs} dict={dict}/>
       </aside>
       <div className={styles.mainWrap}>
         <main className={styles.main}>

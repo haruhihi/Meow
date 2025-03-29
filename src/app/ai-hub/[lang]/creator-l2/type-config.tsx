@@ -12,96 +12,99 @@ import Novel from '@static/novel.svg';
 import Script from '@static/script.svg';
 import Code from '@static/code.svg';
 import Questionnaire from '@static/questionnaire.svg';
+import { IDict } from './dictionaries';
 
-export const typeConfigs = [
-  {
-    key: 'Article',
-    label: '文章',
-    icon: <Article width="16px" height="16px" />,
-    desc: '撰写文章',
-  },
-  {
-    key: 'Essay',
-    label: '论文',
-    icon: <Essay width="16px" height="16px" />,
-    desc: '撰写论文',
-  },
-  {
-    key: 'Email',
-    label: '电子邮件',
-    icon: <Email width="16px" height="16px" />,
-    desc: '起草电子邮件',
-  },
-  {
-    key: 'Poem',
-    label: '社媒文案',
-    icon: <Poem width="16px" height="16px" />,
-    desc: '创作社媒文案',
-  },
-  {
-    key: 'Market report',
-    label: '市场报告',
-    icon: <MarketReport width="16px" height="16px" />,
-    desc: '生成市场报告',
-  },
-  {
-    key: 'Weekly report',
-    label: '周报',
-    icon: <WeeklyReport width="16px" height="16px" />,
-    desc: '创建周报',
-  },
-  {
-    key: 'Proposal',
-    label: '提案',
-    icon: <Proposal width="16px" height="16px" />,
-    desc: '撰写提案',
-  },
-  {
-    key: 'Resume',
-    label: '简历',
-    icon: <Resume width="16px" height="16px" />,
-    desc: '制作简历',
-  },
-  {
-    key: 'Social post',
-    label: '社交帖子',
-    icon: <SocialPost width="16px" height="16px" />,
-    desc: '创建社交帖子',
-  },
-  {
-    key: 'Story',
-    label: '故事',
-    icon: <Story width="16px" height="16px" />,
-    desc: '创作故事',
-  },
-  {
-    key: 'Novel',
-    label: '小说',
-    icon: <Novel width="16px" height="16px" />,
-    desc: '写小说',
-  },
-  {
-    key: 'Script',
-    label: '脚本',
-    icon: <Script width="16px" height="16px" />,
-    desc: '创建脚本',
-  },
-  {
-    key: 'Code',
-    label: '代码',
-    icon: <Code width="16px" height="16px" />,
-    desc: '生成代码',
-  },
-  {
-    key: 'Questionnaire',
-    label: '问卷',
-    icon: <Questionnaire width="16px" height="16px" />,
-    desc: '创建问卷',
-  },
-  {
-    key: 'Essay2',
-    label: '学生作文',
-    icon: <Essay width="16px" height="16px" />,
-    desc: '作文批改及润色',
-  },
-];
+export const getTypeConfigs = (dict: IDict) => {
+  return [
+    {
+      key: 'Article',
+      label: dict.words['Article'],
+      icon: <Article width="16px" height="16px" />,
+      desc: dict.words['Write articles'],
+    },
+    {
+      key: 'Essay',
+      label: dict.words['Essay'],
+      icon: <Essay width="16px" height="16px" />,
+      desc: dict.words['Compose essays'],
+    },
+    {
+      key: 'Email',
+      label: dict.words['Email'],
+      icon: <Email width="16px" height="16px" />,
+      desc: dict.words['Draft emails'],
+    },
+    {
+      key: 'Poem',
+      label: dict.words['Poem'],
+      icon: <Poem width="16px" height="16px" />,
+      desc: dict.words['Write poems'],
+    },
+    {
+      key: 'Market report',
+      label: dict.words['Market report'],
+      icon: <MarketReport width="16px" height="16px" />,
+      desc: dict.words['Generate market reports'],
+    },
+    {
+      key: 'Weekly report',
+      label: dict.words['Weekly report'],
+      icon: <WeeklyReport width="16px" height="16px" />,
+      desc: dict.words['Create weekly reports'],
+    },
+    {
+      key: 'Proposal',
+      label: dict.words['Proposal'],
+      icon: <Proposal width="16px" height="16px" />,
+      desc: dict.words['Write proposals'],
+    },
+    {
+      key: 'Resume',
+      label: dict.words['Resume'],
+      icon: <Resume width="16px" height="16px" />,
+      desc: dict.words['Build resumes'],
+    },
+    {
+      key: 'Social post',
+      label: dict.words['Social post'],
+      icon: <SocialPost width="16px" height="16px" />,
+      desc: dict.words['Create social posts'],
+    },
+    {
+      key: 'Story',
+      label: dict.words['Story'],
+      icon: <Story width="16px" height="16px" />,
+      desc: dict.words['Compose stories'],
+    },
+    {
+      key: 'Novel',
+      label: dict.words['Novel'],
+      icon: <Novel width="16px" height="16px" />,
+      desc: dict.words['Write novels'],
+    },
+    {
+      key: 'Script',
+      label: dict.words['Script'],
+      icon: <Script width="16px" height="16px" />,
+      desc: dict.words['Create scripts'],
+    },
+    {
+      key: 'Code',
+      label: dict.words['Code'],
+      icon: <Code width="16px" height="16px" />,
+      desc: dict.words['Generate code'],
+    },
+    {
+      key: 'Questionnaire',
+      label: dict.words['Questionnaire'],
+      icon: <Questionnaire width="16px" height="16px" />,
+      desc: dict.words['Create questionnaires'],
+    },
+    {
+      key: 'Essay2',
+      label: dict.words['Essay'],
+      icon: <Essay width="16px" height="16px" />,
+      desc: dict.words['Compose essays'],
+    },
+  ];
+};
