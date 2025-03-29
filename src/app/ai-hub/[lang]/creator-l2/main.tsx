@@ -11,7 +11,7 @@ import { typeConfigs } from './type-config';
 import PictureWall from './picture-wall';
 import { MultiPlatformButton } from './multi-platform-button';
 import { isUrlEnable } from '@utils/tool';
-import { IRes, IRound } from './help';
+import { IRes, IRound, StreamingMarkDown } from './help';
 import pako from 'pako';
 
 const isDev = isUrlEnable('dev');
@@ -198,7 +198,7 @@ const MarkDownWrap: React.FC<{
     }
   }, []);
   const appendHeader = platform ? `## ${platform}\n` : '';
-  console.log(`{data.thinking}`);
+
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
@@ -206,7 +206,7 @@ const MarkDownWrap: React.FC<{
           <div>
             {platform === '个人风格' ? (
               <>
-                <Markdown>{`## 您的风格\n> ${
+                <Markdown>{`## 您的风格\n${
                   data.thinking
                     ? data.thinking
                         .split('\n') // 按换行拆分每一行
