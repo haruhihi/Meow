@@ -28,6 +28,15 @@
         "Create scripts": "创建剧本",
         "Generate code": "生成代码",
         "Create questionnaires": "创建问卷调查",
-        "Bing AI Writing": "必应 AI 写作"
+        "Bing AI Writing": "必应 AI 写作",
+        "Prompt": "请帮我为 ${what social media platform} 写作，主题是 ${what topic}，长度是 ${short/medium/long}，${other requirements}",
+        "Please help me write for": "请帮我写作",
+        "the topic is": "主题是",
+        "the length is": "长度是",
+        "what social media platform": "社交媒体平台",
+        "what topic": "主题",
+        "short/medium/long": "短/中/长",
+        "other requirements": "其他要求",
+        "generating": "正在生成"
     }
   }

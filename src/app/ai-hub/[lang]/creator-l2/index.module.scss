@@ -140,22 +140,11 @@
         min-height: var(--input-height);
         span:after {
           display: none;
+          content: attr(data-placeholder)
         }
         span.empty:after {
           display: block;
           clear: both;
-        }
-        span.inputCustom0:after {
-          content: '什么平台';
-        }
-        span.inputCustom1:after {
-          content: '什么内容';
-        }
-        span.inputCustom2:after {
-          content: '短/中/长';
-        }
-        span.inputCustom3:after {
-          content: '其他要求';
         }
         .inputCustom {
           background-color: rgba(110, 75, 250, 0.09);

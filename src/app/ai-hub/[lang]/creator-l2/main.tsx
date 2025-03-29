@@ -25,8 +25,8 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
   const [fileList, setFileList] = useState<UploadFile[]>();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const typeConfigs = getTypeConfigs(dict);
-
-  const query = `请帮我写${texts[0]}文案，主题是${texts[1]}，写作长度${texts[2]}，${texts[3]}`;
+  const { words } = dict;
+  const query = `${words['Please help me write for']} ${texts[0]}, ${words['the topic is']} ${texts[1]}, ${words['the length is']} ${texts[2]}, ${texts[3]}`;
 
   const pillsProps = {
     platforms,
@@ -65,7 +65,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
   return (
     <div className={styles.wrap}>
       <aside className={styles.sideBarWrap}>
-        <SideBar onClickItem={() => {}} typeConfigs={typeConfigs} dict={dict}/>
+        <SideBar onClickItem={() => {}} typeConfigs={typeConfigs} dict={dict} />
       </aside>
       <div className={styles.mainWrap}>
         <main className={styles.main}>
@@ -85,6 +85,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                       round={round}
                       fileList={fileList}
                       setFileList={setFileList}
+                      dict={dict}
                     ></MarkDownWrap>
                   </div>
                 );
@@ -93,14 +94,23 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
             <div className={styles.inputWrap}>
               {isShowText && (
                 <div>
-                  请帮我写
-                  <PromptInput texts={texts} setTexts={setTexts} order={0} />
-                  文案，主题是
-                  <PromptInput texts={texts} setTexts={setTexts} order={1} />
-                  ，写作长度
-                  <PromptInput texts={texts} setTexts={setTexts} order={2} />
-                  ，
-                  <PromptInput texts={texts} setTexts={setTexts} order={3} />
+                  {dict.words['Please help me write for']}
+                  <PromptInput
+                    texts={texts}
+                    setTexts={setTexts}
+                    order={0}
+                    placeholder={words['what social media platform']}
+                  />
+                  , {dict.words['the topic is']}
+                  <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
+                  {dict.words['the length is']}
+                  <PromptInput
+                    texts={texts}
+                    setTexts={setTexts}
+                    order={2}
+                    placeholder={words['short/medium/long']}
+                  />,{' '}
+                  <PromptInput texts={texts} setTexts={setTexts} order={3} placeholder={words['other requirements']} />
                 </div>
               )}
               <div
@@ -152,9 +162,11 @@ const MarkDownWrap: React.FC<{
   round: IRound;
   fileList?: UploadFile[];
   setFileList: (files: UploadFile[]) => void;
+  dict: IDict;
 }> = (props) => {
   const [data, setData] = useState<IRes>();
   const {
+    dict,
     round,
     round: { thinkPlaceholder, loadImgs, platform },
     fileList,
@@ -227,7 +239,7 @@ const MarkDownWrap: React.FC<{
           </div>
         ) : (
           <div>
-            {thinkPlaceholder ?? '正在生成'}... <Spin indicator={<LoadingOutlined spin />} size="small" />
+            {thinkPlaceholder ?? dict.words['generating']}... <Spin indicator={<LoadingOutlined spin />} size="small" />
           </div>
         )}
       </div>
@@ -259,8 +271,9 @@ const PromptInput: React.FC<{
   texts: string[];
   setTexts: (fun: (texts: string[]) => string[]) => void;
   order: number;
+  placeholder: string;
 }> = (props) => {
-  const { order, setTexts, texts } = props;
+  const { order, setTexts, texts, placeholder } = props;
   return (
     <span
       contentEditable="true"
@@ -272,6 +285,7 @@ const PromptInput: React.FC<{
         });
       }}
       content={texts[order]}
+      data-placeholder={placeholder}
     />
   );
 };
