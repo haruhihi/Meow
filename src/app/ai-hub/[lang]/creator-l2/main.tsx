@@ -38,7 +38,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
           return {
             position: 'left' as const,
             load: () => fetchContent('wording', { query: query, type: platform }),
-            thinkPlaceholder: `正在生成${platform}文案...`,
+            thinkPlaceholder: words['generating content for platform'].replace('${0}', platform),
             platform,
           };
         }),
@@ -49,9 +49,9 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
         ...rounds,
         {
           position: 'left' as const,
-          load: () => fetchContent('wording', { query: query, type: '生成个人风格' }),
-          thinkPlaceholder: `正在生成符合您风格的文案...`,
-          platform: '个人风格',
+          load: () => fetchContent('wording', { query: query, type: dict.words['Personal style'] }),
+          thinkPlaceholder: dict.words['Generating in your style'],
+          platform: dict.words['Personal style'],
         },
       ]);
     },
@@ -93,7 +93,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
             </div>
             <div className={styles.inputWrap}>
               {isShowText && (
-                <div>
+                <div className={styles.inputContainer}>
                   {dict.words['Please help me write for']}
                   <PromptInput
                     texts={texts}
@@ -182,13 +182,12 @@ const MarkDownWrap: React.FC<{
         })
         .catch((err) => {
           console.log(err);
-          message.error('内容生成数据失败');
+          message.error(dict.words['Generation failed']);
         });
     }
     if (loadImgs) {
       loadImgs()
         .then((res) => {
-          console.log('图片生成', res);
           setFileList(
             (res.imgs ?? []).map((url, index) => {
               const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
@@ -207,35 +206,27 @@ const MarkDownWrap: React.FC<{
         })
         .catch((err) => {
           console.log(err);
-          message.error('图片生成失败');
+          message.error(dict.words['Generation failed']);
         });
     }
   }, []);
-  const appendHeader = platform ? `## ${platform}\n` : '';
+  const appendHeader = platform ? `## ${platform}` : '';
+  const thinking = data?.thinking
+    ? data.thinking
+        .split('\n') // 按换行拆分每一行
+        .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
+        .join('\n')
+    : '';
 
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
-            {platform === '个人风格' ? (
-              <>
-                <Markdown>{`## 您的风格\n${
-                  data.thinking
-                    ? data.thinking
-                        .split('\n') // 按换行拆分每一行
-                        .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
-                        .join('\n')
-                    : '思考中...'
-                }\n${data.wording}`}</Markdown>
-                <PictureWall fileList={fileList} setFileList={setFileList} />
-              </>
-            ) : (
-              <>
-                <Markdown>{`${appendHeader}${data.wording}`}</Markdown>
-                <PictureWall fileList={fileList} setFileList={setFileList} />
-              </>
-            )}
+            <Markdown>{appendHeader}</Markdown>
+            {thinking && <StreamingMarkDown>{thinking}</StreamingMarkDown>}
+            <Markdown>{data.wording}</Markdown>
+            <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
           </div>
         ) : (
           <div>
@@ -249,16 +240,18 @@ const MarkDownWrap: React.FC<{
             onSubmit={() => props.onMultiPlatSubmit()}
             platforms={props.platforms}
             onPlatformChange={props.onPlatformsChange}
+            dict={dict}
           />
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small" onClick={props.onMyStyle}>
-            生成我的风格
+            {dict.words['Personal style']}
           </Button>
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
-            生成名人风格
+            {dict.words['Generate in a celebrity style']}
           </Button>
-          {platform && platform !== '个人风格' && (
+          {platform && platform !== 
+          dict.words["Personal style"] && (
             <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
-              一键发布到{platform}
+              Share to {platform}
             </Button>
           )}
         </div>

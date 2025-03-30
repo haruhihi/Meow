@@ -11,4 +11,5 @@ export interface IDict {
   words: {
     [key: string]: string;
   };
+  platforms: Array<{ value: string; label: string }>;
 }

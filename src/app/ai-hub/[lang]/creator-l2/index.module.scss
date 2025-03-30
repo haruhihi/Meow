@@ -138,6 +138,9 @@
         border: 1.5px solid #b6adff;
         position: relative;
         min-height: var(--input-height);
+        .inputContainer {
+          padding-right: 23px;
+        }
         span:after {
           display: none;
           content: attr(data-placeholder)

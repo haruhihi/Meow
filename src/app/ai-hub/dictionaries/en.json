@@ -36,6 +36,44 @@
     "what topic": "what topic",
     "short/medium/long": "short/medium/long",
     "other requirements": "other requirements",
-    "generating": "Generating"
-  }
+    "generating": "Generating",
+    "generating content for platform": "Generating content for ${0}...",
+    "Generate for other platforms": "Generate for other platforms",
+    "Generating in your style": "Generating in your style...",
+    "Personal style": "Personal style",
+    "Generate in a celebrity style": "Generate in a celebrity style",
+    "Done": "Done",
+    "Generation failed": "Generation failed",
+    "Generating image": "Generating image"
+  },
+  "platforms": [
+    {
+      "label": "TikTok",
+      "value": "TikTok"
+    },
+    {
+      "label": "Instagram",
+      "value": "Instagram"
+    },
+    {
+      "label": "Facebook",
+      "value": "Facebook"
+    },
+    {
+      "label": "X",
+      "value": "Twitter"
+    },
+    {
+      "label": "LinkedIn",
+      "value": "LinkedIn"
+    },
+    {
+      "label": "Snapchat",
+      "value": "Snapchat"
+    },
+    {
+      "label": "Pinterest",
+      "value": "Pinterest"
+    }
+  ]
 }
