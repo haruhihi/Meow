@@ -1,0 +1,79 @@
+{
+  "words": {
+    "Article": "Article",
+    "Essay": "Essay",
+    "Email": "Email",
+    "Poem": "Poem",
+    "Market report": "Market report",
+    "Weekly report": "Weekly report",
+    "Proposal": "Proposal",
+    "Resume": "Resume",
+    "Social post": "Social post",
+    "Story": "Story",
+    "Novel": "Novel",
+    "Script": "Script",
+    "Code": "Code",
+    "Questionnaire": "Questionnaire",
+    "Write articles": "Write articles",
+    "Compose essays": "Compose essays",
+    "Draft emails": "Draft emails",
+    "Write poems": "Write poems",
+    "Generate market reports": "Generate market reports",
+    "Create weekly reports": "Create weekly reports",
+    "Write proposals": "Write proposals",
+    "Build resumes": "Build resumes",
+    "Create social posts": "Create social posts",
+    "Compose stories": "Compose stories",
+    "Write novels": "Write novels",
+    "Create scripts": "Create scripts",
+    "Generate code": "Generate code",
+    "Create questionnaires": "Create questionnaires",
+    "Bing AI Writing": "Bing AI Writing",
+    "Please help me write for": "Please help me write for",
+    "the topic is": "the topic is",
+    "the length is": "the length is",
+    "what social media platform": "what social media platform",
+    "what topic": "what topic",
+    "short/medium/long": "short/medium/long",
+    "other requirements": "other requirements",
+    "generating": "Generating",
+    "generating content for platform": "Generating content for ${0}...",
+    "Generate for other platforms": "Generate for other platforms",
+    "Generating in your style": "Generating in your style...",
+    "Personal style": "Personal style",
+    "Generate in a celebrity style": "Generate in a celebrity style",
+    "Done": "Done",
+    "Generation failed": "Generation failed",
+    "Generating image": "Generating image"
+  },
+  "platforms": [
+    {
+      "label": "TikTok",
+      "value": "TikTok"
+    },
+    {
+      "label": "Instagram",
+      "value": "Instagram"
+    },
+    {
+      "label": "Facebook",
+      "value": "Facebook"
+    },
+    {
+      "label": "X",
+      "value": "Twitter"
+    },
+    {
+      "label": "LinkedIn",
+      "value": "LinkedIn"
+    },
+    {
+      "label": "Snapchat",
+      "value": "Snapchat"
+    },
+    {
+      "label": "Pinterest",
+      "value": "Pinterest"
+    }
+  ]
+}

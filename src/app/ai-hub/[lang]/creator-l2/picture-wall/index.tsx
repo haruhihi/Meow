@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PlusOutlined } from '@ant-design/icons';
 import { Image, Spin, Upload } from 'antd';
 import type { GetProp, UploadFile, UploadProps } from 'antd';
+import { IDict } from '../dictionaries';
 
 type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
 
@@ -13,9 +14,10 @@ const getBase64 = (file: FileType): Promise<string> =>
     reader.onerror = (error) => reject(error);
   });
 
-const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: UploadFile[]) => void }> = ({
+const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: UploadFile[]) => void; dict: IDict }> = ({
   fileList,
   setFileList,
+  dict,
 }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState('');
@@ -40,7 +42,7 @@ const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: Uplo
   if (fileList === undefined) {
     return (
       <div>
-        <Spin tip="正在生成图片..." /> 生成图片中...
+        <Spin tip="正在生成图片..." /> {dict.words['Generating image']}...
       </div>
     );
   }
