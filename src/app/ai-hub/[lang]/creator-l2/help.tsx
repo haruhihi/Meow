@@ -6,7 +6,7 @@ export interface IRound {
   content?: string;
   thinkPlaceholder?: string;
   load?: () => Promise<IRes>;
-  loadImgs?: () => Promise<IRes>;
+  query: string;
   platform?: string;
 }
 
@@ -14,6 +14,7 @@ export interface IRes {
   wording: string;
   imgs: string[];
   thinking?: string;
+  imgPrompt?: string;
 }
 
 export const StreamingMarkDown: React.FC<{ children: string }> = (props) => {

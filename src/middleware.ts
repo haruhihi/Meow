@@ -7,7 +7,7 @@ export default async function middleware(req: NextRequest) {
   // Redirect Locale
   if (path.startsWith(`/ai-hub`)) {
     // Use regx get the subPath after /ai-hub/xxx
-    const subPath = path.replace(/^\/ai-hub/, '');
+    const subPath = path.replace(/^\/ai-hub\//, '');
     const locales = ['en', 'zh'];
     const pathnameHasLocale = locales.some((locale) => path.startsWith(`/ai-hub/${locale}`));
     if (!pathnameHasLocale) {

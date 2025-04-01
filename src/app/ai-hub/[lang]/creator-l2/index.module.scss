@@ -139,11 +139,35 @@
         position: relative;
         min-height: var(--input-height);
         .inputContainer {
-          padding-right: 23px;
+          margin-right: 23px;
+          position: relative;
+          display: flex;
+          width: 100%;
+          align-items: center;
+          outline: none;
+          .templateInputWrapper {
+            padding-right: 32px;
+            flex: 1;
+            outline: none;
+          }
+          .clearButton {
+            position: absolute;
+            right: 0;
+            opacity: 0.6;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            &:hover {
+              opacity: 1;
+              cursor: pointer;
+            }
+          }
         }
         span:after {
           display: none;
-          content: attr(data-placeholder)
+          content: attr(data-placeholder);
         }
         span.empty:after {
           display: block;
@@ -155,9 +179,8 @@
           color: #6e4bfa;
           line-height: 28px;
           max-width: calc(100% - 27px);
-          padding: 0 2px;
+          padding: 0 4px;
           display: inline-block;
-          margin: 0 3px;
           &:focus {
             outline: 0;
           }

@@ -42,7 +42,7 @@ const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: Uplo
   if (fileList === undefined) {
     return (
       <div>
-        <Spin tip="正在生成图片..." /> {dict.words['Generating image']}...
+        <Spin tip={`${dict.words['Generating image']}...`} /> {dict.words['Generating image']}...
       </div>
     );
   }
