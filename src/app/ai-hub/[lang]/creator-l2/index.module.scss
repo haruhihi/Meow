@@ -38,7 +38,7 @@
     .chat {
       position: relative;
       margin: 0 auto;
-      width: 702px;
+      width: 800px;
       height: 100%;
       border: 1px solid #e5e5e5;
       display: flex;
@@ -66,13 +66,13 @@
           margin: 0;
         }
         :global(.ant-upload-list-item-container) {
-          width: 210px !important;
-          height: 210px !important;
+          width: 180px !important;
+          height: 180px !important;
         }
 
         :global(.ant-upload) {
-          width: 210px;
-          height: 210px;
+          width: 90px;
+          height: 180px;
         }
       }
 
@@ -103,7 +103,8 @@
           height: 105px;
           padding: calc(15px - 0.5px);
           padding-right: 0;
-          width: 160px;
+          width: calc(25% - 5px);
+
           &:hover {
             background-color: rgba(0, 0, 0, 0.03);
           }
