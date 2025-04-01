@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import styles from './index.module.scss';
 import { SideBar } from './side-bar';
-import { Button, message, Spin } from 'antd';
-import { ArrowUpOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Button, message, Spin, Tooltip } from 'antd';
+import { ArrowUpOutlined, LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import Markdown from 'react-markdown';
 import type { UploadFile } from 'antd';
 import classNames from 'classnames';
@@ -18,12 +18,13 @@ import { IDict } from './dictionaries';
 const isDev = isUrlEnable('dev');
 
 export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
-  const [isShowItems, setIsShowItems] = useState(false);
+  // const [isShowItems, setIsShowItems] = useState(false);
   const [rounds, setRounds] = useState<IRound[]>([]);
-  const [isShowText, setIsShowText] = useState(isDev ? true : false);
+  const [isShowTemplatePrompt, setIsShowTemplatePrompt] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
   const [fileList, setFileList] = useState<UploadFile[]>();
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [plainTextPrompt, setPlainTextPrompt] = useState<string>();
   const typeConfigs = getTypeConfigs(dict);
   const { words } = dict;
   const query = `${words['Please help me write for']} ${texts[0]}, ${words['the topic is']} ${texts[1]}, ${words['the length is']} ${texts[2]}, ${texts[3]}`;
@@ -36,6 +37,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
         ...rounds,
         ...platforms.map((platform) => {
           return {
+            query,
             position: 'left' as const,
             load: () => fetchContent('wording', { query: query, type: platform }),
             thinkPlaceholder: words['generating content for platform'].replace('${0}', platform),
@@ -48,6 +50,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
       setRounds([
         ...rounds,
         {
+          query,
           position: 'left' as const,
           load: () => fetchContent('wording', { query: query, type: dict.words['Personal style'] }),
           thinkPlaceholder: dict.words['Generating in your style'],
@@ -57,10 +60,9 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
     },
   };
 
-  useEffect(() => {
-    if (isDev) return;
-    setIsShowItems(true);
-  }, []);
+  const isEmptyPlainTextPrompt = plainTextPrompt === undefined || plainTextPrompt === '' || plainTextPrompt === '\n';
+
+  const isShowSelection = isEmptyPlainTextPrompt && !isShowTemplatePrompt;
 
   return (
     <div className={styles.wrap}>
@@ -75,7 +77,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                 if (round.position === 'right')
                   return (
                     <div key={index} className={styles.bubble}>
-                      {query}
+                      {round.query}
                     </div>
                   );
                 return (
@@ -91,65 +93,94 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                 );
               })}
             </div>
+
             <div className={styles.inputWrap}>
-              {isShowText && (
+              {isShowTemplatePrompt ? (
                 <div className={styles.inputContainer}>
-                  <div className={styles.templateInputWrapper}>
-                    {/* <div className={styles.templateInputWrapper} contentEditable> */}
-                    {dict.words['Please help me write for']}
-                    <PromptInput
-                      texts={texts}
-                      setTexts={setTexts}
-                      order={0}
-                      placeholder={words['what social media platform']}
-                    />
-                    , {dict.words['the topic is']}
-                    <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
-                    {dict.words['the length is']}
-                    <PromptInput texts={texts} setTexts={setTexts} order={2} placeholder={words['short/medium/long']} />
-                    ,{' '}
-                    <PromptInput
-                      texts={texts}
-                      setTexts={setTexts}
-                      order={3}
-                      placeholder={words['other requirements']}
-                    />
-                    .
-                  </div>
-                  {/* <Button
-                    className={styles.clearButton}
-                    type="text"
-                    size="small"
-                    onClick={() => setTexts(['', '', '', ''])}
-                    icon={<span>✕</span>}
-                    title={dict.words['Clear'] || 'Clear'}
-                  /> */}
+                  <>
+                    <div className={styles.templateInputWrapper}>
+                      {dict.words['Please help me write for']}{' '}
+                      <PromptInput
+                        texts={texts}
+                        setTexts={setTexts}
+                        order={0}
+                        placeholder={words['what social media platform']}
+                      />
+                      , {dict.words['the topic is']}{' '}
+                      <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
+                      {dict.words['the length is']}{' '}
+                      <PromptInput
+                        texts={texts}
+                        setTexts={setTexts}
+                        order={2}
+                        placeholder={words['short/medium/long']}
+                      />
+                      ,{' '}
+                      <PromptInput
+                        texts={texts}
+                        setTexts={setTexts}
+                        order={3}
+                        placeholder={words['other requirements']}
+                      />
+                      .
+                    </div>
+                    <Tooltip title="Clean prompt" color={'purple'}>
+                      <div
+                        className={styles.clearButton}
+                        onClick={() => {
+                          setPlainTextPrompt('');
+                          setIsShowTemplatePrompt(false);
+                        }}
+                      >
+                        <CloseCircleOutlined />
+                      </div>
+                    </Tooltip>
+                  </>
                 </div>
+              ) : (
+                <span
+                  className={styles.inputContainer}
+                  contentEditable
+                  content={plainTextPrompt}
+                  onInput={(ev) => setPlainTextPrompt((ev.target as HTMLDivElement).innerText)}
+                />
               )}
+
               <div
                 className={styles.send}
                 onClick={() => {
-                  setIsShowText(false);
-                  setRounds([
-                    ...rounds,
-                    { position: 'right', content: query },
-                    {
-                      position: 'left',
-                      load: () => fetchContent('wording', { query: query }),
-                      loadImgs: () => fetchContent('img', { query: query }),
-                    },
-                  ]);
+                  if (isShowTemplatePrompt) {
+                    setRounds([
+                      ...rounds,
+                      { query, position: 'right', content: query },
+                      {
+                        query,
+                        position: 'left',
+                        load: () => fetchContent('wording', { query: query, type: texts[0] }),
+                      },
+                    ]);
+                    return;
+                  }
+
+                  if (!isEmptyPlainTextPrompt) {
+                    setRounds([
+                      ...rounds,
+                      { query: plainTextPrompt, position: 'right', content: plainTextPrompt },
+                      { query, position: 'left', load: () => fetchContent('wording', { query: plainTextPrompt }) },
+                    ]);
+                  }
                 }}
               >
                 <ArrowUpOutlined />
               </div>
             </div>
+
             <div
               className={styles.items}
-              style={{ opacity: isShowItems ? 1 : 0, pointerEvents: isShowItems ? 'auto' : 'none' }}
+              style={{ opacity: isShowSelection ? 1 : 0, pointerEvents: isShowSelection ? 'auto' : 'none' }}
               onClick={() => {
-                setIsShowItems(false);
-                setIsShowText(true);
+                setPlainTextPrompt('');
+                setIsShowTemplatePrompt(true);
               }}
             >
               {typeConfigs.map((item) => (
@@ -178,12 +209,13 @@ const MarkDownWrap: React.FC<{
   dict: IDict;
 }> = (props) => {
   const [data, setData] = useState<IRes>();
+  const [imgs, setImgs] = useState<UploadFile<any>[]>();
   const {
     dict,
     round,
-    round: { thinkPlaceholder, loadImgs, platform },
+    round: { thinkPlaceholder, platform },
     fileList,
-    setFileList,
+    // setFileList,
   } = props;
 
   useEffect(() => {
@@ -198,31 +230,38 @@ const MarkDownWrap: React.FC<{
           message.error(dict.words['Generation failed']);
         });
     }
-    if (loadImgs) {
-      loadImgs()
-        .then((res) => {
-          setFileList(
-            (res.imgs ?? []).map((url, index) => {
-              const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
-              const decompressedData = pako.inflate(compressedData);
-              const blob = new Blob([decompressedData], { type: 'image/jpeg' });
-              const imageUrl = URL.createObjectURL(blob);
-
-              return {
-                uid: `${index}.jpg`,
-                name: `${index}.jpg`,
-                status: 'done',
-                url: imageUrl,
-              };
-            })
-          );
-        })
-        .catch((err) => {
-          console.log(err);
-          message.error(dict.words['Generation failed']);
-        });
-    }
   }, []);
+  useEffect(() => {
+    if (data === undefined) return;
+    if (!data?.imgPrompt) {
+      setImgs([...(fileList ?? [])]);
+      return;
+    }
+    console.log('start fetch img');
+    fetchContent('img', { query: data.imgPrompt })
+      .then((res) => {
+        setImgs(
+          (res.imgs ?? []).map((url, index) => {
+            const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
+            const decompressedData = pako.inflate(compressedData);
+            const blob = new Blob([decompressedData], { type: 'image/jpeg' });
+            const imageUrl = URL.createObjectURL(blob);
+
+            return {
+              uid: `${index}.jpg`,
+              name: `${index}.jpg`,
+              status: 'done',
+              url: imageUrl,
+            };
+          })
+        );
+      })
+      .catch((err) => {
+        console.log(err);
+        message.error(dict.words['Generation failed']);
+      });
+  }, [data]);
+
   const appendHeader = platform ? `## ${platform}` : '';
   const thinking = data?.thinking
     ? data.thinking
@@ -230,16 +269,20 @@ const MarkDownWrap: React.FC<{
         .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
         .join('\n')
     : '';
-
+  console.log('imgs', typeof imgs, imgs);
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
             <Markdown>{appendHeader}</Markdown>
-            {thinking && <StreamingMarkDown>{thinking}</StreamingMarkDown>}
-            <Markdown>{data.wording}</Markdown>
-            <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
+            {thinking ? (
+              <StreamingMarkDown>{thinking + '\n' + data.wording}</StreamingMarkDown>
+            ) : (
+              <Markdown>{data.wording}</Markdown>
+            )}
+
+            <PictureWall fileList={imgs} setFileList={setImgs} dict={dict} />
           </div>
         ) : (
           <div>
@@ -279,6 +322,7 @@ const PromptInput: React.FC<{
   placeholder: string;
 }> = (props) => {
   const { order, setTexts, texts, placeholder } = props;
+  console.log('texts[order]', texts[order]);
   return (
     <span
       contentEditable="true"
@@ -305,5 +349,5 @@ const fetchContent = (type: 'wording' | 'img', params: { query?: string; type?: 
       body: JSON.stringify(params),
     })
     .then((res) => res.json())
-    .then((res) => res.result);
+    .then((res) => res.result as IRes);
 };
