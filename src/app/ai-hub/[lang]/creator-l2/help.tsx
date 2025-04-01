@@ -9,6 +9,7 @@ export interface IRound {
   query: string;
   platform?: string;
   showButtons?: boolean;
+  shouldFetchImage?: boolean;
 }
 
 export interface IRes {

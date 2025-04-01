@@ -22,7 +22,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
   const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowTemplatePrompt, setIsShowTemplatePrompt] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
-  const [fileList, setFileList] = useState<UploadFile[]>();
+  const [fileList, setFileList] = useState<UploadFile[] | null>();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [plainTextPrompt, setPlainTextPrompt] = useState<string>();
   const typeConfigs = getTypeConfigs(dict);
@@ -156,6 +156,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                       {
                         query,
                         position: 'left',
+                        shouldFetchImage: true,
                         load: () => fetchContent('wording', { query: query, type: texts[0] }),
                       },
                     ]);
@@ -209,18 +210,17 @@ const MarkDownWrap: React.FC<{
   platforms: string[];
   onPlatformsChange: (value: string[]) => void;
   round: IRound;
-  fileList?: UploadFile[];
-  setFileList: (files: UploadFile[]) => void;
+  fileList?: UploadFile[] | null;
+  setFileList: (files: UploadFile[] | null) => void;
   dict: IDict;
 }> = (props) => {
   const [data, setData] = useState<IRes>();
-  const [imgs, setImgs] = useState<UploadFile<any>[] | null>();
   const {
     dict,
     round,
-    round: { thinkPlaceholder, platform, showButtons = true },
+    round: { thinkPlaceholder, platform, showButtons = true, shouldFetchImage = false },
     fileList,
-    // setFileList,
+    setFileList,
   } = props;
 
   useEffect(() => {
@@ -236,17 +236,17 @@ const MarkDownWrap: React.FC<{
         });
     }
   }, []);
+
   useEffect(() => {
     if (data === undefined) return;
-    if (!data?.imgPrompt) {
-      setImgs(null);
-      //setImgs([...(fileList ?? [])]);
+    if (!data?.imgPrompt || !shouldFetchImage) {
+      // setFileList(null);
       return;
     }
     // console.log('start fetch img');
     fetchContent('img', { query: data.imgPrompt })
       .then((res) => {
-        setImgs(
+        setFileList(
           (res.imgs ?? []).map((url, index) => {
             const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
             const decompressedData = pako.inflate(compressedData);
@@ -275,20 +275,26 @@ const MarkDownWrap: React.FC<{
         .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
         .join('\n')
     : '';
-  console.log('imgs', typeof imgs, imgs);
+  const isPicAbove = platform?.toLowerCase() === 'facebook'.toLowerCase();
+
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
             <Markdown>{appendHeader}</Markdown>
+            {isPicAbove && fileList !== null && (
+              <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
+            )}
             {thinking ? (
               <StreamingMarkDown>{thinking + '\n' + data.wording}</StreamingMarkDown>
             ) : (
               <Markdown>{data.wording}</Markdown>
             )}
 
-            {imgs !== null && <PictureWall fileList={imgs} setFileList={setImgs} dict={dict} />}
+            {!isPicAbove && fileList !== null && (
+              <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
+            )}
           </div>
         ) : (
           <div>

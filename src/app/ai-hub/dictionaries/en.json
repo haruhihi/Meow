@@ -48,16 +48,12 @@
   },
   "platforms": [
     {
-      "label": "TikTok",
-      "value": "TikTok"
+      "label": "Facebook",
+      "value": "Facebook"
     },
     {
       "label": "Instagram",
       "value": "Instagram"
-    },
-    {
-      "label": "Facebook",
-      "value": "Facebook"
     },
     {
       "label": "X",
