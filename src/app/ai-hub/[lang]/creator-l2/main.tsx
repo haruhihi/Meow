@@ -94,23 +94,36 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
             <div className={styles.inputWrap}>
               {isShowText && (
                 <div className={styles.inputContainer}>
-                  {dict.words['Please help me write for']}
-                  <PromptInput
-                    texts={texts}
-                    setTexts={setTexts}
-                    order={0}
-                    placeholder={words['what social media platform']}
-                  />
-                  , {dict.words['the topic is']}
-                  <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
-                  {dict.words['the length is']}
-                  <PromptInput
-                    texts={texts}
-                    setTexts={setTexts}
-                    order={2}
-                    placeholder={words['short/medium/long']}
-                  />,{' '}
-                  <PromptInput texts={texts} setTexts={setTexts} order={3} placeholder={words['other requirements']} />
+                  <div className={styles.templateInputWrapper}>
+                    {/* <div className={styles.templateInputWrapper} contentEditable> */}
+                    {dict.words['Please help me write for']}
+                    <PromptInput
+                      texts={texts}
+                      setTexts={setTexts}
+                      order={0}
+                      placeholder={words['what social media platform']}
+                    />
+                    , {dict.words['the topic is']}
+                    <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
+                    {dict.words['the length is']}
+                    <PromptInput texts={texts} setTexts={setTexts} order={2} placeholder={words['short/medium/long']} />
+                    ,{' '}
+                    <PromptInput
+                      texts={texts}
+                      setTexts={setTexts}
+                      order={3}
+                      placeholder={words['other requirements']}
+                    />
+                    .
+                  </div>
+                  {/* <Button
+                    className={styles.clearButton}
+                    type="text"
+                    size="small"
+                    onClick={() => setTexts(['', '', '', ''])}
+                    icon={<span>✕</span>}
+                    title={dict.words['Clear'] || 'Clear'}
+                  /> */}
                 </div>
               )}
               <div
@@ -248,8 +261,7 @@ const MarkDownWrap: React.FC<{
           <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
             {dict.words['Generate in a celebrity style']}
           </Button>
-          {platform && platform !== 
-          dict.words["Personal style"] && (
+          {platform && platform !== dict.words['Personal style'] && (
             <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
               Share to {platform}
             </Button>

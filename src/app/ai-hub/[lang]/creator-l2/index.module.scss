@@ -139,11 +139,19 @@
         position: relative;
         min-height: var(--input-height);
         .inputContainer {
-          padding-right: 23px;
+          margin-right: 23px;
+          position: relative;
+          display: flex;
+          width: 100%;
+          align-items: center;
+          .templateInputWrapper {
+            flex: 1;
+            outline: none;
+          }
         }
         span:after {
           display: none;
-          content: attr(data-placeholder)
+          content: attr(data-placeholder);
         }
         span.empty:after {
           display: block;
