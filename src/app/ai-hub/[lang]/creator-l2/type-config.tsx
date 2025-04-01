@@ -35,6 +35,12 @@ export const getTypeConfigs = (dict: IDict) => {
       desc: dict.words['Draft emails'],
     },
     {
+      key: 'Social post',
+      label: dict.words['Social post'],
+      icon: <SocialPost width="16px" height="16px" />,
+      desc: dict.words['Create social posts'],
+    },
+    {
       key: 'Poem',
       label: dict.words['Poem'],
       icon: <Poem width="16px" height="16px" />,
@@ -63,12 +69,6 @@ export const getTypeConfigs = (dict: IDict) => {
       label: dict.words['Resume'],
       icon: <Resume width="16px" height="16px" />,
       desc: dict.words['Build resumes'],
-    },
-    {
-      key: 'Social post',
-      label: dict.words['Social post'],
-      icon: <SocialPost width="16px" height="16px" />,
-      desc: dict.words['Create social posts'],
     },
     {
       key: 'Story',

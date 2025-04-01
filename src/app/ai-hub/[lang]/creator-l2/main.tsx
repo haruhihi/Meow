@@ -22,12 +22,12 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
   const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowTemplatePrompt, setIsShowTemplatePrompt] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
-  const [fileList, setFileList] = useState<UploadFile[]>();
+  const [fileList, setFileList] = useState<UploadFile[] | null>();
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [plainTextPrompt, setPlainTextPrompt] = useState<string>();
   const typeConfigs = getTypeConfigs(dict);
   const { words } = dict;
-  const query = `${words['Please help me write for']} ${texts[0]}, ${words['the topic is']} ${texts[1]}, ${words['the length is']} ${texts[2]}, ${texts[3]}`;
+  const query = `${words['Please help me write a post for']} ${texts[0]}, ${words['the topic is']} ${texts[1]}, ${words['the length is']} ${texts[2]}, ${texts[3]}`;
 
   const pillsProps = {
     platforms,
@@ -99,7 +99,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                 <div className={styles.inputContainer}>
                   <>
                     <div className={styles.templateInputWrapper}>
-                      {dict.words['Please help me write for']}{' '}
+                      {dict.words['Please help me write a post for']}{' '}
                       <PromptInput
                         texts={texts}
                         setTexts={setTexts}
@@ -124,17 +124,17 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                       />
                       .
                     </div>
-                    <Tooltip title="Clean prompt" color={'purple'}>
-                      <div
-                        className={styles.clearButton}
-                        onClick={() => {
-                          setPlainTextPrompt('');
-                          setIsShowTemplatePrompt(false);
-                        }}
-                      >
+                    <div
+                      className={styles.clearButton}
+                      onClick={() => {
+                        setPlainTextPrompt('');
+                        setIsShowTemplatePrompt(false);
+                      }}
+                    >
+                      <Tooltip title="Clean prompt" color={'purple'}>
                         <CloseCircleOutlined />
-                      </div>
-                    </Tooltip>
+                      </Tooltip>
+                    </div>
                   </>
                 </div>
               ) : (
@@ -156,6 +156,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                       {
                         query,
                         position: 'left',
+                        shouldFetchImage: true,
                         load: () => fetchContent('wording', { query: query, type: texts[0] }),
                       },
                     ]);
@@ -166,7 +167,12 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                     setRounds([
                       ...rounds,
                       { query: plainTextPrompt, position: 'right', content: plainTextPrompt },
-                      { query, position: 'left', load: () => fetchContent('wording', { query: plainTextPrompt }) },
+                      {
+                        query,
+                        position: 'left',
+                        load: () => fetchContent('wording', { query: plainTextPrompt }),
+                        showButtons: false,
+                      },
                     ]);
                   }
                 }}
@@ -204,18 +210,17 @@ const MarkDownWrap: React.FC<{
   platforms: string[];
   onPlatformsChange: (value: string[]) => void;
   round: IRound;
-  fileList?: UploadFile[];
-  setFileList: (files: UploadFile[]) => void;
+  fileList?: UploadFile[] | null;
+  setFileList: (files: UploadFile[] | null) => void;
   dict: IDict;
 }> = (props) => {
   const [data, setData] = useState<IRes>();
-  const [imgs, setImgs] = useState<UploadFile<any>[]>();
   const {
     dict,
     round,
-    round: { thinkPlaceholder, platform },
+    round: { thinkPlaceholder, platform, showButtons = true, shouldFetchImage = false },
     fileList,
-    // setFileList,
+    setFileList,
   } = props;
 
   useEffect(() => {
@@ -231,16 +236,17 @@ const MarkDownWrap: React.FC<{
         });
     }
   }, []);
+
   useEffect(() => {
     if (data === undefined) return;
-    if (!data?.imgPrompt) {
-      setImgs([...(fileList ?? [])]);
+    if (!data?.imgPrompt || !shouldFetchImage) {
+      // setFileList(null);
       return;
     }
-    console.log('start fetch img');
+    // console.log('start fetch img');
     fetchContent('img', { query: data.imgPrompt })
       .then((res) => {
-        setImgs(
+        setFileList(
           (res.imgs ?? []).map((url, index) => {
             const compressedData = Uint8Array.from(atob(url), (c) => c.charCodeAt(0));
             const decompressedData = pako.inflate(compressedData);
@@ -262,27 +268,33 @@ const MarkDownWrap: React.FC<{
       });
   }, [data]);
 
-  const appendHeader = platform ? `## ${platform}` : '';
+  const appendHeader = platform ? `## ${platform}\n` : '';
   const thinking = data?.thinking
     ? data.thinking
         .split('\n') // 按换行拆分每一行
         .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
         .join('\n')
     : '';
-  console.log('imgs', typeof imgs, imgs);
+  const isPicAbove = platform?.toLowerCase() === 'facebook'.toLowerCase();
+
   return (
     <>
       <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
         {data ? (
           <div>
             <Markdown>{appendHeader}</Markdown>
+            {isPicAbove && fileList !== null && (
+              <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
+            )}
             {thinking ? (
               <StreamingMarkDown>{thinking + '\n' + data.wording}</StreamingMarkDown>
             ) : (
               <Markdown>{data.wording}</Markdown>
             )}
 
-            <PictureWall fileList={imgs} setFileList={setImgs} dict={dict} />
+            {!isPicAbove && fileList !== null && (
+              <PictureWall fileList={fileList} setFileList={setFileList} dict={dict} />
+            )}
           </div>
         ) : (
           <div>
@@ -290,7 +302,7 @@ const MarkDownWrap: React.FC<{
           </div>
         )}
       </div>
-      {data && (
+      {showButtons && data && (
         <div>
           <MultiPlatformButton
             onSubmit={() => props.onMultiPlatSubmit()}
@@ -298,14 +310,21 @@ const MarkDownWrap: React.FC<{
             onPlatformChange={props.onPlatformsChange}
             dict={dict}
           />
-          <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small" onClick={props.onMyStyle}>
+
+          <Button
+            color="primary"
+            variant="outlined"
+            style={{ marginRight: 8, borderRadius: 12 }}
+            size="small"
+            onClick={props.onMyStyle}
+          >
             {dict.words['Personal style']}
           </Button>
-          <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
+          {/* <Button color="primary" variant="outlined" style={{ marginRight: 8, borderRadius: 12 }} size="small">
             {dict.words['Generate in a celebrity style']}
-          </Button>
+          </Button> */}
           {platform && platform !== dict.words['Personal style'] && (
-            <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
+            <Button color="primary" variant="outlined" style={{ marginRight: 8, borderRadius: 12 }} size="small">
               Share to {platform}
             </Button>
           )}

@@ -8,6 +8,8 @@ export interface IRound {
   load?: () => Promise<IRes>;
   query: string;
   platform?: string;
+  showButtons?: boolean;
+  shouldFetchImage?: boolean;
 }
 
 export interface IRes {
@@ -22,18 +24,18 @@ export const StreamingMarkDown: React.FC<{ children: string }> = (props) => {
 
   useEffect(() => {
     setStream('');
-    console.log('clean stream', props.children);
     const words = props.children.split(' '); // Split the text into words
     let currentIndex = 0; // Local variable to track the current word index
 
     const interval = setInterval(() => {
-      if (currentIndex >= words.length) {
+      if (currentIndex >= words.length - 1) {
         clearInterval(interval);
         return;
       }
+
       setStream((prevStream) => (prevStream ? `${prevStream} ${words[currentIndex]}` : words[currentIndex]));
       currentIndex++;
-    }, 100); // Adjust the interval time as needed
+    }, 60); // Adjust the interval time as needed
 
     return () => clearInterval(interval);
   }, [props.children]);

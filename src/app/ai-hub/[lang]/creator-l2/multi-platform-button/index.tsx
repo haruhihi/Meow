@@ -29,7 +29,7 @@ export const MultiPlatformButton: React.FC<{
       title={null}
       trigger="click"
     >
-      <Button color="primary" variant="outlined" style={{ marginRight: 4 }} size="small">
+      <Button color="primary" variant="outlined" style={{ marginRight: 8, borderRadius: 12 }} size="small">
         {dict.words['Generate for other platforms']}
       </Button>
     </Popover>
