@@ -31,14 +31,15 @@
     "Bing AI Writing": "必应 AI 写作",
     "Prompt": "请帮我为 ${what social media platform} 写作，主题是 ${what topic}，长度是 ${short/medium/long}，${other requirements}",
     "Please help me write for": "请帮我写作",
-    "the topic is": "主题是",
-    "the length is": "长度是",
+    "the topic is": "文案, 主题是",
+    "the length is": ", 长度是",
     "what social media platform": "社交媒体平台",
     "what topic": "主题",
     "short/medium/long": "短/中/长",
-    "other requirements": "其他要求",
+    "other requirements": "更多要求（例如帮我配图)",
     "generating": "正在生成",
-    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务"
+    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务",
+    "Please help me write a post for": "帮我写一篇"
   },
   "platforms": []
 }

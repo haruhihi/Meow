@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './index.module.scss';
 import { SideBar } from './side-bar';
 import { Button, message, Spin, Tooltip } from 'antd';
@@ -114,7 +114,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
               {isShowTemplatePrompt ? (
                 <div className={styles.inputContainer}>
                   <>
-                    <div className={styles.templateInputWrapper}>
+                    <div className={creatorType == 'coding' ? styles.codingInputWrapper : styles.templateInputWrapper}>
                     {templateMap[creatorType].map((item, index) => (
                       <div key={index}>
                         {dict.words[templateMap[creatorType][index]]}{' '}
@@ -124,7 +124,7 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                           order={index}
                           placeholder={dict.words[placeholderMap[creatorType][index]] || ''}
                         />
-                        {index < templateMap[creatorType].length - 1 && ', '}.
+                        {/* {index < templateMap[creatorType].length - 1 && ', '}. */}
                       </div>
                     ))}
                     </div>
@@ -142,11 +142,10 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                   </>
                 </div>
               ) : (
-                <span
-                  className={styles.inputContainer}
-                  contentEditable
-                  content={plainTextPrompt}
-                  onInput={(ev) => setPlainTextPrompt((ev.target as HTMLDivElement).innerText)}
+                <PlainTextInput
+                  plainTextPrompt={plainTextPrompt || ''}
+                  setPlainTextPrompt={(fun) => setPlainTextPrompt((prev) => fun(prev ?? ''))}
+                  placeholder={dict.words['Please enter your prompt']}
                 />
               )}
 
@@ -391,6 +390,35 @@ const PromptInput: React.FC<{
   );
 };
 
+const PlainTextInput: React.FC<{
+  plainTextPrompt: string;
+  setPlainTextPrompt: (fun: (plainTextPrompt: string) => string) => void;
+  placeholder: string;
+}> = (props) => {
+  const { plainTextPrompt, setPlainTextPrompt, placeholder } = props;
+  const spanRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (spanRef.current && (plainTextPrompt === null || plainTextPrompt === '')) {
+      spanRef.current.innerText = '';
+    }
+  }, [plainTextPrompt]);
+  return (
+    <span
+      ref={spanRef}
+      className={styles.inputContainer}
+      contentEditable
+      content={plainTextPrompt}
+      onInput={(ev) => {
+        setPlainTextPrompt(() => {
+          (ev.target as HTMLDivElement).innerText;
+          return (ev.target as HTMLDivElement).innerText;
+        });
+      }}
+      data-placeholder={placeholder}></span>
+  );
+};
+
 const fetchContent = (type: string, params: { query?: string; type?: string }) => {
   return window
     .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01.azurewebsites.net/${type}`, {
@@ -437,8 +465,12 @@ const generateQuery = (creatorType: string, texts: string[], dict: IDict): strin
     if (templateValue === '' && placeholderValue === '') {
       break;
     }
-    query += `${templateValue} ${placeholderValue}, `;
+    query += `${templateValue}${placeholderValue}`;
+    // if (i < templateItems.length - 1) {
+    //   query += ', ';
+    // }
   }
+  query += '.';
 
   return query.trim(); // Remove trailing spaces
 };

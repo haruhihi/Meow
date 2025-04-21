@@ -107,26 +107,26 @@ export const CodingMarkDownWrap: React.FC<{
           {data ? (
             <div>
               <Markdown>{data.head}</Markdown>
-              <Markdown
-                      components={{
-                        code({ className, children }) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return match ? (
-                            <SyntaxHighlighter
-                              style={vscDarkPlus}
-                              language={match[1]}
-                              PreTag="div"
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className}>
-                              {children}
-                            </code>
-                          );
-                        },
-                      }}
-                >{`\`\`\`${data.language}\n${data.code}\n\`\`\``}</Markdown>
+              {data.code && <Markdown
+                components={{
+                  code({ className, children }) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return match ? (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    ) : (
+                      <code className={className}>
+                        {children}
+                      </code>
+                    );
+                  },
+                }}
+                >{`\`\`\`${data.language}\n${data.code}\n\`\`\``}</Markdown>}
               {/* {thinking ? (
                 <StreamingMarkDown>{thinking + '\n' + data.wording}</StreamingMarkDown>
               ) : (
