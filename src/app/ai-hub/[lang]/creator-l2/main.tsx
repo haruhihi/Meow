@@ -17,8 +17,9 @@ import { IDict } from './dictionaries';
 
 const isDev = isUrlEnable('dev');
 
-export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
+export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) => {
   // const [isShowItems, setIsShowItems] = useState(false);
+  const isZH = 'zh' === lang.toLowerCase();
   const [rounds, setRounds] = useState<IRound[]>([]);
   const [isShowTemplatePrompt, setIsShowTemplatePrompt] = useState(isDev ? true : false);
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
@@ -325,7 +326,8 @@ const MarkDownWrap: React.FC<{
           </Button> */}
           {platform && platform !== dict.words['Personal style'] && (
             <Button color="primary" variant="outlined" style={{ marginRight: 8, borderRadius: 12 }} size="small">
-              Share to {platform}
+              {dict.words['Share to']}
+              {platform}
             </Button>
           )}
         </div>
