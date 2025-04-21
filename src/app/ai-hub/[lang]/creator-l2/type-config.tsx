@@ -93,6 +93,7 @@ export const getTypeConfigs = (dict: IDict) => {
       label: dict.words['Code'],
       icon: <Code width="16px" height="16px" />,
       desc: dict.words['Generate code'],
+      type: 'coding',
     },
     {
       key: 'Questionnaire',
