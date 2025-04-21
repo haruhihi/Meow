@@ -11,9 +11,13 @@ import { getTypeConfigs } from './type-config';
 import PictureWall from './picture-wall';
 import { MultiPlatformButton } from './multi-platform-button';
 import { isUrlEnable } from '@utils/tool';
-import { IRes, IRound, StreamingMarkDown } from './help';
+import { IRes, IRound, StreamingMarkDown, ICodingRes } from './help';
 import pako from 'pako';
 import { IDict } from './dictionaries';
+import { templateMap, placeholderMap } from './constants';
+
+import mockData from '../../../../static/mock/coding.json'; // Import the mock JSON file
+import { CodingMarkDownWrap } from './coding/CodingMarkDownWrap';
 
 const isDev = isUrlEnable('dev');
 
@@ -25,10 +29,13 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
   const [texts, setTexts] = useState<string[]>(['', '', '', '']);
   const [fileList, setFileList] = useState<UploadFile[] | null>();
   const [platforms, setPlatforms] = useState<string[]>([]);
-  const [plainTextPrompt, setPlainTextPrompt] = useState<string>();
+  const [creatorType, setcreatorType] = useState('wording');
   const typeConfigs = getTypeConfigs(dict);
   const { words } = dict;
-  const query = `${words['Please help me write a post for']} ${texts[0]}, ${words['the topic is']} ${texts[1]}, ${words['the length is']} ${texts[2]}, ${texts[3]}`;
+
+  const initialPrompt = templateMap[creatorType].map((item) => `${words[item]}`).join(', ');
+  const [plainTextPrompt, setPlainTextPrompt] = useState<string>();
+  const [query, setQuery] = useState<string>(initialPrompt);
 
   const pillsProps = {
     platforms,
@@ -63,7 +70,7 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
 
   const isEmptyPlainTextPrompt = plainTextPrompt === undefined || plainTextPrompt === '' || plainTextPrompt === '\n';
 
-  const isShowSelection = isEmptyPlainTextPrompt && !isShowTemplatePrompt;
+  const isShowSelection = isEmptyPlainTextPrompt && !isShowTemplatePrompt && rounds.length === 0;
 
   return (
     <div className={styles.wrap}>
@@ -83,13 +90,22 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
                   );
                 return (
                   <div key={index}>
+                    {creatorType !== 'coding' ? 
                     <MarkDownWrap
                       {...pillsProps}
                       round={round}
                       fileList={fileList}
                       setFileList={setFileList}
                       dict={dict}
-                    ></MarkDownWrap>
+                    ></MarkDownWrap> : 
+                    <CodingMarkDownWrap
+                      {...pillsProps}
+                      round={round}
+                      fileList={fileList}
+                      setFileList={setFileList}
+                      dict={dict}>
+                    </CodingMarkDownWrap>
+                    }
                   </div>
                 );
               })}
@@ -100,30 +116,18 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
                 <div className={styles.inputContainer}>
                   <>
                     <div className={styles.templateInputWrapper}>
-                      {dict.words['Please help me write a post for']}{' '}
-                      <PromptInput
-                        texts={texts}
-                        setTexts={setTexts}
-                        order={0}
-                        placeholder={words['what social media platform']}
-                      />
-                      , {dict.words['the topic is']}{' '}
-                      <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,{' '}
-                      {dict.words['the length is']}{' '}
-                      <PromptInput
-                        texts={texts}
-                        setTexts={setTexts}
-                        order={2}
-                        placeholder={words['short/medium/long']}
-                      />
-                      ,{' '}
-                      <PromptInput
-                        texts={texts}
-                        setTexts={setTexts}
-                        order={3}
-                        placeholder={words['other requirements']}
-                      />
-                      .
+                    {templateMap[creatorType].map((item, index) => (
+                      <div key={index}>
+                        {dict.words[templateMap[creatorType][index]]}{' '}
+                        <PromptInput
+                          texts={texts}
+                          setTexts={setTexts}
+                          order={index}
+                          placeholder={dict.words[placeholderMap[creatorType][index]] || ''}
+                        />
+                        {index < templateMap[creatorType].length - 1 && ', '}.
+                      </div>
+                    ))}
                     </div>
                     <div
                       className={styles.clearButton}
@@ -150,17 +154,27 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
               <div
                 className={styles.send}
                 onClick={() => {
+                  const completeHistory = generateHistory(rounds);
                   if (isShowTemplatePrompt) {
+                    const completeQuery = generateQuery(creatorType, texts, dict);
                     setRounds([
                       ...rounds,
-                      { query, position: 'right', content: query },
+                      { query: completeQuery, position: 'right', content: completeQuery },
                       {
-                        query,
+                        query: completeQuery,
                         position: 'left',
                         shouldFetchImage: true,
-                        load: () => fetchContent('wording', { query: query, type: texts[0] }),
+                        load: () => {
+                          if (creatorType === 'coding') {
+                            return fetchCoding(creatorType, { prompt: completeQuery, history: completeHistory });
+                          } else {
+                            return fetchContent(creatorType, { query: completeQuery, type: texts[0] })
+                          }
+                        },
                       },
                     ]);
+                    setPlainTextPrompt('');
+                    setIsShowTemplatePrompt(false);
                     return;
                   }
 
@@ -169,12 +183,19 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
                       ...rounds,
                       { query: plainTextPrompt, position: 'right', content: plainTextPrompt },
                       {
-                        query,
+                        query: plainTextPrompt,
                         position: 'left',
-                        load: () => fetchContent('wording', { query: plainTextPrompt }),
+                        load: () => {
+                          if (creatorType === 'coding') {
+                            return fetchCoding(creatorType, { prompt: plainTextPrompt, history: completeHistory });
+                          } else {
+                            return fetchContent(creatorType, { query: plainTextPrompt })
+                          }
+                        },
                         showButtons: false,
                       },
                     ]);
+                    setPlainTextPrompt('');
                   }
                 }}
               >
@@ -185,13 +206,20 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
             <div
               className={styles.items}
               style={{ opacity: isShowSelection ? 1 : 0, pointerEvents: isShowSelection ? 'auto' : 'none' }}
-              onClick={() => {
-                setPlainTextPrompt('');
-                setIsShowTemplatePrompt(true);
-              }}
             >
               {typeConfigs.map((item) => (
-                <div key={item.key} className={styles.item}>
+                <div 
+                  key={item.key} 
+                  className={styles.item}
+                  onClick={() => {
+                    setPlainTextPrompt('');
+                    setIsShowTemplatePrompt(true);
+                    const creatorType = item.key === 'Code' ? 'coding' : 'wording';
+                    setcreatorType(creatorType);
+                    const query =templateMap[creatorType].join(', ')
+                    setQuery(query);
+                  }}
+                >
                   <div className={styles.icon}>{item.icon}</div>
                   <div className={styles.name}>{item.label}</div>
                   <div className={styles.extra}>{item.desc}</div>
@@ -229,7 +257,12 @@ const MarkDownWrap: React.FC<{
       round
         .load()
         .then((res) => {
-          setData(res);
+          if ('wording' in res && 'imgs' in res) {
+            setData(res as IRes);
+          } else {
+            console.error('Invalid response type:', res);
+            message.error(dict.words['Generation failed']);
+          }
         })
         .catch((err) => {
           console.log(err);
@@ -360,7 +393,7 @@ const PromptInput: React.FC<{
   );
 };
 
-const fetchContent = (type: 'wording' | 'img', params: { query?: string; type?: string }) => {
+const fetchContent = (type: string, params: { query?: string; type?: string }) => {
   return window
     .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01.azurewebsites.net/${type}`, {
       method: 'POST',
@@ -371,4 +404,56 @@ const fetchContent = (type: 'wording' | 'img', params: { query?: string; type?: 
     })
     .then((res) => res.json())
     .then((res) => res.result as IRes);
+};
+
+const fetchCoding = (type: string, params: { prompt?: string; history?: string }) => {
+  return window
+    .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01.azurewebsites.net/${type}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    })
+    .then((res) => res.json())
+    .then((res) => res.result as ICodingRes )
+    .catch((error) => {
+      console.error('Error fetching content:', error);
+      return Promise.resolve({
+        ...mockData
+      } as ICodingRes ); // Fallback to mockData
+  });
+  // return Promise.resolve({
+  //   ...mockData
+  // } as ICodingRes ); // Fallback to mockData
+}
+
+const generateQuery = (creatorType: string, texts: string[], dict: IDict): string => {
+  const templateItems = templateMap[creatorType];
+
+  let query = '';
+
+  for (let i = 0; i < templateItems.length; i++) {
+    const templateValue = dict.words[templateItems[i]] || '';
+    const placeholderValue = texts[i] || '';
+    if (templateValue === '' && placeholderValue === '') {
+      break;
+    }
+    query += `${templateValue} ${placeholderValue}, `;
+  }
+
+  return query.trim(); // Remove trailing spaces
+};
+
+const generateHistory = (rounds: IRound[]): string => {
+  const history = rounds.map((round) => {
+    if (round.position === 'right') {
+      return { role: 'prompt', content: round.content };
+    } else if (round.position === 'left') {
+      return { role: 'result', content: round.content };
+    }
+    return null; // Handle unexpected cases (optional)
+  }).filter((entry) => entry !== null); // Remove null entries
+
+  return JSON.stringify(history, null, 2); // Convert to JSON string with indentation
 };

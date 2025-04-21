@@ -45,7 +45,8 @@
     "Done": "完成",
     "Generation failed": "生成失败",
     "Generating image": "正在生成图像",
-    "Share to": "分享至"
+    "Share to": "分享至",
+    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务"
   },
   "platforms": [
     {
