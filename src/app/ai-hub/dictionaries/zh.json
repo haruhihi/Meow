@@ -37,7 +37,8 @@
     "what topic": "主题",
     "short/medium/long": "短/中/长",
     "other requirements": "其他要求",
-    "generating": "正在生成"
+    "generating": "正在生成",
+    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务"
   },
   "platforms": []
 }

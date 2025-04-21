@@ -61,6 +61,28 @@
           background: #e6f4ff;
           border-radius: 18px 18px 18px 18px;
           margin: 10px 76px 3px 0;
+          .codingButtons {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            .codingButton {
+              border-radius: 18px;
+              margin-left: 8px;
+              background: #6e4bfa;
+              width: 28px;
+              height: 28px;
+              display: flex;
+              justify-content: center;
+              transition: transform 0.24s ease-in-out, opacity 0.24s ease-in-out;
+              &:hover {
+                cursor: pointer;
+                opacity: 0.8;
+              }
+              svg {
+                fill: #fff;
+              }
+            }
+          }
         }
         :global(.ant-upload-list-item-image) {
           margin: 0;
