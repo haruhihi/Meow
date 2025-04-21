@@ -9,55 +9,54 @@ import { IDict } from '../dictionaries';
 import { ICodingRes, IRound } from '../help';
 import styles from '../index.module.scss';
 
-
 export const CodingMarkDownWrap: React.FC<{
-    onMultiPlatSubmit: () => void;
-    onMyStyle: () => void;
-    platforms: string[];
-    onPlatformsChange: (value: string[]) => void;
-    round: IRound;
-    fileList?: UploadFile[] | null;
-    setFileList: (files: UploadFile[] | null) => void;
-    dict: IDict;
-  }> = (props) => {
-    const [data, setData] = useState<ICodingRes>();
-    const {
-      dict,
-      round,
-      round: { thinkPlaceholder },
-    } = props;
-  
-    useEffect(() => {
-      if (round.load) {
-        round
-          .load()
-          .then((res) => {
-            if ('code' in res) {
-              setData(res as ICodingRes);
-              round.content = (res as ICodingRes).fulltext;
-            } else {
-              console.error('Invalid response type:', res);
-              message.error(dict.words['Generation failed']);
-            }
-          })
-          .catch((err) => {
-            console.log(err);
+  onMultiPlatSubmit: (round: IRound) => void;
+  onMyStyle: (round: IRound) => void;
+  platforms: string[];
+  onPlatformsChange: (value: string[]) => void;
+  round: IRound;
+  fileList?: UploadFile[] | null;
+  setFileList: (files: UploadFile[] | null) => void;
+  dict: IDict;
+}> = (props) => {
+  const [data, setData] = useState<ICodingRes>();
+  const {
+    dict,
+    round,
+    round: { thinkPlaceholder },
+  } = props;
+
+  useEffect(() => {
+    if (round.load) {
+      round
+        .load()
+        .then((res) => {
+          if ('code' in res) {
+            setData(res as ICodingRes);
+            round.content = (res as ICodingRes).fulltext;
+          } else {
+            console.error('Invalid response type:', res);
             message.error(dict.words['Generation failed']);
-          });
-      } else {
-        setData({
-          code: 'Loading...',
-          wording: 'Loading...',
-          imgs: [],
-        } as ICodingRes);
-      }
-    }, []);
-  
-    return (
-      <>
-        <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
-          <div className={styles.codingButtons}>
-            {data && (
+          }
+        })
+        .catch((err) => {
+          console.log(err);
+          message.error(dict.words['Generation failed']);
+        });
+    } else {
+      setData({
+        code: 'Loading...',
+        wording: 'Loading...',
+        imgs: [],
+      } as ICodingRes);
+    }
+  }, []);
+
+  return (
+    <>
+      <div className={styles.bubble + ' ' + styles.bubbleLeft + ' prose prose-base prose-blue max-w-none space-y-1'}>
+        <div className={styles.codingButtons}>
+          {data && (
             <>
               <div
                 className={styles.codingButton}
@@ -103,43 +102,37 @@ export const CodingMarkDownWrap: React.FC<{
               </div>
             </>
           )}
-          </div>
-          {data ? (
-            <div>
-              <Markdown>{data.head}</Markdown>
-              <Markdown
-                      components={{
-                        code({ className, children }) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return match ? (
-                            <SyntaxHighlighter
-                              style={vscDarkPlus}
-                              language={match[1]}
-                              PreTag="div"
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className}>
-                              {children}
-                            </code>
-                          );
-                        },
-                      }}
-                >{`\`\`\`${data.language}\n${data.code}\n\`\`\``}</Markdown>
-              {/* {thinking ? (
+        </div>
+        {data ? (
+          <div>
+            <Markdown>{data.head}</Markdown>
+            <Markdown
+              components={{
+                code({ className, children }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  return match ? (
+                    <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div">
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  ) : (
+                    <code className={className}>{children}</code>
+                  );
+                },
+              }}
+            >{`\`\`\`${data.language}\n${data.code}\n\`\`\``}</Markdown>
+            {/* {thinking ? (
                 <StreamingMarkDown>{thinking + '\n' + data.wording}</StreamingMarkDown>
               ) : (
                 <Markdown>{data.code}</Markdown>
               )} */}
-              <Markdown>{data.tail}</Markdown>
-            </div>
-          ) : (
-            <div>
-              {thinkPlaceholder ?? dict.words['generating']}... <Spin indicator={<LoadingOutlined spin />} size="small" />
-            </div>
-          )}
-        </div>
-      </>
-    );
-  };
+            <Markdown>{data.tail}</Markdown>
+          </div>
+        ) : (
+          <div>
+            {thinkPlaceholder ?? dict.words['generating']}... <Spin indicator={<LoadingOutlined spin />} size="small" />
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
