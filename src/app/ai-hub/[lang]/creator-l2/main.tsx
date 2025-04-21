@@ -153,9 +153,9 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
               <div
                 className={styles.send}
                 onClick={() => {
-                  let completeHistory = generateHistory(rounds);
+                  const completeHistory = generateHistory(rounds);
                   if (isShowTemplatePrompt) {
-                    let completeQuery = generateQuery(creatorType, texts, dict);
+                    const completeQuery = generateQuery(creatorType, texts, dict);
                     setRounds([
                       ...rounds,
                       { query: completeQuery, position: 'right', content: completeQuery },
@@ -213,9 +213,9 @@ export const Main: React.FC<{ dict: IDict }> = ({ dict }) => {
                   onClick={() => {
                     setPlainTextPrompt('');
                     setIsShowTemplatePrompt(true);
-                    let creatorType = item.type !== undefined ? item.type : 'wording';
+                    const creatorType = item.key === 'Code' ? 'coding' : 'wording';
                     setcreatorType(creatorType);
-                    let query =templateMap[creatorType].join(', ')
+                    const query =templateMap[creatorType].join(', ')
                     setQuery(query);
                   }}
                 >
@@ -406,7 +406,7 @@ const fetchContent = (type: string, params: { query?: string; type?: string }) =
 
 const fetchCoding = (type: string, params: { prompt?: string; history?: string }) => {
   return window
-    .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01f.azurewebsites.net/${type}`, {
+    .fetch(`https://aicreator-ejc7hcd6atf3cdam.eastasia-01.azurewebsites.net/${type}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -428,7 +428,6 @@ const fetchCoding = (type: string, params: { prompt?: string; history?: string }
 
 const generateQuery = (creatorType: string, texts: string[], dict: IDict): string => {
   const templateItems = templateMap[creatorType];
-  const placeholderItems = placeholderMap[creatorType];
 
   let query = '';
 

@@ -3,11 +3,10 @@ import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { UploadFile } from 'antd';
-import { Button, message, Spin, Tooltip } from 'antd';
+import { message, Spin, Tooltip } from 'antd';
 import { LoadingOutlined, DownloadOutlined, CaretRightOutlined } from '@ant-design/icons';
 import { IDict } from '../dictionaries';
-import { MultiPlatformButton } from '../multi-platform-button';
-import { ICodingRes, IRound, StreamingMarkDown } from '../help';
+import { ICodingRes, IRound } from '../help';
 import styles from '../index.module.scss';
 
 
@@ -25,9 +24,7 @@ export const CodingMarkDownWrap: React.FC<{
     const {
       dict,
       round,
-      round: { thinkPlaceholder, showButtons = true, platform },
-      fileList,
-      setFileList,
+      round: { thinkPlaceholder },
     } = props;
   
     useEffect(() => {
@@ -55,14 +52,6 @@ export const CodingMarkDownWrap: React.FC<{
         } as ICodingRes);
       }
     }, []);
-  
-    const appendHeader = platform ? `## ${platform}\n` : '';
-    // const thinking = data?.thinking
-    //   ? data.thinking
-    //       .split('\n') // 按换行拆分每一行
-    //       .map((line) => '> ' + line.trim()) // 每行前加上 >，并去掉首尾空白
-    //       .join('\n')
-    //   : '';
   
     return (
       <>
@@ -120,19 +109,18 @@ export const CodingMarkDownWrap: React.FC<{
               <Markdown>{data.head}</Markdown>
               <Markdown
                       components={{
-                        code({ node, className, children, ...props }) {
+                        code({ className, children }) {
                           const match = /language-(\w+)/.exec(className || '');
                           return match ? (
                             <SyntaxHighlighter
                               style={vscDarkPlus}
                               language={match[1]}
                               PreTag="div"
-                              {...props}
                             >
                               {String(children).replace(/\n$/, '')}
                             </SyntaxHighlighter>
                           ) : (
-                            <code className={className} {...props}>
+                            <code className={className}>
                               {children}
                             </code>
                           );
