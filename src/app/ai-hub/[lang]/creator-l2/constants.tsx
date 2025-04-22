@@ -3,6 +3,7 @@ export const templateMap: Record<string, string[]> = {
     'Please help me write a post for',
     'the topic is',
     'the length is',
+    ' ',
   ],
   coding: [
     '',

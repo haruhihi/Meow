@@ -169,6 +169,12 @@
           align-items: center;
           outline: none;
           .templateInputWrapper {
+            display: ruby;
+            padding-right: 32px;
+            flex: 1;
+            outline: none;
+          }
+          .codingInputWrapper {
             padding-right: 32px;
             flex: 1;
             outline: none;
@@ -203,7 +209,7 @@
           line-height: 28px;
           max-width: calc(100% - 27px);
           padding: 0 4px;
-          display: inline-block;
+          display: ruby;
           &:focus {
             outline: 0;
           }
