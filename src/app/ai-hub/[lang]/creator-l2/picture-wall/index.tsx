@@ -36,7 +36,7 @@ const PictureWall: React.FC<{ fileList?: UploadFile[]; setFileList: (files: Uplo
   const uploadButton = (
     <button style={{ border: 0, background: 'none' }} type="button">
       <PlusOutlined />
-      <div style={{ marginTop: 8 }}>Upload</div>
+      <div style={{ marginTop: 8 }}>{dict.words['Upload']}</div>
     </button>
   );
   if (fileList === undefined) {

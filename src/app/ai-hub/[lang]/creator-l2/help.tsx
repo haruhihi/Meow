@@ -31,21 +31,26 @@ export interface ICodingRes {
 
 export const StreamingMarkDown: React.FC<{ children: string }> = (props) => {
   const [stream, setStream] = useState<string>(''); // Single state to manage the streamed content
-
+  const isZH = location.pathname.includes('zh');
   useEffect(() => {
     setStream('');
-    const words = props.children.split(' '); // Split the text into words
+    const words = props.children.split(isZH ? '' : ' '); // Split the text into words
     let currentIndex = 0; // Local variable to track the current word index
 
-    const interval = setInterval(() => {
-      if (currentIndex >= words.length - 1) {
-        clearInterval(interval);
-        return;
-      }
+    const interval = setInterval(
+      () => {
+        if (currentIndex >= words.length - 1) {
+          clearInterval(interval);
+          return;
+        }
 
-      setStream((prevStream) => (prevStream ? `${prevStream} ${words[currentIndex]}` : words[currentIndex]));
-      currentIndex++;
-    }, 60); // Adjust the interval time as needed
+        setStream((prevStream) =>
+          prevStream ? `${prevStream}${isZH ? '' : ' '}${words[currentIndex]}` : words[currentIndex]
+        );
+        currentIndex++;
+      },
+      isZH ? 20 : 60
+    ); // Adjust the interval time as needed
 
     return () => clearInterval(interval);
   }, [props.children]);

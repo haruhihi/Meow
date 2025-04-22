@@ -46,7 +46,8 @@
     "Generation failed": "生成失败",
     "Generating image": "正在生成图像",
     "Share to": "分享至",
-    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务"
+    "You can ask me any code-related questions": "你可以问我任何代码相关的问题，或者让我帮你写一段代码完成任务",
+    "Upload": "上传图片"
   },
   "platforms": [
     {
@@ -54,12 +55,12 @@
       "value": "小红书"
     },
     {
-      "label": "朋友圈",
-      "value": "朋友圈"
-    },
-    {
       "label": "微信公众号",
       "value": "微信公众号"
+    },
+    {
+      "label": "朋友圈",
+      "value": "朋友圈"
     },
     {
       "label": "微博",
