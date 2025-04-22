@@ -132,23 +132,23 @@ export const Main: React.FC<{ dict: IDict; lang: string }> = ({ dict, lang }) =>
                         ))
                       ) : (
                         <>
-                          请帮我写{' '}
+                          请帮我写一篇{' '}
                           <PromptInput
                             texts={texts}
                             setTexts={setTexts}
                             order={0}
                             placeholder={words['what social media platform']}
                           />{' '}
-                          文案,主题是{' '}
-                          <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />
-                          ,长度{' '}
+                          文案, 主题是{' '}
+                          <PromptInput texts={texts} setTexts={setTexts} order={1} placeholder={words['what topic']} />,
+                          长度{' '}
                           <PromptInput
                             texts={texts}
                             setTexts={setTexts}
                             order={2}
                             placeholder={words['short/medium/long']}
                           />
-                          ,
+                          ,{' '}
                           <PromptInput
                             texts={texts}
                             setTexts={setTexts}
