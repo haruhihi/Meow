@@ -15,7 +15,7 @@ export default async function App(props: { params: { lang: string } }) {
   // const markdown = fs.readFileSync(filePath, 'utf-8');
   const dict = await getDictionary(lang as any);
 
-  return <Main dict={dict} />;
+  return <Main dict={dict} lang={lang} />;
 }
 
 
