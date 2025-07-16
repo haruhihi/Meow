@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Calendar, Card, FloatingBubble, Modal, Toast, Input, Form, Button } from 'antd-mobile';
+import React, { useEffect, useState, RefObject } from 'react';
+import { Calendar, Card, FloatingBubble, Modal, Toast, Input, Form, Button, DatePicker, Stepper } from 'antd-mobile';
 import dayjs from 'dayjs';
 import classNames from 'classnames';
 import { AddCircleOutline, RightOutline } from 'antd-mobile-icons';
@@ -11,6 +11,12 @@ import { handleError, useRefresh } from '@utils/tool';
 import { ITrekSearchRes } from '@dtos/meow';
 import { TopLoading } from '@components/loading';
 
+
+const TYPE = {
+  exercise:'健身次数',
+  sleep:'睡眠时间',
+  junkfood:'吃垃圾食品'
+}
 export default function App() {
   const [res, setRes] = useState<ITrekSearchRes>();
   const [selectedType, setSelectedType] = useState<string>();
@@ -38,6 +44,8 @@ export default function App() {
 
   let allTypes = res.treks.map((t) => t.type).concat(newTypes);
   allTypes = [...new Set(allTypes)];
+  console.log('allTypes', allTypes);
+  
 
   return (
     <div>
@@ -116,12 +124,18 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
     onRefresh,
     res: { treks },
   } = props;
-  const existedTreks = treks.filter((t) => t.type === type);
-  const isSelected = (date: Date) => {
-    return existedTreks.some((trek) => {
-      return dayjs(trek.date).isSame(dayjs(date), 'day');
-    });
-  };
+  const [visible, setVisible] = useState(false);
+  const [originDate, setOriginDate] = useState<Date>();
+
+  console.log('treks',treks);
+  console.log('type',type);
+  
+  // const existedTreks = treks.filter((t) => t.type === type);
+  // const isSelected = (date: Date) => {
+  //   return existedTreks.some((trek) => {
+  //     return dayjs(trek.date).isSame(dayjs(date), 'day');
+  //   });
+  // };
   return (
     <Card
       title={<div style={{ fontWeight: 'normal' }}>{type}</div>}
@@ -133,9 +147,9 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
           renderDate={(date) => {
             return (
               <div
-                className={classNames(styles['custom-cell'], {
-                  [styles['custom-cell-selected']]: isSelected(date),
-                })}
+                // className={classNames(styles['custom-cell'], {
+                //   [styles['custom-cell-selected']]: isSelected(date),
+                // })}
               >
                 {dayjs(date).date()}
               </div>
@@ -144,51 +158,120 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
           selectionMode="single"
           onChange={(originDate: Date | null) => {
             console.log(originDate);
-            const date = dayjs(originDate).startOf('day');
             if (!originDate) {
               return;
             }
-            if (isSelected(originDate)) {
-              Modal.confirm({
-                content: `是否取消打卡 ${type} ${date.format('YYYY-MM-DD')}`,
-                onConfirm: async () => {
-                  try {
-                    await post('/api/trek/delete', {
-                      date: date.unix() * 1000,
-                      type,
-                    });
-                    Toast.show({
-                      content: '取消打卡成功',
-                      afterClose: () => onRefresh(),
-                    });
-                  } catch (error) {
-                    handleError(error);
-                  }
-                },
-              });
-              return;
-            }
-            Modal.confirm({
-              content: `是否打卡 ${type} ${date.format('YYYY-MM-DD')}`,
-              onConfirm: async () => {
-                try {
-                  await post('/api/trek/create', {
-                    date: date.unix() * 1000,
-                    count: 1,
-                    type,
-                  });
-                  Toast.show({
-                    content: '打卡成功',
-                    afterClose: () => onRefresh(),
-                  });
-                } catch (error) {
-                  handleError(error);
-                }
-              },
-            });
+            setVisible(true);
+            setOriginDate(originDate)
+            console.log('originDate', originDate);
+            
+            // if (isSelected(originDate)) {
+            //   Modal.confirm({
+            //     content: `是否取消打卡 ${type} ${date.format('YYYY-MM-DD')}`,
+            //     onConfirm: async () => {
+            //       try {
+            //         await post('/api/trek/delete', {
+            //           date: date.unix() * 1000,
+            //           type,
+            //         });
+            //         Toast.show({
+            //           content: '取消打卡成功',
+            //           afterClose: () => onRefresh(),
+            //         });
+            //       } catch (error) {
+            //         handleError(error);
+            //       }
+            //     },
+            //   });
+            //   return;
+            // }
+            // Modal.confirm({
+            //   content: `是否打卡 ${type} ${date.format('YYYY-MM-DD')}`,
+            //   onConfirm: async () => {
+            //     try {
+            //       await post('/api/trek/create', {
+            //         date: date.unix() * 1000,
+            //         count: 1,
+            //         type,
+            //       });
+            //       Toast.show({
+            //         content: '打卡成功',
+            //         afterClose: () => onRefresh(),
+            //       });
+            //     } catch (error) {
+            //       handleError(error);
+            //     }
+            //   },
+            // });
           }}
         />
       </div>
+        <Modal
+              visible={visible}
+              closeOnMaskClick
+              showCloseButton
+              onClose={() => {
+                setVisible(false);
+                setOriginDate(undefined);
+              }}
+              content={
+                <Form
+                  layout="horizontal"
+                  footer={
+                    <Button block type="submit" color="primary" size="large">
+                      提交
+                    </Button>
+                  }
+                  initialValues={{}}
+                  style={{ marginTop: '20px' }}
+                  onFinish={async (values: {exercise:number; sleep:number; junkfood:number }) => {
+                    if (!values) return console.log('values is empty');
+                    if (!originDate) {
+                      return;
+                    }
+                    console.log(values);
+                    const date =  dayjs(originDate).unix() * 1000;
+
+                    const data = Object.keys(values).map(((key:'exercise'| 'sleep' |'junkfood')=> {
+                      return {
+                        date: date,
+                        count: values[key],
+                        type:TYPE[key],
+                      }
+                    })).filter(v => !!v.count);
+
+                    try {
+                      await post('/api/trek/multi-create',data);
+                      Toast.show({
+                        content: '打卡成功',
+                        afterClose: () => {
+                          setVisible(false);
+                          setOriginDate(undefined)
+                          onRefresh();
+                        },
+                      });
+                    } catch (error) {
+                      handleError(error);
+                    }
+              }
+            
+                  }
+                >
+                  <Form.Item name="exercise" label="健身">
+                    <Stepper  min={0} />
+                  </Form.Item>
+      
+                  <Form.Item name="sleep" label="睡眠时间">
+                    <Stepper  min={0} />
+                  </Form.Item>
+
+                  <Form.Item name="junkfood" label="吃垃圾食品">
+                    <Stepper  min={0}/>
+                  </Form.Item>
+
+                </Form>
+              }
+            ></Modal>
     </Card>
   );
 };
