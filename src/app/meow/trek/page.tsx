@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, RefObject } from 'react';
-import { Calendar, Card, FloatingBubble, Modal, Toast, Input, Form, Button, DatePicker, Stepper } from 'antd-mobile';
+import React, { useEffect, useState } from 'react';
+import { Calendar, Card, FloatingBubble, Modal, Toast, Input, Form, Button, Stepper } from 'antd-mobile';
 import dayjs from 'dayjs';
 import classNames from 'classnames';
 import { AddCircleOutline, RightOutline } from 'antd-mobile-icons';
@@ -178,18 +178,18 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
             }
             initialValues={{}}
             style={{ marginTop: '20px' }}
-            onFinish={async (values: {exercise:number; sleep:number; junkfood:number }) => {
+            onFinish={async (values: any) => {
               if (!values) return console.log('values is empty');
               if (!originDate) {
                 return;
               }
               const date =  dayjs(originDate).unix() * 1000;
 
-              const data = Object.keys(values).map(((key:'exercise'| 'sleep' |'junkfood')=> {
+              const data = Object.keys(values).map(((key)=> {
                 return {
                   date: date,
                   count: values[key],
-                  type:TYPE[key],
+                  type:(TYPE as any)[key],
                 }
               })).filter(v => !!v.count);
 
