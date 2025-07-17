@@ -1,5 +1,5 @@
 import { prisma } from '@libs/prisma';
-import { ITrekCreateReq, ITrekCreateRes } from '@dtos/meow';
+import { ITrekCreateReq } from '@dtos/meow';
 import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 
