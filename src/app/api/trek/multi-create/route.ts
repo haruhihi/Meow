@@ -25,7 +25,7 @@ export async function POST(request: Request) {
        skipDuplicates: true,
     });
 
-    return success<ITrekCreateRes>({ trek: newTrek });
+    return success<any>({ trek: newTrek });
   } catch (error) {
     return fail(error);
   }
