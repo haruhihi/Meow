@@ -11,12 +11,26 @@ import { handleError, useRefresh } from '@utils/tool';
 import { ITrekSearchRes } from '@dtos/meow';
 import { TopLoading } from '@components/loading';
 
-
-const TYPE = {
-  exercise:'健身次数',
-  sleep:'睡眠时间',
-  junkfood:'吃垃圾食品'
+const TYPE: any = {
+  exercise:{
+    name:'健身',
+    default: 1
+  },
+  sleep:{
+    name:'睡眠',
+    default:7
+  },
+  junkfood:{
+    name:'垃圾食品',
+    default:0
+  },
+  brushteeth:{
+    name:'刷牙',
+    default:2
+  }
 }
+
+
 export default function App() {
   const [res, setRes] = useState<ITrekSearchRes>();
   const [selectedType, setSelectedType] = useState<string>();
@@ -176,7 +190,12 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
                 提交
               </Button>
             }
-            initialValues={{}}
+            initialValues={{
+              exercise:1,
+              sleep: 7,
+              junkfood:0,
+              brushteeth:2
+            }}
             style={{ marginTop: '20px' }}
             onFinish={async (values: any) => {
               if (!values) return console.log('values is empty');
@@ -189,7 +208,7 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
                 return {
                   date: date,
                   count: values[key],
-                  type:(TYPE as any)[key],
+                  type:(TYPE as any)[key].name,
                 }
               })).filter(v => !!v.count);
 
@@ -208,18 +227,14 @@ const ATrek: React.FC<{ type: string; res: ITrekSearchRes; onRefresh: () => void
               }
             }}
           >
-            <Form.Item name="exercise" label="健身">
-              <Stepper  min={0} />
-            </Form.Item>
 
-            <Form.Item name="sleep" label="睡眠时间">
-              <Stepper  min={0} />
-            </Form.Item>
-
-            <Form.Item name="junkfood" label="吃垃圾食品">
-              <Stepper  min={0}/>
-            </Form.Item>
-
+            {
+              Object.keys(TYPE).map(name => {
+                return (<Form.Item name={name} label={TYPE[name].name} key = {name}>
+                  <Stepper  min={0} />
+                </Form.Item>)
+              })
+            }
           </Form>
         }
       ></Modal>
