@@ -22,10 +22,12 @@ import { ITransactionCreateReq, ITransactionCreateRes } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
 import { TopLoading } from '@components/loading';
+import Analyze from './analyze';
 
 export default function App() {
   const [visible, setVisible] = useState(false);
   const [categoryVisible, setCategoryVisible] = useState(false);
+  const [analyzeVisible, setAnalyzeVisible] = useState(false);
   const categoryRes = useCategories();
   const { transactions, reQuery, loadMore, hasMore } = useTransactions();
 
@@ -40,10 +42,14 @@ export default function App() {
 
   const cascaderOptions = getCategoryOptions(categoryRes.categories);
   console.log(cascaderOptions);
+
+  
+
   return (
     <div>
       {transactions.length > 0 ? (
         <div>
+          <Analyze setAnalyzeVisible={setAnalyzeVisible} analyzeVisible = {analyzeVisible} cascaderOptions = {cascaderOptions} />
           <List>
             {(transactions ?? []).map((transaction) => {
               3;
