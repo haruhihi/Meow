@@ -47,6 +47,21 @@ export interface ITransactionSearchReq {
   pageSize: number;
 }
 
+export interface ITransactionAnalyzeReq {
+  categoryId?: Transaction['categoryId'];
+  year: number;   // 年份
+  month: number;  // 月份 (1-12)
+}
+
+export interface ITransactionAnalyzeRes {
+  transactions: Prisma.TransactionGetPayload<{
+    include: {
+      category: true;
+    };
+  }>[];
+  total: number;
+}
+
 export interface ITransactionDeleteReq {
   ids: Transaction['id'][];
 }

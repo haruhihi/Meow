@@ -33,9 +33,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} style={{ height: '100vh' }}>
         {children}
-        <script
+        <Script
+          id="set-body-height"
           dangerouslySetInnerHTML={{
             __html: `
                 // 这段 JavaScript 会在页面加载之前执行
@@ -44,6 +45,7 @@ export default function RootLayout({
                 // 你可以添加其他初始化脚本
               `,
           }}
+          strategy="afterInteractive"
         />
         <Script src="https://cdn.jsdelivr.net/npm/eruda" strategy="beforeInteractive" />
       </body>
