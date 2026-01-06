@@ -1,27 +1,23 @@
 'use client';
 import {
-  FloatingBubble,
   Modal,
   Form,
   Button,
-  Input,
   List,
   SwipeAction,
   Toast,
-  InfiniteScroll,
   DatePicker,
   DatePickerRef,
   Tag,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { HandPayCircleOutline } from 'antd-mobile-icons';
 import { RefObject, useEffect, useState } from 'react';
 import { FormCascader } from '@components/form-cascader';
 import { post } from '@libs/fetch';
 import { ITransactionAnalyzeReq, ITransactionAnalyzeRes } from '@dtos/meow';
 import { getIconFromCategoryId } from '@utils/category';
 
-export default ({setAnalyzeVisible, analyzeVisible, cascaderOptions}: any) => {
+export default function Analyze({setAnalyzeVisible, analyzeVisible, cascaderOptions}: any) {
     const [categoryVisible, setCategoryVisible] = useState(false);
     const [data, setData] = useState<ITransactionAnalyzeRes | null>(null);
     
