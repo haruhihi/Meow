@@ -2,7 +2,6 @@ import { prisma } from '@libs/prisma';
 import { ITransactionAnalyzeReq, ITransactionAnalyzeRes } from '@dtos/meow';
 import { success, fail } from '@libs/fetch';
 import { getSession } from '@libs/session';
-import dayjs from 'dayjs';
 
 export async function POST(req: Request) {
   try {
