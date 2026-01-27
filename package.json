@@ -21,6 +21,8 @@
     "antd-mobile": "^5.38.1",
     "classnames": "^2.5.1",
     "dayjs": "^1.11.13",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
     "eruda": "^3.4.1",
     "jose": "^5.9.6",
     "lodash-es": "^4.17.21",
