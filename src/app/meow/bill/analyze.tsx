@@ -9,7 +9,6 @@ import {
   DatePicker,
   DatePickerRef,
   Tag,
-  Tabs,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
 import { RefObject, useEffect, useState, useRef } from 'react';
