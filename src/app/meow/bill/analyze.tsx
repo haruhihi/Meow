@@ -76,8 +76,9 @@ export default function Analyze({setAnalyzeVisible, analyzeVisible, cascaderOpti
       // Reset data when modal is opened
       if (analyzeVisible) {
         setData(null);
+        fetchData({ time: new Date() });
       }
-      fetchData({ time: new Date() });
+      
     }, [analyzeVisible]);
 
     return   <div>
