@@ -1,4 +1,4 @@
-import { Category, Transaction, Trek, User } from '@prisma/client';
+import { Category, Transaction, Trek, User, Budget } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export interface ICategoryRes {
@@ -51,6 +51,7 @@ export interface ITransactionAnalyzeReq {
   categoryId?: Transaction['categoryId'];
   year: number;   // 年份
   month: number;  // 月份 (1-12)
+  granularity?: 'month' | 'year';
 }
 
 export interface ITransactionAnalyzeRes {
@@ -88,4 +89,44 @@ export interface ITrekCreateRes {
 
 export interface ITrekDeleteRes {
   treks: Trek[];
+}
+
+export interface ICategoryMergeReq {
+  fromId: number;
+  toId: number;
+}
+
+export interface ICategoryMergeRes {
+  movedChildren: number;
+  movedTransactions: number;
+  movedBudgets: number;
+}
+
+export interface ICategoryDeleteReq {
+  id: number;
+}
+
+export interface ICategoryDeleteRes {
+  id: number;
+}
+
+export interface IBudgetSearchReq {
+  year: number;
+  month: number;
+}
+
+export interface IBudgetSearchRes {
+  budgets: Prisma.BudgetGetPayload<{
+    include: { category: true };
+  }>[];
+}
+
+export interface IBudgetUpsertReq {
+  year: number;
+  month: number;
+  amount: number | null;
+}
+
+export interface IBudgetUpsertRes {
+  budget: Budget | null;
 }

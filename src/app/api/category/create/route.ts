@@ -6,14 +6,14 @@ export async function POST(request: Request) {
   try {
     const { name, parentId } = (await request.json()) as ICategoryCreateReq;
 
-    if (!name || !parentId) {
-      throw new Error(`非法的 params, name: ${name}, parent: ${parentId}`);
+    if (!name) {
+      throw new Error(`非法的 params, name: ${name}`);
     }
 
     const newCategory = await prisma.category.create({
       data: {
         name,
-        parentId,
+        parentId: parentId ?? null,
       },
     });
 

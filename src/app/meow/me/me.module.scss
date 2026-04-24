@@ -1,0 +1,89 @@
+.page {
+  background: var(--meow-bg);
+  min-height: 100%;
+  padding-bottom: 80px;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 20px 20px;
+  background: linear-gradient(135deg, #5B7CFA 0%, #3B5BE0 100%);
+  color: #fff;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.who {
+  flex: 1;
+}
+
+.nickname {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sub {
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.82;
+}
+
+.card {
+  margin: -14px 12px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--meow-surface);
+  box-shadow: 0 4px 16px rgba(31, 35, 48, 0.08);
+  position: relative;
+}
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--meow-text-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.budgetRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.budgetLabel {
+  font-size: 11px;
+  color: var(--meow-text-muted);
+}
+
+.budgetValue {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--meow-text);
+}
+
+.list {
+  margin: 14px 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  --border-top: none;
+  --border-bottom: none;
+}
+
+.danger {
+  padding: 20px 16px;
+}

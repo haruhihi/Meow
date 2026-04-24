@@ -38,12 +38,14 @@ const Bottom: FC = () => {
   }
 
   useEffect(() => {
-    console.log('window as any).eruda', (window as any).eruda);
     if ((window as any).eruda) {
       (window as any).eruda.init();
     }
   }, []);
   if (pathname === '/meow/texas') {
+    return null;
+  }
+  if (pathname === '/meow/analyze') {
     return null;
   }
   return (

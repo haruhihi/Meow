@@ -5,6 +5,25 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Meow design tokens. Keep in sync with src/styles/theme.ts */
+  --meow-primary: #5B7CFA;
+  --meow-primary-dim: #3B5BE0;
+  --meow-success: #25B67A;
+  --meow-warning: #F5A524;
+  --meow-danger: #F04438;
+
+  --meow-bg: #F4F6FB;
+  --meow-surface: #FFFFFF;
+  --meow-surface-alt: #F8F9FC;
+  --meow-border: #E5E8F0;
+
+  --meow-text: #1F2330;
+  --meow-text-sub: #5B6478;
+  --meow-text-muted: #8A93A8;
+
+  /* antd-mobile primary override */
+  --adm-color-primary: var(--meow-primary);
 }
 
 @media (prefers-color-scheme: dark) {

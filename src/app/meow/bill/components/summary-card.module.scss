@@ -1,0 +1,135 @@
+.card {
+  margin: 12px;
+  padding: 16px 18px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #5B7CFA 0%, #3B5BE0 100%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(59, 91, 224, 0.22);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.monthLabel {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthTag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 500;
+}
+
+.navBtn {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  font-size: 14px;
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.amountRow {
+  margin-top: 14px;
+}
+
+.amountLabel {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.amount {
+  margin-top: 4px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.delta {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.statsRow {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat {
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  text-align: center;
+}
+
+.statValue {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.statLabel {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.budgetBlock {
+  margin-top: 14px;
+}
+
+.budgetRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  opacity: 0.95;
+  margin-bottom: 6px;
+}
+
+.progress {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressInner {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.budgetHint {
+  margin-top: 14px;
+  font-size: 12px;
+  opacity: 0.78;
+  text-align: center;
+  padding: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+}

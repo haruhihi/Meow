@@ -1,0 +1,120 @@
+.page {
+  background: var(--meow-bg);
+  min-height: 100%;
+  padding-bottom: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--meow-text);
+}
+
+.linkBtn {
+  all: unset;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--meow-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trendCard {
+  margin: 0 12px;
+  padding: 10px 4px 4px;
+  border-radius: 14px;
+  background: var(--meow-surface);
+  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+}
+
+.group {
+  margin: 0 12px 10px;
+  border-radius: 14px;
+  background: var(--meow-surface);
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+}
+
+.groupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--meow-surface-alt);
+  border-bottom: 1px solid var(--meow-border);
+}
+
+.groupDate {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--meow-text);
+}
+
+.groupWeekday {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--meow-text-muted);
+}
+
+.groupTotal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--meow-text-sub);
+}
+
+.list {
+  --border-top: none;
+  --border-bottom: none;
+  --border-inner: 1px solid var(--meow-border);
+}
+
+.iconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.itemTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--meow-text);
+}
+
+.itemDesc {
+  font-size: 12px;
+  color: var(--meow-text-muted);
+}
+
+.itemAmount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--meow-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.loadMore {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.endText {
+  text-align: center;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+}
+
+.endSpacer {
+  height: 80px;
+}
