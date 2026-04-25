@@ -34,7 +34,7 @@ export const Main: React.FC<{ tools: AI_Tool[] }> = (props) => {
         setTools((prev) => [...prev, ...res.result]);
         setLoading(false);
       }
-    } catch (error) {
+    } catch {
       message.error('Failed to fetch tools');
       setLoading(false);
     }

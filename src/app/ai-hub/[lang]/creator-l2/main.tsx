@@ -445,10 +445,7 @@ const PlainTextInput: React.FC<{
       contentEditable
       content={plainTextPrompt}
       onInput={(ev) => {
-        setPlainTextPrompt(() => {
-          (ev.target as HTMLDivElement).innerText;
-          return (ev.target as HTMLDivElement).innerText;
-        });
+        setPlainTextPrompt(() => (ev.target as HTMLDivElement).innerText);
       }}
       data-placeholder={placeholder}></span>
   );
