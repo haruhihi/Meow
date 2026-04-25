@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "./node_modules/next/dist/bin/next start",
-    "postinstall": "prisma generate",
     "lint": "next lint",
     "update-db": "prisma format && prisma migrate dev --name update && prisma generate",
     "view": "prisma studio",
