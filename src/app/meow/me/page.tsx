@@ -7,6 +7,7 @@ import {
   PayCircleOutline,
   DownlandOutline,
   AppstoreOutline,
+  FileOutline,
   RightOutline,
 } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
@@ -100,6 +101,14 @@ export default function App() {
       </div>
 
       <List header="设置" className={styles.list}>
+        <List.Item
+          prefix={<FileOutline />}
+          extra={<RightOutline />}
+          onClick={() => router.push('/meow/articles')}
+          description="浏览已同步文章列表"
+        >
+          文章
+        </List.Item>
         <List.Item
           prefix={<DownlandOutline />}
           extra={<RightOutline />}
