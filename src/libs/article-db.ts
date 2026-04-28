@@ -3,17 +3,26 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForArticlePrisma = global as unknown as { articlePrisma?: PrismaClient };
 
-export const articlePrisma =
-  globalForArticlePrisma.articlePrisma ||
-  new PrismaClient({
+const getArticlePrisma = () => {
+  if (globalForArticlePrisma.articlePrisma) {
+    return globalForArticlePrisma.articlePrisma;
+  }
+
+  const url = process.env.DATABASE_URL2;
+  if (!url) {
+    throw new Error('DATABASE_URL2 is required to read articles');
+  }
+
+  globalForArticlePrisma.articlePrisma = new PrismaClient({
     datasources: {
       db: {
-        url: process.env.DATABASE_URL2,
+        url,
       },
     },
   });
 
-globalForArticlePrisma.articlePrisma = articlePrisma;
+  return globalForArticlePrisma.articlePrisma;
+};
 
 export interface ArticleListItem {
   id: string;
@@ -59,7 +68,7 @@ const normalizeListItem = (row: ArticleListRow): ArticleListItem => ({
 });
 
 export const getArticles = async (limit = 100): Promise<ArticleListItem[]> => {
-  const rows = await articlePrisma.$queryRaw<ArticleListRow[]>`
+  const rows = await getArticlePrisma().$queryRaw<ArticleListRow[]>`
     select
       id::text as id,
       slug,
@@ -82,7 +91,7 @@ export const getArticleById = async (id: string): Promise<ArticleDetail | null> 
     return null;
   }
 
-  const rows = await articlePrisma.$queryRaw<ArticleDetailRow[]>`
+  const rows = await getArticlePrisma().$queryRaw<ArticleDetailRow[]>`
     select
       id::text as id,
       slug,
