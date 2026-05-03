@@ -14,7 +14,7 @@ export default function App() {
           await post('/api/user/sign', values);
           Toast.show({
             content: '登录成功',
-            afterClose: () => router.push('/'),
+            afterClose: () => router.push('/meow/bill'),
           });
         }}
       >

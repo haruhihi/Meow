@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+
 export default function App() {
-  return <h1>Hello world</h1>;
+  redirect('/meow/bill');
 }

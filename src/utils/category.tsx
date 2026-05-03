@@ -21,6 +21,14 @@ import {
 } from '@ant-design/icons';
 import { getCategoryColorByName } from '@styles/theme';
 
+export interface FlatCategoryOption {
+  value: string[];
+  label: string;
+  pathLabels: string[];
+  keywords: string;
+  groupLabel: string;
+}
+
 export const useCategories = () => {
   const [res, setRes] = useState<ICategoryRes>();
   const { refreshSignal, refresh } = useRefresh();
@@ -69,6 +77,38 @@ export const getCategoryOptions = (categories: ICategoryRes['categories']) => {
   };
 
   return buildCategoryTree(categories);
+};
+
+const normalizeOptionLabel = (label: CascaderOption['label']) =>
+  String(label ?? '').replace(/\(子\)$/g, '');
+
+export const flattenCategoryOptions = (
+  options: CascaderOption[],
+  parentValues: string[] = [],
+  parentLabels: string[] = []
+): FlatCategoryOption[] => {
+  return options.flatMap((option) => {
+    const label = normalizeOptionLabel(option.label);
+    const value = [...parentValues, String(option.value)];
+    const pathLabels = [...parentLabels, label];
+    const children = option.children
+      ? flattenCategoryOptions(option.children, value, pathLabels)
+      : [];
+
+    if (children.length > 0) {
+      return children;
+    }
+
+    return [
+      {
+        value,
+        label,
+        pathLabels,
+        keywords: pathLabels.join(' ').toLowerCase(),
+        groupLabel: pathLabels[0] ?? label,
+      },
+    ];
+  });
 };
 
 // ---------- Icon & color resolution ----------
