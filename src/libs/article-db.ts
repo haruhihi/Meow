@@ -123,3 +123,31 @@ export const getArticleById = async (id: string): Promise<ArticleDetail | null> 
     bonusBody: row.bonusBody,
   };
 };
+
+export const updateArticlePublishDate = async (id: string, publishDate: string | null): Promise<string | null> => {
+  if (!/^\d+$/.test(id)) {
+    throw new Error('invalid article id');
+  }
+
+  let nextDate: Date | null = null;
+  if (publishDate) {
+    const parsed = new Date(publishDate);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error('invalid publish date');
+    }
+    nextDate = parsed;
+  }
+
+  const rows = await getArticlePrisma().$queryRaw<{ publishDate: Date | null }[]>`
+    update public.articles
+    set publish_date = ${nextDate}
+    where id = ${BigInt(id)}
+    returning publish_date as "publishDate"
+  `;
+
+  if (!rows[0]) {
+    throw new Error('article not found');
+  }
+
+  return toDateString(rows[0].publishDate);
+};

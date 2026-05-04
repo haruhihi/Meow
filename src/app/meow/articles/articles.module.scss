@@ -32,6 +32,104 @@
   padding: 12px;
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 12px 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--meow-border);
+  background: var(--meow-surface);
+  color: var(--meow-text-sub);
+  font-size: 13px;
+  cursor: pointer;
+
+  em {
+    font-style: normal;
+    color: var(--meow-text-muted);
+    font-size: 12px;
+  }
+}
+
+.tabActive {
+  background: var(--meow-primary);
+  color: #fff;
+  border-color: var(--meow-primary);
+
+  em {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+.empty {
+  padding: 36px 12px;
+  text-align: center;
+  color: var(--meow-text-muted);
+  font-size: 13px;
+}
+
+.dateEditBtn {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--meow-border);
+  background: var(--meow-surface-alt);
+  color: var(--meow-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dateEditor {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+
+  input {
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--meow-border);
+    background: var(--meow-surface);
+    color: var(--meow-text);
+    font-size: 13px;
+  }
+
+  button {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--meow-border);
+    background: var(--meow-surface-alt);
+    color: var(--meow-text);
+    font-size: 12px;
+    cursor: pointer;
+
+    &:first-of-type {
+      background: var(--meow-primary);
+      color: #fff;
+      border-color: var(--meow-primary);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.detailDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .item {
   display: block;
   padding: 14px;

@@ -4,20 +4,9 @@ import { unstable_noStore as noStore } from 'next/cache';
 import ReactMarkdown from 'react-markdown';
 import { getArticleById } from '@libs/article-db';
 import styles from '../articles.module.scss';
+import PublishDateEditor from './publish-date-editor';
 
 export const dynamic = 'force-dynamic';
-
-const formatDate = (value: string | null) => {
-  if (!value) {
-    return '未标日期';
-  }
-
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value));
-};
 
 export default async function ArticleDetailPage({ params }: { params: { id: string } }) {
   noStore();
@@ -34,7 +23,7 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
           返回
         </a>
         <div className={styles.detailMeta}>
-          <span>{formatDate(article.publishDate)}</span>
+          <PublishDateEditor id={article.id} publishDate={article.publishDate} />
           <span>{article.author}</span>
           <span>{article.source}</span>
         </div>
