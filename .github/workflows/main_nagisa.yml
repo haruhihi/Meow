@@ -29,6 +29,7 @@ jobs:
         run: |
           npm install
           echo DATABASE_URL=${{ secrets.DATABASE_URL }} >> .env
+          echo DATABASE_URL2=${{ secrets.DATABASE_URL2 }} >> .env
           echo SESSION_SECRET=${{ secrets.SESSION_SECRET }} >> .env
           npm run build --if-present
           npm run test --if-present
