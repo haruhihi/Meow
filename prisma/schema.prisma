@@ -23,7 +23,6 @@ model User {
   updatedAt DateTime @updatedAt
 
   Transaction Transaction[] @relation
-  Trek        Trek[]
 }
 
 model Category {
@@ -72,19 +71,6 @@ model Coupon {
 
   @@index([validYear, validMonth])
   @@index([name])
-}
-
-model Trek {
-  id        Int      @id @default(autoincrement())
-  userId    Int // User ID
-  type      String // 打卡类型
-  date      DateTime // check in time
-  count     Int
-  note      String? // note
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id])
 }
 
 model AI_Tool {

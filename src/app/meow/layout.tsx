@@ -3,7 +3,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
-import { HistogramOutline, EditSOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
+import { HistogramOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
 import styles from './index.module.scss';
 import { useUserInfo } from '@utils/user';
 
@@ -12,11 +12,6 @@ const Bottom: FC = () => {
   const pathname = usePathname();
   const { user } = useUserInfo();
   const tabs = [
-    {
-      key: '/meow/trek',
-      title: '打卡',
-      icon: <EditSOutline />,
-    },
     {
       key: '/meow/bill',
       title: '账单',

@@ -76,3 +76,115 @@
   color: var(--meow-text-muted);
   font-variant-numeric: tabular-nums;
 }
+
+.parentTrigger {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  color: var(--meow-text);
+  font-size: 14px;
+}
+
+.parentPanel {
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  background: var(--meow-surface);
+}
+
+.parentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+
+.parentTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--meow-text);
+}
+
+.parentClose {
+  all: unset;
+  color: var(--meow-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.parentCrumbs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 12px 8px;
+}
+
+.crumb,
+.crumbActive {
+  flex: 0 0 auto;
+  max-width: 140px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--meow-border);
+  background: var(--meow-surface-alt);
+  color: var(--meow-text-sub);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbActive {
+  background: var(--meow-primary);
+  border-color: var(--meow-primary);
+  color: #fff;
+}
+
+.parentActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--meow-border);
+}
+
+.parentList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.parentItem {
+  width: 100%;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--meow-border);
+  background: var(--meow-surface);
+  color: var(--meow-text);
+  font-size: 14px;
+  text-align: left;
+
+  span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.parentItemMeta {
+  color: var(--meow-text-muted);
+  font-size: 12px;
+}
+
+.parentEmpty {
+  padding: 28px 16px;
+  color: var(--meow-text-muted);
+  font-size: 13px;
+  text-align: center;
+}

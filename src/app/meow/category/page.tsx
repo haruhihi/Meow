@@ -11,6 +11,7 @@ import {
   Cascader,
   CascaderOption,
   Tag,
+  Popup,
 } from 'antd-mobile';
 import { AddCircleOutline, DownOutline, RightOutline } from 'antd-mobile-icons';
 import { useMemo, useState } from 'react';
@@ -25,16 +26,15 @@ import {
   ICategoryRes,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
-import { FormCascader } from '@components/form-cascader';
 import { TopLoading } from '@components/loading';
 import { getCategoryColorByName } from '@styles/theme';
 import styles from './category.module.scss';
 
 type Cat = ICategoryRes['categories'][number];
+type CatNode = Cat & { children: CatNode[] };
 
 export default function App() {
   const [createVisible, setCreateVisible] = useState(false);
-  const [categoryVisible, setCategoryVisible] = useState(false);
   const [mergeTarget, setMergeTarget] = useState<Cat | null>(null);
   const [mergeCascaderVisible, setMergeCascaderVisible] = useState(false);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -42,17 +42,17 @@ export default function App() {
   const categoryRes = useCategories();
 
   const tree = useMemo(() => {
-    if (!categoryRes) return [] as (Cat & { children: Cat[] })[];
+    if (!categoryRes) return [] as CatNode[];
     const byParent = new Map<number | null, Cat[]>();
     categoryRes.categories.forEach((c) => {
       const arr = byParent.get(c.parentId) ?? [];
       arr.push(c);
       byParent.set(c.parentId, arr);
     });
-    const build = (parentId: number | null): (Cat & { children: Cat[] })[] =>
+    const build = (parentId: number | null): CatNode[] =>
       (byParent.get(parentId) ?? [])
         .sort((a, b) => a.id - b.id)
-        .map((c) => ({ ...c, children: build(c.id) as Cat[] }));
+        .map((c) => ({ ...c, children: build(c.id) }));
     return build(null);
   }, [categoryRes]);
 
@@ -78,7 +78,7 @@ export default function App() {
     }
     const confirm = await Dialog.confirm({
       title: '确认合并',
-      content: '此操作会把该类目下的所有账单、预算迁移到目标类目，子类也会一并挂到目标类目下，原类目随后被删除。操作不可撤销。',
+      content: '此操作会把该类目下的所有账单迁移到目标类目，子类也会一并挂到目标类目下，原类目随后被删除。操作不可撤销。',
     });
     if (!confirm) return;
     try {
@@ -95,7 +95,7 @@ export default function App() {
   const onDelete = async (cat: Cat) => {
     const confirm = await Dialog.confirm({
       title: '删除类目',
-      content: `删除 "${cat.name}" ? 只能删除无子类、无账单、无预算的类目。`,
+      content: `删除 "${cat.name}" ? 只能删除无子类、无账单的类目。`,
     });
     if (!confirm) return;
     try {
@@ -233,11 +233,7 @@ export default function App() {
             }}
           >
             <Form.Item name="parent" label="父级">
-              <FormCascader
-                options={cascaderOptions ?? []}
-                categoryVisible={categoryVisible}
-                setCategoryVisible={(v: boolean) => setCategoryVisible(v)}
-              />
+              <ParentCategoryPicker tree={tree} />
             </Form.Item>
             <Form.Item name="name" label="类名" rules={[{ required: true, message: '类名不能为空' }]}>
               <Input placeholder="为空则创建顶级类目" type="string" />
@@ -272,4 +268,127 @@ const MergeCascader: React.FC<{
       title="合并到…"
     />
   );
+};
+
+const ParentCategoryPicker: React.FC<{
+  value?: string[];
+  onChange?: (value: string[] | undefined) => void;
+  tree: CatNode[];
+}> = ({ value, onChange = () => {}, tree }) => {
+  const [visible, setVisible] = useState(false);
+  const [draftPath, setDraftPath] = useState<string[]>(value ?? []);
+
+  const selectedNodes = getNodesFromPath(tree, draftPath);
+  const currentOptions = selectedNodes.length > 0
+    ? selectedNodes[selectedNodes.length - 1].children
+    : tree;
+  const display = getNodesFromPath(tree, value ?? []).map((node) => node.name).join(' / ');
+
+  const open = () => {
+    setDraftPath(value ?? []);
+    setVisible(true);
+  };
+
+  const chooseNode = (node: CatNode) => {
+    setDraftPath([...draftPath, String(node.id)]);
+  };
+
+  const confirm = () => {
+    onChange(draftPath.length > 0 ? draftPath : undefined);
+    setVisible(false);
+  };
+
+  const clear = () => {
+    onChange(undefined);
+    setDraftPath([]);
+    setVisible(false);
+  };
+
+  return (
+    <>
+      <div className={styles.parentTrigger} onClick={open}>
+        <span>{display || '不选择，创建顶级类目'}</span>
+      </div>
+      <Popup
+        visible={visible}
+        onMaskClick={() => setVisible(false)}
+        bodyStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+      >
+        <div className={styles.parentPanel}>
+          <div className={styles.parentHeader}>
+            <div className={styles.parentTitle}>选择父级类目</div>
+            <button type="button" className={styles.parentClose} onClick={() => setVisible(false)}>
+              关闭
+            </button>
+          </div>
+
+          <div className={styles.parentCrumbs}>
+            <button type="button" className={draftPath.length === 0 ? styles.crumbActive : styles.crumb} onClick={() => setDraftPath([])}>
+              顶级
+            </button>
+            {selectedNodes.map((node, index) => (
+              <button
+                key={node.id}
+                type="button"
+                className={index === selectedNodes.length - 1 ? styles.crumbActive : styles.crumb}
+                onClick={() => setDraftPath(draftPath.slice(0, index + 1))}
+              >
+                {node.name}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.parentActions}>
+            <Button size="small" color="primary" onClick={confirm}>
+              {draftPath.length > 0 ? '使用当前选择' : '创建顶级类目'}
+            </Button>
+            {draftPath.length > 0 && (
+              <Button size="small" onClick={() => setDraftPath(draftPath.slice(0, -1))}>
+                返回上一级
+              </Button>
+            )}
+            <Button size="small" fill="none" onClick={clear}>
+              清空
+            </Button>
+          </div>
+
+          <div className={styles.parentList}>
+            {currentOptions.length > 0 ? (
+              currentOptions.map((node) => {
+                const hasChildren = node.children.length > 0;
+                return (
+                  <button
+                    key={node.id}
+                    type="button"
+                    className={styles.parentItem}
+                    onClick={() => chooseNode(node)}
+                  >
+                    <span>{node.name}</span>
+                    <span className={styles.parentItemMeta}>{hasChildren ? '进入下一级' : '可选为父级'}</span>
+                    {hasChildren && <RightOutline />}
+                  </button>
+                );
+              })
+            ) : (
+              <div className={styles.parentEmpty}>当前类目下没有子类目，可直接使用当前选择</div>
+            )}
+          </div>
+        </div>
+      </Popup>
+    </>
+  );
+};
+
+const getNodesFromPath = (tree: CatNode[], path: string[]) => {
+  const nodes: CatNode[] = [];
+  let options = tree;
+
+  for (const id of path) {
+    const node = options.find((item) => String(item.id) === id);
+    if (!node) break;
+    nodes.push(node);
+    options = node.children;
+  }
+
+  return nodes;
 };

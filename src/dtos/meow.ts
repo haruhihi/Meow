@@ -1,4 +1,4 @@
-import { Category, Coupon, Transaction, Trek, User } from '@prisma/client';
+import { Category, Coupon, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -15,10 +15,6 @@ export interface ICategoryRes {
       children: true;
     };
   }>[];
-}
-
-export interface ITrekSearchRes {
-  treks: Trek[];
 }
 
 export interface ICategoryCreateReq {
@@ -88,20 +84,6 @@ export interface ISignReq {
 
 export interface IUserInfoRes {
   user: User;
-}
-
-export interface ITrekCreateReq {
-  date: number;
-  count: Trek['count'];
-  type: string;
-}
-
-export interface ITrekCreateRes {
-  trek: Trek;
-}
-
-export interface ITrekDeleteRes {
-  treks: Trek[];
 }
 
 export interface ICategoryMergeReq {
