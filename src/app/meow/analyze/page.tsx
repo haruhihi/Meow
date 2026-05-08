@@ -31,6 +31,8 @@ export default function AnalyzePage() {
   const [categoryVisible, setCategoryVisible] = useState(false);
   const [data, setData] = useState<ITransactionAnalyzeRes | null>(null);
   const [month, setMonth] = useState<Date>(new Date());
+  const [selectedCategory, setSelectedCategory] = useState<string[] | undefined>();
+  const [includeCouponDiscount, setIncludeCouponDiscount] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('pie');
   const [groupByParent, setGroupByParent] = useState(true);
 
@@ -39,7 +41,7 @@ export default function AnalyzePage() {
     [categoryRes]
   );
 
-  const fetchData = async (d: Date, categoryPath?: string[]) => {
+  const fetchData = async (d: Date, categoryPath?: string[], includeCoupon = includeCouponDiscount) => {
     const categoryId = categoryPath?.[categoryPath.length - 1];
     const timeObj = dayjs(d);
     try {
@@ -48,6 +50,7 @@ export default function AnalyzePage() {
         year: timeObj.year(),
         month: timeObj.month() + 1,
         granularity: 'month',
+        includeCouponDiscount: includeCoupon,
       });
       setData(res);
     } catch (err) {
@@ -152,8 +155,10 @@ export default function AnalyzePage() {
           layout="horizontal"
           initialValues={{ time: new Date() }}
           onValuesChange={(_, values) => {
-            setMonth(values.time ?? new Date());
-            fetchData(values.time ?? new Date(), values.category);
+            const nextMonth = values.time ?? new Date();
+            setMonth(nextMonth);
+            setSelectedCategory(values.category);
+            fetchData(nextMonth, values.category);
           }}
         >
           <Form.Item
@@ -179,11 +184,43 @@ export default function AnalyzePage() {
           <>
             <div className={styles.summaryCard}>
               <div>
-                <div className={styles.summarySub}>共 {data.transactions.length} 笔</div>
+                <div className={styles.summarySub}>共 {data.transactions.length} 笔 · 券抵扣 {formatMoney(data.couponDiscountTotal)}</div>
                 <div className={styles.summaryTotal}>{formatMoney(data.total)}</div>
               </div>
               <div className={styles.summaryMonth}>{dayjs(month).format('YYYY 年 M 月')}</div>
             </div>
+
+            <div className={styles.selector}>
+              <Selector
+                value={[includeCouponDiscount ? 'gross' : 'net']}
+                onChange={(v) => {
+                  const next = v[0] === 'gross';
+                  setIncludeCouponDiscount(next);
+                  fetchData(month, selectedCategory, next);
+                }}
+                options={[
+                  { label: '实付统计', value: 'net' },
+                  { label: '统计券金额', value: 'gross' },
+                ]}
+              />
+            </div>
+
+            {data.couponUsages.length > 0 && (
+              <div className={styles.couponUsage}>
+                <div className={styles.breakdownTitle}>券使用</div>
+                <List className={styles.breakdownList}>
+                  {data.couponUsages.map((usage) => (
+                    <List.Item
+                      key={`${usage.couponId ?? 'deleted'}-${usage.name}`}
+                      description={`${usage.count} 笔`}
+                      extra={<span className={styles.amount}>{formatMoney(usage.discount)}</span>}
+                    >
+                      {usage.name}
+                    </List.Item>
+                  ))}
+                </List>
+              </div>
+            )}
 
             <div className={styles.selector}>
               <Selector

@@ -22,7 +22,6 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  budgets     Budget[]      @relation("UserBudgets")
   Transaction Transaction[] @relation
   Trek        Trek[]
 }
@@ -34,35 +33,45 @@ model Category {
   parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
   children Category[] @relation("CategoryParent") // Children categories
 
-  Budget      Budget[]      @relation
   Transaction Transaction[] @relation
 }
 
-model Budget {
-  id         Int      @id @default(autoincrement())
-  categoryId Int? // Null for full category
-  amount     Float // Budget amount
-  startDate  DateTime // Budget start date
-  endDate    DateTime // Budget end date
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  users    User[]    @relation("UserBudgets")
-  category Category? @relation(fields: [categoryId], references: [id])
-}
-
 model Transaction {
-  id          Int      @id @default(autoincrement())
-  userId      Int // User ID
-  categoryId  Int // Category of the transaction (mandatory)
-  amount      Float // Transaction amount
-  description String?  @db.VarChar(255) // Optional description
-  date        DateTime // Transaction date
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  userId         Int // User ID
+  categoryId     Int // Category of the transaction (mandatory)
+  couponId       Int?
+  couponName     String?  @db.VarChar(255)
+  couponDiscount Float    @default(0)
+  amount         Float // Transaction amount before coupon discount
+  description    String?  @db.VarChar(255) // Optional description
+  date           DateTime // Transaction date
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user     User     @relation(fields: [userId], references: [id])
   category Category @relation(fields: [categoryId], references: [id])
+  coupon   Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+}
+
+model Coupon {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(255)
+  type            String?  @db.VarChar(80)
+  amount          Float
+  remainingAmount Float
+  validYear       Int
+  validMonth      Int
+  startDate       DateTime
+  endDate         DateTime
+  seedKey         String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions Transaction[]
+
+  @@index([validYear, validMonth])
+  @@index([name])
 }
 
 model Trek {

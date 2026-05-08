@@ -5,10 +5,8 @@ import {
   ITransactionSearchReq,
   ITransactionAnalyzeReq,
   ITransactionAnalyzeRes,
-  IBudgetSearchReq,
-  IBudgetSearchRes,
-  IBudgetUpsertReq,
-  IBudgetUpsertRes,
+  ICouponSearchReq,
+  ICouponSearchRes,
 } from '@dtos/meow';
 import dayjs from 'dayjs';
 
@@ -61,7 +59,7 @@ export const useTransactions = () => {
 };
 
 // Fetch analyze data (full month dump). Bumps on refreshKey change.
-export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0) => {
+export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0, includeCouponDiscount = false) => {
   const [data, setData] = useState<ITransactionAnalyzeRes | null>(null);
   const [loading, setLoading] = useState(false);
   const year = month.year();
@@ -74,12 +72,22 @@ export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0) => {
       year,
       month: m,
       granularity: 'month',
+      includeCouponDiscount,
     })
       .then((res) => {
         if (!cancelled) setData(res);
       })
       .catch(() => {
-        if (!cancelled) setData({ transactions: [], total: 0 });
+        if (!cancelled) {
+          setData({
+            transactions: [],
+            total: 0,
+            grossTotal: 0,
+            netTotal: 0,
+            couponDiscountTotal: 0,
+            couponUsages: [],
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -87,36 +95,49 @@ export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0) => {
     return () => {
       cancelled = true;
     };
-  }, [year, m, refreshKey]);
+  }, [year, m, refreshKey, includeCouponDiscount]);
 
   return { data, loading };
 };
 
-export const useMonthBudget = (month: dayjs.Dayjs, refreshKey: number = 0) => {
-  const [budget, setBudget] = useState<IBudgetSearchRes['budgets'][number] | null>(null);
+export const usePaymentCoupons = (month: dayjs.Dayjs, refreshKey: number = 0) => {
+  const [coupons, setCoupons] = useState<ICouponSearchRes['coupons']>([]);
   const year = month.year();
   const m = month.month() + 1;
 
   useEffect(() => {
     let cancelled = false;
-    post<IBudgetSearchReq, IBudgetSearchRes>('/api/budget/search', { year, month: m })
+    post<ICouponSearchReq, ICouponSearchRes>('/api/coupon/search', {
+      year,
+      month: m,
+      includeAdjacent: true,
+    })
       .then((res) => {
         if (cancelled) return;
-        // Prefer the overall budget (categoryId == null) if one exists.
-        const overall = res.budgets.find((b) => b.categoryId == null) ?? null;
-        setBudget(overall);
+        const currentKey = year * 12 + m;
+        setCoupons(
+          res.coupons
+            .slice()
+            .sort((left, right) => {
+              const rank = (diff: number) => (diff === 0 ? 0 : diff === -1 ? 1 : diff === 1 ? 2 : 3 + Math.abs(diff));
+              const leftRank = rank(left.validYear * 12 + left.validMonth - currentKey);
+              const rightRank = rank(right.validYear * 12 + right.validMonth - currentKey);
+              if (leftRank !== rightRank) return leftRank - rightRank;
+              return left.name.localeCompare(right.name, 'zh-CN');
+            })
+        );
       })
       .catch(() => {
-        if (!cancelled) setBudget(null);
+        if (!cancelled) setCoupons([]);
       });
     return () => {
       cancelled = true;
     };
   }, [year, m, refreshKey]);
 
-  return budget;
+  return coupons;
 };
 
-export const upsertMonthBudget = (year: number, month: number, amount: number | null) =>
-  post<IBudgetUpsertReq, IBudgetUpsertRes>('/api/budget/upsert', { year, month, amount });
+export const searchCoupons = (params: ICouponSearchReq) =>
+  post<ICouponSearchReq, ICouponSearchRes>('/api/coupon/search', params);
 

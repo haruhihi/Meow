@@ -12,12 +12,13 @@ import {
   DatePicker,
   DatePickerRef,
   PullToRefresh,
+  Selector,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { HandPayCircleOutline, PieOutline } from 'antd-mobile-icons';
+import { HandPayCircleOutline, PayCircleOutline, PieOutline } from 'antd-mobile-icons';
 import { RefObject, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTransactions, useMonthAnalyze, useMonthBudget } from '@utils/transaction';
+import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import {
   useCategories,
   getCategoryOptions,
@@ -44,12 +45,13 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTop, setSelectedTop] = useState<string | null>(null);
   const [showTrend, setShowTrend] = useState(true);
+  const [payTime, setPayTime] = useState(dayjs());
 
   const categoryRes = useCategories();
   const { transactions, reQuery, loadMore, hasMore } = useTransactions();
   const { data: monthData } = useMonthAnalyze(month, refreshKey);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey);
-  const budget = useMonthBudget(month, refreshKey);
+  const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
 
   // Resolver: category id -> top-level category name. Built from the current
   // categories payload (or a no-op while loading). Must live BEFORE any early
@@ -118,6 +120,26 @@ export default function App() {
     return (rankedOptions.length > 0 ? rankedOptions : flatCategoryOptions).slice(0, 6);
   }, [flatCategoryOptions, monthData?.transactions, transactions]);
 
+  const couponOptions = useMemo(
+    () =>
+      paymentCoupons.map((coupon) => ({
+        label: (
+          <span className={styles.couponOption}>
+            <span className={styles.couponOptionTitle}>
+              <PayCircleOutline />
+              <span>{coupon.name}</span>
+              <span>{coupon.validYear}/{String(coupon.validMonth).padStart(2, '0')}</span>
+            </span>
+            <span className={styles.couponOptionAmount}>
+              剩余 {formatMoney(coupon.remainingAmount)}（总：{formatMoney(coupon.amount)}）
+            </span>
+          </span>
+        ),
+        value: String(coupon.id),
+      })),
+    [paymentCoupons]
+  );
+
   if (!categoryRes || transactions === undefined) {
     return <TopLoading />;
   }
@@ -125,6 +147,7 @@ export default function App() {
   primeCategoryResolvers(categoryRes.categories);
 
   const onClick = () => {
+    setPayTime(dayjs());
     setVisible(true);
     setCategoryVisible(true);
   };
@@ -142,7 +165,7 @@ export default function App() {
           onMonthChange={setMonth}
           transactions={monthData?.transactions ?? []}
           prevMonthTotal={prevMonthData?.total}
-          budget={budget}
+          couponDiscountTotal={monthData?.couponDiscountTotal}
         />
 
         {monthData && monthData.transactions.length > 0 && (
@@ -229,14 +252,47 @@ export default function App() {
             }
             initialValues={{ time: new Date() }}
             style={{ marginTop: '20px' }}
-            onFinish={async (values: { amount: string; category: string[]; time: Date; description?: string }) => {
+            onValuesChange={(_, values) => {
+              if (values.time) setPayTime(dayjs(values.time));
+            }}
+            onFinish={async (values: {
+              amount: string;
+              category: string[];
+              time: Date;
+              description?: string;
+              couponId?: string[];
+              couponDiscount?: string;
+            }) => {
               if (!values) return;
-              const { amount, category, time, description } = values;
+              const { amount, category, time, description, couponId, couponDiscount } = values;
+              const selectedCouponId = couponId?.[0] ? Number(couponId[0]) : undefined;
+              const discount = Number(couponDiscount || 0);
+              const selectedCoupon = selectedCouponId
+                ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
+                : undefined;
+              if (discount < 0) {
+                Toast.show({ content: '抵扣金额不能小于 0' });
+                return;
+              }
+              if (discount > Number(amount)) {
+                Toast.show({ content: '抵扣金额不能超过消费金额' });
+                return;
+              }
+              if (discount > 0 && !selectedCoupon) {
+                Toast.show({ content: '请选择要使用的券' });
+                return;
+              }
+              if (selectedCoupon && discount > selectedCoupon.remainingAmount) {
+                Toast.show({ content: '抵扣金额不能超过券余额' });
+                return;
+              }
               await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', {
                 amount: Number(amount),
                 categoryId: Number(category[category.length - 1]),
                 date: dayjs(time).unix() * 1000,
                 description,
+                couponId: selectedCouponId,
+                couponDiscount: discount,
               });
               Toast.show({
                 content: '记录成功',
@@ -274,6 +330,16 @@ export default function App() {
               <Input placeholder="请输入金额" type="number" />
             </Form.Item>
 
+            {couponOptions.length > 0 && (
+              <Form.Item name="couponId" label="券">
+                <Selector columns={1} options={couponOptions} />
+              </Form.Item>
+            )}
+
+            <Form.Item name="couponDiscount" label="抵扣">
+              <Input placeholder="本次券抵扣金额" type="number" />
+            </Form.Item>
+
             <Form.Item name="description" label="备注">
               <Input placeholder="请输入备注" type="string" />
             </Form.Item>
@@ -304,7 +370,7 @@ const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedLis
     });
     return [...m.entries()].map(([date, items]) => ({
       date,
-      total: items.reduce((s, t) => s + t.amount, 0),
+      total: items.reduce((s, t) => s + Math.max(0, t.amount - t.couponDiscount), 0),
       items,
     }));
   }, [transactions]);
@@ -325,6 +391,10 @@ const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedLis
               const Icon = getIconFromCategoryId(transaction.category.id);
               const color = getColorFromCategoryId(transaction.category.id);
               const { description, category } = transaction;
+              const netAmount = Math.max(0, transaction.amount - transaction.couponDiscount);
+              const couponText = transaction.couponDiscount > 0
+                ? ` · ${transaction.coupon?.name ?? transaction.couponName ?? '券'}抵扣 ${formatMoney(transaction.couponDiscount)}`
+                : '';
               return (
                 <SwipeAction
                   key={transaction.id}
@@ -347,9 +417,10 @@ const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedLis
                       <span className={styles.itemDesc}>
                         {dayjs(transaction.date).format('HH:mm')}
                         {description ? ` · ${description}` : ''}
+                        {couponText}
                       </span>
                     }
-                    extra={<span className={styles.itemAmount}>{formatMoney(transaction.amount)}</span>}
+                    extra={<span className={styles.itemAmount}>{formatMoney(netAmount)}</span>}
                   >
                     <span className={styles.itemTitle}>{category.name}</span>
                   </List.Item>

@@ -102,6 +102,37 @@
   font-variant-numeric: tabular-nums;
 }
 
+.couponOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.couponOptionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: var(--meow-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.couponOptionAmount {
+  color: var(--meow-text-sub);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .loadMore {
   display: flex;
   justify-content: center;

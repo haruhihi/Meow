@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       take: pageSize,
       include: {
         category: true,
+        coupon: true,
       },
     });
 

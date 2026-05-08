@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { Button, List, Toast, Dialog, Input, Modal, Form } from 'antd-mobile';
+import { Button, List, Toast, Dialog } from 'antd-mobile';
 import {
   UserOutline,
   PayCircleOutline,
@@ -12,10 +12,8 @@ import {
 } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { useUserInfo } from '@utils/user';
-import { useMonthBudget, upsertMonthBudget } from '@utils/transaction';
 import { post } from '@libs/fetch';
 import { ITransactionAnalyzeReq, ITransactionAnalyzeRes } from '@dtos/meow';
-import { formatMoney } from '@styles/theme';
 import { TopLoading } from '@components/loading';
 import styles from './me.module.scss';
 
@@ -24,10 +22,7 @@ export default function App() {
   const userInfo = useUserInfo();
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
-  const [month, setMonth] = useState(dayjs());
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [budgetVisible, setBudgetVisible] = useState(false);
-  const budget = useMonthBudget(month, refreshKey);
+  const [month] = useState(dayjs());
 
   useEffect(() => {
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream);
@@ -81,26 +76,32 @@ export default function App() {
 
       <div className={styles.card}>
         <div className={styles.cardTitle}>
-          <PayCircleOutline /> 本月预算
+          <PayCircleOutline /> 券管理
         </div>
-        <div className={styles.budgetRow}>
+        <div className={styles.couponRow}>
           <div>
-            <div className={styles.budgetLabel}>{month.format('YYYY 年 M 月')}</div>
-            <div className={styles.budgetValue}>
-              {budget ? formatMoney(budget.amount) : '未设置'}
-            </div>
+            <div className={styles.couponLabel}>共享券池</div>
+            <div className={styles.couponValue}>创建、修改、删除券</div>
           </div>
           <Button
             color="primary"
             size="small"
-            onClick={() => setBudgetVisible(true)}
+            onClick={() => router.push('/meow/coupons')}
           >
-            {budget ? '修改' : '设置'}
+            进入
           </Button>
         </div>
       </div>
 
       <List header="设置" className={styles.list}>
+        <List.Item
+          prefix={<PayCircleOutline />}
+          extra={<RightOutline />}
+          onClick={() => router.push('/meow/coupons')}
+          description="管理共享券，生成默认月度券"
+        >
+          券管理
+        </List.Item>
         <List.Item
           prefix={<FileOutline />}
           extra={<RightOutline />}
@@ -137,68 +138,6 @@ export default function App() {
           切换账号
         </Button>
       </div>
-
-      <BudgetModal
-        visible={budgetVisible}
-        current={budget?.amount ?? 0}
-        month={month}
-        onClose={() => setBudgetVisible(false)}
-        onMonthChange={setMonth}
-        onSave={async (amt) => {
-          try {
-            await upsertMonthBudget(month.year(), month.month() + 1, amt);
-            Toast.show({ content: amt > 0 ? '已保存' : '已清除预算' });
-            setBudgetVisible(false);
-            setRefreshKey((k) => k + 1);
-          } catch (e) {
-            Toast.show({ content: `保存失败: ${(e as any)?.result ?? e}` });
-          }
-        }}
-      />
     </div>
   );
 }
-
-const BudgetModal: React.FC<{
-  visible: boolean;
-  current: number;
-  month: dayjs.Dayjs;
-  onClose: () => void;
-  onMonthChange: (m: dayjs.Dayjs) => void;
-  onSave: (amount: number) => Promise<void>;
-}> = ({ visible, current, month, onClose, onSave }) => {
-  return (
-    <Modal
-      visible={visible}
-      title={`${month.format('YYYY 年 M 月')} 预算`}
-      closeOnMaskClick
-      showCloseButton
-      onClose={onClose}
-      content={
-        <Form
-          layout="horizontal"
-          initialValues={{ amount: current || '' }}
-          footer={
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button block type="submit" color="primary">
-                保存
-              </Button>
-              <Button
-                block
-                color="default"
-                onClick={() => onSave(0)}
-              >
-                清除
-              </Button>
-            </div>
-          }
-          onFinish={(v: { amount: string }) => onSave(Number(v.amount))}
-        >
-          <Form.Item name="amount" label="金额" rules={[{ required: true, message: '请输入预算金额' }]}>
-            <Input placeholder="如 3000" type="number" />
-          </Form.Item>
-        </Form>
-      }
-    />
-  );
-};

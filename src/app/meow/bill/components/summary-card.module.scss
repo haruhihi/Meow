@@ -99,32 +99,7 @@
   opacity: 0.8;
 }
 
-.budgetBlock {
-  margin-top: 14px;
-}
-
-.budgetRow {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  opacity: 0.95;
-  margin-bottom: 6px;
-}
-
-.progress {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.progressInner {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.3s ease, background-color 0.3s ease;
-}
-
-.budgetHint {
+.couponHint {
   margin-top: 14px;
   font-size: 12px;
   opacity: 0.78;

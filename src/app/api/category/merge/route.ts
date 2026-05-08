@@ -46,12 +46,8 @@ export async function POST(request: Request) {
         });
       }
 
-      // Re-point all transactions & budgets from source to target.
+      // Re-point all transactions from source to target.
       const txns = await tx.transaction.updateMany({
-        where: { categoryId: fromId },
-        data: { categoryId: toId },
-      });
-      const budgets = await tx.budget.updateMany({
         where: { categoryId: fromId },
         data: { categoryId: toId },
       });
@@ -61,7 +57,6 @@ export async function POST(request: Request) {
       return {
         movedChildren: from.children.length,
         movedTransactions: txns.count,
-        movedBudgets: budgets.count,
       };
     });
 

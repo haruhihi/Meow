@@ -1,0 +1,55 @@
+.page {
+  min-height: 100%;
+  background: var(--meow-bg);
+  padding-bottom: 88px;
+}
+
+.navbar {
+  background: var(--meow-surface);
+  border-bottom: 1px solid var(--meow-border);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+}
+
+.list {
+  margin: 0 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  --border-top: none;
+  --border-bottom: none;
+}
+
+.itemTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--meow-text);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.itemMeta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--meow-text-sub);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}

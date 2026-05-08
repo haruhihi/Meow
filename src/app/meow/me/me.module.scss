@@ -57,21 +57,21 @@
   gap: 6px;
 }
 
-.budgetRow {
+.couponRow {
   margin-top: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.budgetLabel {
+.couponLabel {
   font-size: 11px;
   color: var(--meow-text-muted);
 }
 
-.budgetValue {
+.couponValue {
   margin-top: 4px;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--meow-text);
 }

@@ -1,5 +1,12 @@
-import { Category, Transaction, Trek, User, Budget } from '@prisma/client';
+import { Category, Coupon, Transaction, Trek, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
+
+export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
+  include: {
+    category: true;
+    coupon: true;
+  };
+}>;
 
 export interface ICategoryRes {
   categories: Prisma.CategoryGetPayload<{
@@ -28,6 +35,8 @@ export interface ITransactionCreateReq {
   amount: Transaction['amount'];
   description?: Transaction['description'];
   date: number;
+  couponId?: Transaction['couponId'];
+  couponDiscount?: Transaction['couponDiscount'];
 }
 
 export interface ITransactionCreateRes {
@@ -35,11 +44,7 @@ export interface ITransactionCreateRes {
 }
 
 export interface ITransactionSearchRes {
-  transactions: Prisma.TransactionGetPayload<{
-    include: {
-      category: true;
-    };
-  }>[];
+  transactions: TransactionWithCoupon[];
 }
 
 export interface ITransactionSearchReq {
@@ -52,15 +57,23 @@ export interface ITransactionAnalyzeReq {
   year: number;   // 年份
   month: number;  // 月份 (1-12)
   granularity?: 'month' | 'year';
+  includeCouponDiscount?: boolean;
+}
+
+export interface ICouponUsageSummary {
+  couponId: Coupon['id'] | null;
+  name: string;
+  discount: number;
+  count: number;
 }
 
 export interface ITransactionAnalyzeRes {
-  transactions: Prisma.TransactionGetPayload<{
-    include: {
-      category: true;
-    };
-  }>[];
+  transactions: TransactionWithCoupon[];
   total: number;
+  grossTotal: number;
+  netTotal: number;
+  couponDiscountTotal: number;
+  couponUsages: ICouponUsageSummary[];
 }
 
 export interface ITransactionDeleteReq {
@@ -99,7 +112,6 @@ export interface ICategoryMergeReq {
 export interface ICategoryMergeRes {
   movedChildren: number;
   movedTransactions: number;
-  movedBudgets: number;
 }
 
 export interface ICategoryDeleteReq {
@@ -110,23 +122,43 @@ export interface ICategoryDeleteRes {
   id: number;
 }
 
-export interface IBudgetSearchReq {
-  year: number;
-  month: number;
+export interface ICouponSearchReq {
+  year?: number;
+  month?: number;
+  includeAdjacent?: boolean;
+  includeEmpty?: boolean;
+  keyword?: string;
 }
 
-export interface IBudgetSearchRes {
-  budgets: Prisma.BudgetGetPayload<{
-    include: { category: true };
-  }>[];
+export interface ICouponSearchRes {
+  coupons: Coupon[];
 }
 
-export interface IBudgetUpsertReq {
-  year: number;
-  month: number;
-  amount: number | null;
+export interface ICouponCreateReq {
+  name: Coupon['name'];
+  type?: Coupon['type'];
+  amount: Coupon['amount'];
+  validYear: Coupon['validYear'];
+  validMonth: Coupon['validMonth'];
 }
 
-export interface IBudgetUpsertRes {
-  budget: Budget | null;
+export interface ICouponCreateRes {
+  coupon: Coupon;
+}
+
+export interface ICouponUpdateReq extends Partial<ICouponCreateReq> {
+  id: Coupon['id'];
+}
+
+export interface ICouponUpdateRes {
+  coupon: Coupon;
+}
+
+export interface ICouponDeleteReq {
+  id: Coupon['id'];
+}
+
+export interface ICouponSeedRes {
+  created: number;
+  skipped: number;
 }

@@ -4,7 +4,7 @@ import { FC, useMemo } from 'react';
 import dayjs from 'dayjs';
 import { LeftOutline, RightOutline } from 'antd-mobile-icons';
 import { formatMoney, PALETTE } from '@styles/theme';
-import type { ITransactionSearchRes, IBudgetSearchRes } from '@dtos/meow';
+import type { ITransactionSearchRes } from '@dtos/meow';
 import styles from './summary-card.module.scss';
 
 interface Props {
@@ -12,10 +12,10 @@ interface Props {
   onMonthChange: (m: dayjs.Dayjs) => void;
   transactions: ITransactionSearchRes['transactions'];
   prevMonthTotal?: number;
-  budget: IBudgetSearchRes['budgets'][number] | null;
+  couponDiscountTotal?: number;
 }
 
-export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, prevMonthTotal, budget }) => {
+export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, prevMonthTotal, couponDiscountTotal = 0 }) => {
   const stats = useMemo(() => {
     const start = month.startOf('month');
     const end = month.endOf('month');
@@ -35,12 +35,7 @@ export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, pre
     : null;
 
   const isCurrentMonth = month.isSame(dayjs(), 'month');
-  const budgetAmount = budget?.amount ?? 0;
-  const pct = budgetAmount > 0 ? Math.min(999, (stats.total / budgetAmount) * 100) : 0;
-  const over = budgetAmount > 0 && stats.total > budgetAmount;
-  const nearLimit = budgetAmount > 0 && !over && pct >= 80;
-
-  const barColor = over ? PALETTE.danger : nearLimit ? PALETTE.warning : PALETTE.success;
+  const grossTotal = stats.total + couponDiscountTotal;
 
   return (
     <div className={styles.card}>
@@ -87,24 +82,9 @@ export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, pre
         <Stat label="上月" value={prevMonthTotal != null ? formatMoney(prevMonthTotal) : '—'} />
       </div>
 
-      {budgetAmount > 0 ? (
-        <div className={styles.budgetBlock}>
-          <div className={styles.budgetRow}>
-            <span>预算 {formatMoney(budgetAmount)}</span>
-            <span style={{ color: barColor }}>
-              {over ? `超支 ${formatMoney(stats.total - budgetAmount)}` : `剩余 ${formatMoney(budgetAmount - stats.total)}`}
-            </span>
-          </div>
-          <div className={styles.progress}>
-            <div
-              className={styles.progressInner}
-              style={{ width: `${Math.min(100, pct)}%`, background: barColor }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className={styles.budgetHint}>未设置本月预算 · 前往「我的」设置</div>
-      )}
+      <div className={styles.couponHint}>
+        原始支出 {formatMoney(grossTotal)} · 券抵扣 {formatMoney(couponDiscountTotal)}
+      </div>
     </div>
   );
 };
