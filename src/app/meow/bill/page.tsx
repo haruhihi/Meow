@@ -5,6 +5,7 @@ import {
   Form,
   Button,
   Input,
+  Switch,
   List,
   SwipeAction,
   Empty,
@@ -39,6 +40,7 @@ import styles from './bill.module.scss';
 
 export default function App() {
   const router = useRouter();
+  const [form] = Form.useForm();
   const [visible, setVisible] = useState(false);
   const [categoryVisible, setCategoryVisible] = useState(false);
   const [month, setMonth] = useState(dayjs());
@@ -126,9 +128,13 @@ export default function App() {
         label: (
           <span className={styles.couponOption}>
             <span className={styles.couponOptionTitle}>
-              <PayCircleOutline />
-              <span>{coupon.name}</span>
-              <span>{coupon.validYear}/{String(coupon.validMonth).padStart(2, '0')}</span>
+              <span className={styles.couponOptionIcon}>
+                <PayCircleOutline />
+              </span>
+              <span className={styles.couponOptionName}>{coupon.name}</span>
+              <span className={styles.couponOptionDate}>
+                {coupon.validYear}/{String(coupon.validMonth).padStart(2, '0')}
+              </span>
             </span>
             <span className={styles.couponOptionAmount}>
               剩余 {formatMoney(coupon.remainingAmount)}（总：{formatMoney(coupon.amount)}）
@@ -244,29 +250,50 @@ export default function App() {
         onClose={() => setVisible(false)}
         content={
           <Form
+            form={form}
             layout="horizontal"
             footer={
               <Button block type="submit" color="primary" size="large">
                 提交
               </Button>
             }
-            initialValues={{ time: new Date() }}
+            initialValues={{ time: new Date(), useCoupon: false }}
             style={{ marginTop: '20px' }}
             onValuesChange={(_, values) => {
               if (values.time) setPayTime(dayjs(values.time));
+              if (!values.useCoupon) {
+                form.setFieldsValue({ couponId: undefined, couponDiscount: undefined });
+                form.setFields([
+                  { name: ['couponId'], errors: [] },
+                  { name: ['couponDiscount'], errors: [] },
+                ]);
+              }
+              const couponId = values.couponId?.[0];
+              const hasValidCoupon = Boolean(
+                couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+              );
+              if (!hasValidCoupon) {
+                form.setFields([
+                  {
+                    name: ['couponDiscount'],
+                    errors: [],
+                  },
+                ]);
+              }
             }}
             onFinish={async (values: {
               amount: string;
               category: string[];
               time: Date;
+              useCoupon?: boolean;
               description?: string;
               couponId?: string[];
               couponDiscount?: string;
             }) => {
               if (!values) return;
-              const { amount, category, time, description, couponId, couponDiscount } = values;
-              const selectedCouponId = couponId?.[0] ? Number(couponId[0]) : undefined;
-              const discount = Number(couponDiscount || 0);
+              const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
+              const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
+              const discount = useCoupon ? Number(couponDiscount || 0) : 0;
               const selectedCoupon = selectedCouponId
                 ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
                 : undefined;
@@ -330,14 +357,46 @@ export default function App() {
               <Input placeholder="请输入金额" type="number" />
             </Form.Item>
 
-            {couponOptions.length > 0 && (
-              <Form.Item name="couponId" label="券">
-                <Selector columns={1} options={couponOptions} />
-              </Form.Item>
-            )}
+            <Form.Item name="useCoupon" label="使用券" valuePropName="checked">
+              <Switch />
+            </Form.Item>
 
-            <Form.Item name="couponDiscount" label="抵扣">
-              <Input placeholder="本次券抵扣金额" type="number" />
+            <Form.Item noStyle shouldUpdate={(prev, next) => prev.useCoupon !== next.useCoupon}>
+              {({ getFieldValue }) => {
+                const useCoupon = Boolean(getFieldValue('useCoupon'));
+                if (!useCoupon) return null;
+
+                return (
+                  <>
+                    {couponOptions.length > 0 && (
+                      <Form.Item name="couponId" label="券" className={styles.couponField}>
+                        <Selector className={styles.couponSelector} columns={1} options={couponOptions} />
+                      </Form.Item>
+                    )}
+
+                    <Form.Item noStyle shouldUpdate={(prev, next) => prev.couponId !== next.couponId}>
+                      {({ getFieldValue: getNestedFieldValue }) => {
+                        const couponId = getNestedFieldValue('couponId')?.[0];
+                        const hasValidCoupon = Boolean(
+                          couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+                        );
+
+                        return (
+                          <Form.Item
+                            key={hasValidCoupon ? 'coupon-discount-required' : 'coupon-discount-optional'}
+                            name="couponDiscount"
+                            label="抵扣"
+                            required={hasValidCoupon}
+                            rules={hasValidCoupon ? [{ required: true, message: '已选券时请填写抵扣金额' }] : []}
+                          >
+                            <Input placeholder="本次券抵扣金额" type="number" />
+                          </Form.Item>
+                        );
+                      }}
+                    </Form.Item>
+                  </>
+                );
+              }}
             </Form.Item>
 
             <Form.Item name="description" label="备注">
