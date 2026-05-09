@@ -159,13 +159,39 @@
 }
 
 .couponOptionAmount {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   color: var(--meow-text-sub);
   font-size: 12px;
+  white-space: normal;
+  line-height: 1.3;
+  padding-left: 28px;
+
+  > span {
+    display: block;
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+  }
+}
+
+.couponOptionAmountExtra {
+  opacity: 0.88;
   white-space: nowrap;
-  padding-left: 30px;
 }
 
 .couponField {
+  :global(.adm-form-item-label) {
+    display: none;
+  }
+
+  :global(.adm-form-item-child) {
+    width: 100%;
+    min-width: 0;
+  }
+
   :global(.adm-form-item-child-inner) {
     width: 100%;
   }
@@ -178,7 +204,7 @@
     border-radius: 12px;
     border: 1px solid var(--meow-border);
     background: linear-gradient(180deg, color-mix(in srgb, var(--meow-surface-alt) 64%, white), var(--meow-surface));
-    padding: 10px 12px;
+    padding: 9px 10px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   }
 

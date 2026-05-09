@@ -137,7 +137,8 @@ export default function App() {
               </span>
             </span>
             <span className={styles.couponOptionAmount}>
-              剩余 {formatMoney(coupon.remainingAmount)}（总：{formatMoney(coupon.amount)}）
+              <span>剩余：{formatMoney(coupon.remainingAmount)}</span>
+              <span className={styles.couponOptionAmountExtra}>总：{formatMoney(coupon.amount)}</span>
             </span>
           </span>
         ),
@@ -153,7 +154,18 @@ export default function App() {
   primeCategoryResolvers(categoryRes.categories);
 
   const onClick = () => {
-    setPayTime(dayjs());
+    const now = new Date();
+    setPayTime(dayjs(now));
+    form.resetFields();
+    form.setFieldsValue({
+      time: now,
+      useCoupon: false,
+      couponId: undefined,
+      couponDiscount: undefined,
+      amount: undefined,
+      category: undefined,
+      description: undefined,
+    });
     setVisible(true);
     setCategoryVisible(true);
   };
@@ -369,7 +381,7 @@ export default function App() {
                 return (
                   <>
                     {couponOptions.length > 0 && (
-                      <Form.Item name="couponId" label="券" className={styles.couponField}>
+                      <Form.Item name="couponId" className={styles.couponField}>
                         <Selector className={styles.couponSelector} columns={1} options={couponOptions} />
                       </Form.Item>
                     )}
