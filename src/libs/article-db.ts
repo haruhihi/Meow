@@ -1,5 +1,5 @@
 import 'server-only';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const globalForArticlePrisma = global as unknown as { articlePrisma?: PrismaClient };
 
@@ -67,8 +67,46 @@ const normalizeListItem = (row: ArticleListRow): ArticleListItem => ({
   publishDate: toDateString(row.publishDate),
 });
 
-export const getArticles = async (limit = 100): Promise<ArticleListItem[]> => {
-  const rows = await getArticlePrisma().$queryRaw<ArticleListRow[]>`
+export interface GetArticlesOptions {
+  limit?: number;
+  offset?: number;
+  year?: number | null;
+  keyword?: string;
+}
+
+export const getArticles = async ({
+  limit = 30,
+  offset = 0,
+  year,
+  keyword,
+}: GetArticlesOptions = {}): Promise<ArticleListItem[]> => {
+  const prisma = getArticlePrisma();
+
+  const conditions: Prisma.Sql[] = [];
+  if (year === null) {
+    conditions.push(Prisma.sql`publish_date is null`);
+  } else if (typeof year === 'number') {
+    conditions.push(Prisma.sql`extract(year from publish_date) = ${year}`);
+  }
+
+  const trimmed = keyword?.trim();
+  if (trimmed) {
+    const pattern = `%${trimmed.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    conditions.push(
+      Prisma.sql`(title ilike ${pattern} or author ilike ${pattern} or body ilike ${pattern})`,
+    );
+  }
+
+  const whereSql = conditions.length
+    ? Prisma.sql`where ${Prisma.join(conditions, ' and ')}`
+    : Prisma.empty;
+
+  const orderSql =
+    year === null
+      ? Prisma.sql`order by id desc`
+      : Prisma.sql`order by publish_date desc nulls last, id desc`;
+
+  const rows = await prisma.$queryRaw<ArticleListRow[]>`
     select
       id::text as id,
       slug,
@@ -77,13 +115,34 @@ export const getArticles = async (limit = 100): Promise<ArticleListItem[]> => {
       publish_date as "publishDate",
       source,
       tags,
-      regexp_replace(left(body, 180), '\\s+', ' ', 'g') as excerpt
+      regexp_replace(left(body, 180), '\s+', ' ', 'g') as excerpt
     from public.articles
-    order by publish_date desc nulls last, id desc
-    limit ${limit}
+    ${whereSql}
+    ${orderSql}
+    limit ${limit} offset ${offset}
   `;
 
   return rows.map(normalizeListItem);
+};
+
+export interface ArticleYearCount {
+  year: number | null;
+  count: number;
+}
+
+export const getArticleYearCounts = async (): Promise<{ total: number; years: ArticleYearCount[] }> => {
+  const rows = await getArticlePrisma().$queryRaw<{ year: number | null; count: bigint }[]>`
+    select
+      extract(year from publish_date)::int as year,
+      count(*)::bigint as count
+    from public.articles
+    group by extract(year from publish_date)
+    order by year desc nulls last
+  `;
+
+  const years = rows.map((r) => ({ year: r.year, count: Number(r.count) }));
+  const total = years.reduce((sum, y) => sum + y.count, 0);
+  return { total, years };
 };
 
 export const getArticleById = async (id: string): Promise<ArticleDetail | null> => {

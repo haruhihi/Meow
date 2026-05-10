@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { post } from '@libs/fetch';
-import type { ArticleListItem } from '@libs/article-db';
+import type { ArticleListItem, ArticleYearCount } from '@libs/article-db';
 import styles from './articles.module.scss';
 
 const UNKNOWN_KEY = 'unknown';
+const HISTORY_KEY = 'meow.articles.searchHistory';
+const HISTORY_MAX = 10;
 
 const formatDate = (value: string | null) => {
   if (!value) {
@@ -28,45 +30,187 @@ const toInputDate = (value: string | null) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const yearOf = (value: string | null) => {
-  if (!value) return UNKNOWN_KEY;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return UNKNOWN_KEY;
-  return String(d.getFullYear());
-};
-
 interface Props {
-  articles: ArticleListItem[];
+  initialArticles: ArticleListItem[];
+  yearCounts: ArticleYearCount[];
+  total: number;
+  pageSize: number;
 }
 
-export default function ArticlesList({ articles }: Props) {
-  const [items, setItems] = useState(articles);
-  const [activeYear, setActiveYear] = useState<string>('all');
+type YearFilter = 'all' | typeof UNKNOWN_KEY | string;
+
+const yearFilterToParam = (filter: YearFilter): number | null | undefined => {
+  if (filter === 'all') return undefined;
+  if (filter === UNKNOWN_KEY) return null;
+  return Number(filter);
+};
+
+const loadHistory = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveHistory = (list: string[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    // ignore
+  }
+};
+
+export default function ArticlesList({ initialArticles, yearCounts, total, pageSize }: Props) {
+  const [items, setItems] = useState<ArticleListItem[]>(initialArticles);
+  const [activeYear, setActiveYear] = useState<YearFilter>('all');
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(initialArticles.length >= pageSize);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftDate, setDraftDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
 
-  const yearGroups = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const a of items) {
-      const key = yearOf(a.publishDate);
-      map.set(key, (map.get(key) ?? 0) + 1);
-    }
-    const known = Array.from(map.entries())
-      .filter(([k]) => k !== UNKNOWN_KEY)
-      .sort((a, b) => Number(b[0]) - Number(a[0]));
-    const unknown = map.get(UNKNOWN_KEY);
-    const result = [...known];
-    if (unknown) {
-      result.push([UNKNOWN_KEY, unknown]);
-    }
-    return result;
-  }, [items]);
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
 
-  const filtered = useMemo(() => {
-    if (activeYear === 'all') return items;
-    return items.filter((a) => yearOf(a.publishDate) === activeYear);
-  }, [items, activeYear]);
+  useEffect(() => {
+    if (!historyOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!searchBoxRef.current) return;
+      if (!searchBoxRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
+  }, [historyOpen]);
+
+  const yearGroups: [string, number][] = [
+    ...yearCounts
+      .filter((y) => y.year !== null)
+      .map((y) => [String(y.year), y.count] as [string, number]),
+  ];
+  const unknownCount = yearCounts.find((y) => y.year === null)?.count ?? 0;
+  if (unknownCount > 0) {
+    yearGroups.push([UNKNOWN_KEY, unknownCount]);
+  }
+
+  const filterCount =
+    activeYear === 'all'
+      ? total
+      : activeYear === UNKNOWN_KEY
+        ? unknownCount
+        : (yearCounts.find((y) => String(y.year) === activeYear)?.count ?? 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await post<
+          { year?: number | null; offset: number; limit: number; keyword?: string },
+          { articles: ArticleListItem[] }
+        >('/api/article/list', {
+          year: yearFilterToParam(activeYear),
+          offset: 0,
+          limit: pageSize,
+          keyword: keyword || undefined,
+        });
+        if (cancelled) return;
+        setItems(res.articles);
+        setHasMore(res.articles.length >= pageSize);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    if (activeYear === 'all' && !keyword) {
+      // Already have initial first page from server.
+      setItems(initialArticles);
+      setHasMore(initialArticles.length >= pageSize);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeYear, keyword]);
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    try {
+      const res = await post<
+        { year?: number | null; offset: number; limit: number; keyword?: string },
+        { articles: ArticleListItem[] }
+      >('/api/article/list', {
+        year: yearFilterToParam(activeYear),
+        offset: items.length,
+        limit: pageSize,
+        keyword: keyword || undefined,
+      });
+      setItems((prev) => [...prev, ...res.articles]);
+      setHasMore(res.articles.length >= pageSize);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pushHistory = (q: string) => {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setHistory((prev) => {
+      const next = [trimmed, ...prev.filter((x) => x !== trimmed)].slice(0, HISTORY_MAX);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const submitSearch = (q: string) => {
+    const trimmed = q.trim();
+    setSearchInput(trimmed);
+    setKeyword(trimmed);
+    setHistoryOpen(false);
+    if (trimmed) pushHistory(trimmed);
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setKeyword('');
+    setHistoryOpen(false);
+  };
+
+  const removeHistory = (q: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((x) => x !== q);
+      saveHistory(next);
+      return next;
+    });
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    saveHistory([]);
+  };
 
   const startEdit = (e: React.MouseEvent, item: ArticleListItem) => {
     e.preventDefault();
@@ -107,20 +251,99 @@ export default function ArticlesList({ articles }: Props) {
 
   return (
     <>
+      <div ref={searchBoxRef} className={styles.searchBox}>
+        <form
+          className={styles.searchForm}
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitSearch(searchInput);
+          }}
+        >
+          <input
+            type="search"
+            value={searchInput}
+            placeholder="搜索标题 / 作者 / 正文"
+            onChange={(e) => setSearchInput(e.target.value)}
+            onFocus={() => setHistoryOpen(true)}
+          />
+          {searchInput && (
+            <button
+              type="button"
+              className={styles.searchClear}
+              onClick={() => {
+                setSearchInput('');
+                if (keyword) clearSearch();
+              }}
+              aria-label="清空"
+            >
+              ×
+            </button>
+          )}
+          <button type="submit" className={styles.searchSubmit}>
+            搜索
+          </button>
+        </form>
+        {historyOpen && history.length > 0 && (
+          <div className={styles.historyPanel}>
+            <div className={styles.historyHeader}>
+              <span>搜索历史</span>
+              <button type="button" onClick={clearHistory}>
+                清空
+              </button>
+            </div>
+            <ul className={styles.historyList}>
+              {history.map((q) => (
+                <li key={q}>
+                  <button
+                    type="button"
+                    className={styles.historyItem}
+                    onClick={() => {
+                      setSearchInput(q);
+                      submitSearch(q);
+                    }}
+                  >
+                    {q}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.historyRemove}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeHistory(q);
+                    }}
+                    aria-label="删除"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {keyword && (
+          <div className={styles.searchInfo}>
+            搜索：<strong>{keyword}</strong>
+            <button type="button" onClick={clearSearch}>
+              清除
+            </button>
+          </div>
+        )}
+      </div>
+
       <nav className={styles.tabs}>
         <button
           type="button"
           className={`${styles.tab} ${activeYear === 'all' ? styles.tabActive : ''}`}
           onClick={() => setActiveYear('all')}
         >
-          全部 <em>{items.length}</em>
+          全部 <em>{total}</em>
         </button>
         {yearGroups.map(([key, count]) => (
           <button
             key={key}
             type="button"
             className={`${styles.tab} ${activeYear === key ? styles.tabActive : ''}`}
-            onClick={() => setActiveYear(key)}
+            onClick={() => setActiveYear(key as YearFilter)}
           >
             {key === UNKNOWN_KEY ? '未知' : `${key} 年`} <em>{count}</em>
           </button>
@@ -128,7 +351,7 @@ export default function ArticlesList({ articles }: Props) {
       </nav>
 
       <div className={styles.list}>
-        {filtered.map((article) => {
+        {items.map((article) => {
           const isEditing = editingId === article.id;
           return (
             <a key={article.id} href={`/meow/articles/${article.id}`} className={styles.item}>
@@ -170,7 +393,23 @@ export default function ArticlesList({ articles }: Props) {
             </a>
           );
         })}
-        {filtered.length === 0 && <div className={styles.empty}>该年份暂无文章</div>}
+        {items.length === 0 && !loading && (
+          <div className={styles.empty}>{keyword ? '未找到匹配的文章' : '该年份暂无文章'}</div>
+        )}
+      </div>
+
+      <div className={styles.loadMore}>
+        {hasMore ? (
+          <button type="button" onClick={loadMore} disabled={loading}>
+            {loading ? '加载中...' : '加载更多'}
+          </button>
+        ) : (
+          items.length > 0 && (
+            <span className={styles.loadMoreEnd}>
+              已加载 {items.length} / {filterCount}
+            </span>
+          )
+        )}
       </div>
     </>
   );
