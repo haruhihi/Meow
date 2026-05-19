@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useMemo } from 'react';
+import { Switch } from 'antd-mobile';
 import dayjs from 'dayjs';
 import { LeftOutline, RightOutline } from 'antd-mobile-icons';
 import { formatMoney, PALETTE } from '@styles/theme';
@@ -13,9 +14,19 @@ interface Props {
   transactions: ITransactionSearchRes['transactions'];
   prevMonthTotal?: number;
   couponDiscountTotal?: number;
+  includeCouponDiscount?: boolean;
+  onIncludeCouponDiscountChange?: (checked: boolean) => void;
 }
 
-export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, prevMonthTotal, couponDiscountTotal = 0 }) => {
+export const SummaryCard: FC<Props> = ({
+  month,
+  onMonthChange,
+  transactions,
+  prevMonthTotal,
+  couponDiscountTotal = 0,
+  includeCouponDiscount = false,
+  onIncludeCouponDiscountChange,
+}) => {
   const stats = useMemo(() => {
     const start = month.startOf('month');
     const end = month.endOf('month');
@@ -35,7 +46,7 @@ export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, pre
     : null;
 
   const isCurrentMonth = month.isSame(dayjs(), 'month');
-  const grossTotal = stats.total + couponDiscountTotal;
+  const grossTotal = includeCouponDiscount ? stats.total : stats.total + couponDiscountTotal;
 
   return (
     <div className={styles.card}>
@@ -65,7 +76,16 @@ export const SummaryCard: FC<Props> = ({ month, onMonthChange, transactions, pre
 
       <div className={styles.amountRow}>
         <div className={styles.amountLabel}>本月支出</div>
-        <div className={styles.amount}>{formatMoney(stats.total)}</div>
+        <div className={styles.amountLine}>
+          <div className={styles.amount}>{formatMoney(stats.total)}</div>
+          <label className={styles.couponToggle}>
+            <span>统计券</span>
+            <Switch
+              checked={includeCouponDiscount}
+              onChange={onIncludeCouponDiscountChange}
+            />
+          </label>
+        </div>
         {delta != null && (
           <div
             className={styles.delta}

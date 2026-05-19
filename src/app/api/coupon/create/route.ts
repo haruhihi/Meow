@@ -2,6 +2,7 @@ import { prisma } from '@libs/prisma';
 import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 import { ICouponCreateReq, ICouponCreateRes } from '@dtos/meow';
+import { roundMoney } from '@utils/money';
 
 const monthRange = (year: number, month: number) => ({
   startDate: new Date(year, month - 1, 1, 0, 0, 0, 0),
@@ -13,7 +14,9 @@ export async function POST(req: Request) {
     const uid = await getUID();
     if (!uid) throw new Error('unauthorized');
 
-    const { name, type, amount, validYear, validMonth } = (await req.json()) as ICouponCreateReq;
+    const body = (await req.json()) as ICouponCreateReq;
+    const { name, type, validYear, validMonth } = body;
+    const amount = roundMoney(body.amount);
     if (!name?.trim()) throw new Error('name is required');
     if (!amount || amount <= 0) throw new Error('amount must be greater than 0');
     if (!validYear || !validMonth || validMonth < 1 || validMonth > 12) {

@@ -8,10 +8,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px 8px;
+  padding: 0 16px 6px;
   font-size: 14px;
   font-weight: 600;
   color: var(--meow-text);
+}
+
+.recentHeader {
+  margin-top: 12px;
 }
 
 .linkBtn {
@@ -27,7 +31,7 @@
 
 .trendCard {
   margin: 0 12px;
-  padding: 10px 4px 4px;
+  padding: 0 4px 4px;
   border-radius: 14px;
   background: var(--meow-surface);
   box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);

@@ -33,6 +33,7 @@ import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
 import { TopLoading } from '@components/loading';
 import { formatMoney } from '@styles/theme';
+import { isMoneyGreater, roundMoney } from '@utils/money';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
@@ -47,12 +48,13 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTop, setSelectedTop] = useState<string | null>(null);
   const [showTrend, setShowTrend] = useState(true);
+  const [includeCouponDiscount, setIncludeCouponDiscount] = useState(true);
   const [payTime, setPayTime] = useState(dayjs());
 
   const categoryRes = useCategories();
   const { transactions, reQuery, loadMore, hasMore } = useTransactions();
-  const { data: monthData } = useMonthAnalyze(month, refreshKey);
-  const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey);
+  const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
+  const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
 
   // Resolver: category id -> top-level category name. Built from the current
@@ -184,6 +186,8 @@ export default function App() {
           transactions={monthData?.transactions ?? []}
           prevMonthTotal={prevMonthData?.total}
           couponDiscountTotal={monthData?.couponDiscountTotal}
+          includeCouponDiscount={includeCouponDiscount}
+          onIncludeCouponDiscountChange={setIncludeCouponDiscount}
         />
 
         {monthData && monthData.transactions.length > 0 && (
@@ -210,7 +214,7 @@ export default function App() {
           </>
         )}
 
-        <div className={styles.sectionHeader}>
+        <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
           <span>最近记录{selectedTop ? ` · ${selectedTop}` : ''}</span>
           <button
             type="button"
@@ -305,7 +309,8 @@ export default function App() {
               if (!values) return;
               const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
               const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
-              const discount = useCoupon ? Number(couponDiscount || 0) : 0;
+              const amountValue = roundMoney(amount);
+              const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
               const selectedCoupon = selectedCouponId
                 ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
                 : undefined;
@@ -313,7 +318,7 @@ export default function App() {
                 Toast.show({ content: '抵扣金额不能小于 0' });
                 return;
               }
-              if (discount > Number(amount)) {
+              if (isMoneyGreater(discount, amountValue)) {
                 Toast.show({ content: '抵扣金额不能超过消费金额' });
                 return;
               }
@@ -321,12 +326,12 @@ export default function App() {
                 Toast.show({ content: '请选择要使用的券' });
                 return;
               }
-              if (selectedCoupon && discount > selectedCoupon.remainingAmount) {
+              if (selectedCoupon && isMoneyGreater(discount, selectedCoupon.remainingAmount)) {
                 Toast.show({ content: '抵扣金额不能超过券余额' });
                 return;
               }
               await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', {
-                amount: Number(amount),
+                amount: amountValue,
                 categoryId: Number(category[category.length - 1]),
                 date: dayjs(time).unix() * 1000,
                 description,

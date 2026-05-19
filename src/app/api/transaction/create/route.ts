@@ -2,10 +2,14 @@ import { prisma } from '@libs/prisma';
 import { ITransactionCreateRes, ITransactionCreateReq } from '@dtos/meow';
 import { success, fail } from '@libs/fetch';
 import { getSession } from '@libs/session';
+import { isMoneyGreater, roundMoney } from '@utils/money';
 
 export async function POST(request: Request) {
   try {
-    const { categoryId, amount, date, description, couponId, couponDiscount = 0 } = (await request.json()) as ITransactionCreateReq;
+    const body = (await request.json()) as ITransactionCreateReq;
+    const { categoryId, date, description, couponId } = body;
+    const amount = roundMoney(body.amount);
+    const couponDiscount = roundMoney(body.couponDiscount ?? 0);
     const userId = (await getSession())?.userId;
 
     if (!userId) {
@@ -20,7 +24,7 @@ export async function POST(request: Request) {
       throw new Error('coupon discount cannot be negative');
     }
 
-    if (couponDiscount > amount) {
+    if (isMoneyGreater(couponDiscount, amount)) {
       throw new Error('coupon discount cannot exceed amount');
     }
 
@@ -34,13 +38,13 @@ export async function POST(request: Request) {
       if (couponId && couponDiscount > 0) {
         const coupon = await tx.coupon.findUnique({ where: { id: couponId } });
         if (!coupon) throw new Error('coupon not found');
-        if (coupon.remainingAmount < couponDiscount) {
+        if (isMoneyGreater(couponDiscount, coupon.remainingAmount)) {
           throw new Error('coupon remaining amount is not enough');
         }
         couponName = coupon.name;
         await tx.coupon.update({
           where: { id: coupon.id },
-          data: { remainingAmount: { decrement: couponDiscount } },
+          data: { remainingAmount: roundMoney(coupon.remainingAmount - couponDiscount) },
         });
       }
 

@@ -58,10 +58,38 @@
 }
 
 .amount {
-  margin-top: 4px;
   font-size: 30px;
   font-weight: 700;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
+}
+
+.amountLine {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.couponToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+
+  :global(.adm-switch) {
+    --width: 38px;
+    --height: 22px;
+    --checked-color: #1677ff;
+    --unchecked-color: rgba(255, 255, 255, 0.26);
+  }
+
+  :global(.adm-switch-checkbox:checked + .adm-switch-label) {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+  }
 }
 
 .delta {

@@ -86,13 +86,17 @@ export const TopCategories: FC<Props> = ({ month, transactions, categories, sele
               onClick={() => onSelect?.(selected === row.name ? null : row.name)}
             >
               <div className={styles.cardHeader}>
-                <div className={styles.iconWrap} style={{ background: color + '22', color }}>
-                  <Icon />
+                <div className={styles.cardTitle}>
+                  <div className={styles.iconWrap} style={{ background: color + '22', color }}>
+                    <Icon />
+                  </div>
+                  <div className={styles.name}>{row.name}</div>
                 </div>
+              </div>
+              <div className={styles.totalRow}>
+                <div className={styles.total}>{formatMoney(row.total)}</div>
                 <div className={styles.pct}>{row.pct.toFixed(0)}%</div>
               </div>
-              <div className={styles.name}>{row.name}</div>
-              <div className={styles.total}>{formatMoney(row.total)}</div>
               <div className={styles.bar}>
                 <div className={styles.barInner} style={{ width: `${row.pct}%`, background: color }} />
               </div>

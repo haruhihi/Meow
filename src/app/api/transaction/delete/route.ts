@@ -2,6 +2,7 @@ import { ITransactionDeleteReq } from '@dtos/meow';
 import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getSession } from '@libs/session';
+import { roundMoney } from '@utils/money';
 
 export async function POST(req: Request) {
   try {
@@ -27,9 +28,11 @@ export async function POST(req: Request) {
 
       for (const transaction of transactions) {
         if (transaction.couponId && transaction.couponDiscount > 0) {
+          const coupon = await tx.coupon.findUnique({ where: { id: transaction.couponId } });
+          if (!coupon) continue;
           await tx.coupon.update({
             where: { id: transaction.couponId },
-            data: { remainingAmount: { increment: transaction.couponDiscount } },
+            data: { remainingAmount: roundMoney(coupon.remainingAmount + transaction.couponDiscount) },
           });
         }
       }
