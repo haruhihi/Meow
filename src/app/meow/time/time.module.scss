@@ -19,6 +19,27 @@
   margin-bottom: 14px;
 }
 
+.viewModeSelector {
+  margin-bottom: 12px;
+
+  :global(.adm-selector-item) {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid var(--meow-border);
+    border-radius: 10px;
+    background: var(--meow-surface-alt);
+    color: var(--meow-text-sub);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  :global(.adm-selector-item-active) {
+    border-color: color-mix(in srgb, var(--meow-primary) 50%, var(--meow-border));
+    background: color-mix(in srgb, var(--meow-primary) 10%, #ffffff);
+    color: var(--meow-primary);
+  }
+}
+
 .navBtn {
   width: 32px;
   height: 32px;
@@ -352,10 +373,16 @@
   font-weight: 700;
 }
 
-.list {
-  --border-top: none;
-  --border-bottom: none;
-  --border-inner: 1px solid var(--meow-border);
+.page {
+  :global(.adm-list-default .adm-list-body) {
+    border-top: 0;
+  }
+
+  :global(.adm-list-item-content-prefix) {
+    width: 70px;
+    flex: 0 0 70px;
+    margin-right: 0;
+  }
 }
 
 .iconWrap {
@@ -392,6 +419,18 @@
   gap: 7px;
   max-width: 100%;
   min-width: 0;
+
+  span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.entryModal {
+  :global(.adm-center-popup-wrap) {
+    width: 80vw;
+  }
 }
 
 .activitySelector {
@@ -401,7 +440,7 @@
     border-radius: 12px;
     border: 1px solid var(--meow-border);
     background: var(--meow-surface-alt);
-    padding: 8px 10px;
+    padding: 8px 7px;
   }
 
   :global(.adm-selector-item-active) {
@@ -411,6 +450,7 @@
 }
 
 .modalTitle {
+  margin-left: 15px;
   margin-bottom: 12px;
   color: var(--meow-text);
   font-size: 16px;
@@ -418,13 +458,19 @@
 }
 
 .activityField {
+  --border-inner: none;
+
+  :global(.adm-list-item-content) {
+    border-bottom: 0;
+  }
+
   :global(.adm-form-item-child) {
     min-width: 0;
   }
 }
 
 .durationHint {
-  margin: 0 0 8px 76px;
+  margin: 0 0 8px 90px;
   color: var(--meow-text-sub);
   font-size: 12px;
 }

@@ -128,8 +128,10 @@ export interface ITimeEntryDeleteReq {
 
 export interface ITimeEntryAnalyzeReq {
   activityTypeId?: TimeEntry['activityTypeId'];
-  year: number;
-  month: number;
+  year?: number;
+  month?: number;
+  startedAt?: number;
+  endedAt?: number;
   timezoneOffsetMinutes?: number;
 }
 

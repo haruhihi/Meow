@@ -1,15 +1,9 @@
 import { prisma } from '@libs/prisma';
 import { success, fail } from '@libs/fetch';
-import { getUID } from '@libs/session';
 import { ICategoryDeleteReq, ICategoryDeleteRes } from '@dtos/meow';
-
-const ADMIN_IDS = new Set([1, 2]);
 
 export async function POST(request: Request) {
   try {
-    const uid = await getUID();
-    if (!uid || !ADMIN_IDS.has(uid)) throw new Error('unauthorized');
-
     const { id } = (await request.json()) as ICategoryDeleteReq;
     if (!id) throw new Error('id is required');
 

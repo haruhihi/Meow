@@ -72,10 +72,12 @@
   color: var(--meow-text-sub);
 }
 
-.list {
-  --border-top: none;
-  --border-bottom: none;
-  --border-inner: 1px solid var(--meow-border);
+.page {
+  :global(.adm-list-item-content-prefix) {
+    width: 70px;
+    flex: 0 0 70px;
+    margin-right: 0;
+  }
 }
 
 .iconWrap {

@@ -29,6 +29,7 @@ import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,
   ITimeActivitySummary,
+  ITimeDailySummary,
   ITimeEntryCreateReq,
   ITimeEntryCreateRes,
   ITimeEntryUpdateReq,
@@ -37,7 +38,7 @@ import {
 } from '@dtos/meow';
 import { PALETTE } from '@styles/theme';
 import { formatDuration, formatHours, minutesBetween } from '@utils/time';
-import { useActivityTypes, useTimeEntries, useTimeMonthAnalyze } from '@utils/time-entry';
+import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
 import { TopLoading } from '@components/loading';
 import styles from './time.module.scss';
 
@@ -49,20 +50,87 @@ type TimeFormValues = {
   note?: string;
 };
 
-type AnalyzeData = NonNullable<ReturnType<typeof useTimeMonthAnalyze>['data']>;
+type AnalyzeData = NonNullable<ReturnType<typeof useTimeRangeAnalyze>['data']>;
+type TimeViewMode = 'day' | 'week' | 'month';
+
+type TimeChartPoint = Pick<ITimeDailySummary, 'minutes' | 'byActivity'> & {
+  label: string;
+};
+
+type TimeViewData = {
+  totalMinutes: number;
+  recordedDays: number;
+  totalLabel: string;
+  rangeLabel: string;
+  chartTitle: string;
+  chartHint: string;
+  activitySummaries: ITimeActivitySummary[];
+  chartPoints: TimeChartPoint[];
+  rhythmSegments: AnalyzeData['rhythmSegments'];
+  sleepAverage: number;
+  stats: { label: string; value: string }[];
+};
+
+const VIEW_MODE_OPTIONS = [
+  { label: '按日', value: 'day' },
+  { label: '近一周', value: 'week' },
+  { label: '近一月', value: 'month' },
+];
+
+const buildActivitySummaries = ({
+  byActivity,
+  baseSummaries,
+  entryCounts,
+  divisor = 1,
+}: {
+  byActivity: Record<string, number>;
+  baseSummaries: ITimeActivitySummary[];
+  entryCounts?: Map<number, number>;
+  divisor?: number;
+}) => {
+  const activityInfoMap = new Map(baseSummaries.map((summary) => [summary.activityTypeId, summary]));
+  return Object.entries(byActivity)
+    .map(([activityTypeId, minutes]) => {
+      const id = Number(activityTypeId);
+      const activity = activityInfoMap.get(id);
+      if (!activity) return null;
+      return {
+        ...activity,
+        minutes: Math.round(minutes / divisor),
+        count: entryCounts?.get(id) ?? activity.count,
+      };
+    })
+    .filter((summary): summary is ITimeActivitySummary => summary !== null && summary.minutes > 0)
+    .sort((left, right) => right.minutes - left.minutes);
+};
+
+const getAnalyzeRange = (selectedDate: dayjs.Dayjs, viewMode: TimeViewMode) => {
+  const end = selectedDate.startOf('day').add(1, 'day');
+  if (viewMode === 'week') return { start: end.subtract(7, 'day'), end, days: 7 };
+  if (viewMode === 'month') return { start: end.subtract(30, 'day'), end, days: 30 };
+  return { start: selectedDate.startOf('day'), end, days: 1 };
+};
+
+const getViewStepDays = (viewMode: TimeViewMode) => {
+  if (viewMode === 'week') return 7;
+  if (viewMode === 'month') return 30;
+  return 1;
+};
 
 export default function TimePage() {
   const [form] = Form.useForm();
   const [visible, setVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntryWithActivityType | null>(null);
-  const [month, setMonth] = useState(dayjs());
+  const [selectedDate, setSelectedDate] = useState(dayjs());
+  const [viewMode, setViewMode] = useState<TimeViewMode>('day');
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [showAllRhythm, setShowAllRhythm] = useState(false);
 
   const activityRes = useActivityTypes(refreshKey);
   const { timeEntries, reQuery, loadMore, hasMore } = useTimeEntries();
-  const { data: monthData } = useTimeMonthAnalyze(month, refreshKey);
+  const analyzeRange = useMemo(() => getAnalyzeRange(selectedDate, viewMode), [selectedDate, viewMode]);
+  const { data: analyzeData } = useTimeRangeAnalyze(analyzeRange.start, analyzeRange.end, refreshKey);
 
   const activityTypes = activityRes.activityTypes ?? [];
   const selectedActivity = selectedActivityId
@@ -94,6 +162,83 @@ export default function TimePage() {
     if (list.length === 0) return null;
     return new Date(Math.max(...list.map((entry) => new Date(entry.endedAt).getTime())));
   }, [timeEntries]);
+
+  const viewData = useMemo<TimeViewData | null>(() => {
+    if (!analyzeData) return null;
+
+    const selectedDayKey = selectedDate.format('YYYY-MM-DD');
+    const selectedDay = analyzeData.dailySummaries.find((summary) => summary.date === selectedDayKey) ?? {
+      date: selectedDayKey,
+      minutes: 0,
+      byActivity: {},
+    };
+    const selectedDayStart = selectedDate.startOf('day');
+    const selectedDayEnd = selectedDayStart.add(1, 'day');
+    const selectedDayEntryCounts = new Map<number, number>();
+    analyzeData.timeEntries.forEach((entry) => {
+      const startedAt = dayjs(entry.startedAt);
+      const endedAt = dayjs(entry.endedAt);
+      if (startedAt.isBefore(selectedDayEnd) && endedAt.isAfter(selectedDayStart)) {
+        selectedDayEntryCounts.set(entry.activityTypeId, (selectedDayEntryCounts.get(entry.activityTypeId) ?? 0) + 1);
+      }
+    });
+
+    if (viewMode === 'day') {
+      return {
+        totalMinutes: selectedDay.minutes,
+        recordedDays: selectedDay.minutes > 0 ? 1 : 0,
+        totalLabel: '当日记录时长',
+        rangeLabel: selectedDate.format('YYYY 年 M 月 D 日'),
+        chartTitle: '当日分布',
+        chartHint: selectedDate.format('MM/DD'),
+        activitySummaries: buildActivitySummaries({
+          byActivity: selectedDay.byActivity,
+          baseSummaries: analyzeData.activitySummaries,
+          entryCounts: selectedDayEntryCounts,
+        }),
+        chartPoints: [{ ...selectedDay, label: selectedDate.format('MM/DD') }],
+        rhythmSegments: analyzeData.rhythmSegments.filter((segment) => segment.date === selectedDayKey),
+        sleepAverage: analyzeData.sleepSamples.find((sample) => sample.date === selectedDayKey)?.minutes ?? 0,
+        stats: [
+          { label: '活动数', value: String(Object.keys(selectedDay.byActivity).length) },
+          { label: '开始', value: selectedDay.firstStartedAt ? dayjs(selectedDay.firstStartedAt).format('HH:mm') : '—' },
+          { label: '结束', value: selectedDay.lastEndedAt ? dayjs(selectedDay.lastEndedAt).format('HH:mm') : '—' },
+        ],
+      };
+    }
+
+    const rangeEndLabel = analyzeRange.end.subtract(1, 'day');
+    const sleepAverage = analyzeData.sleepSamples.length
+      ? Math.round(analyzeData.sleepSamples.reduce((sum, item) => sum + item.minutes, 0) / analyzeData.sleepSamples.length)
+      : 0;
+
+    return {
+      totalMinutes: analyzeData.totalMinutes,
+      recordedDays: analyzeData.recordedDays,
+      totalLabel: viewMode === 'week' ? '近一周记录时长' : '近一月记录时长',
+      rangeLabel: `${analyzeRange.start.format('M/D')} - ${rangeEndLabel.format('M/D')}`,
+      chartTitle: '每日趋势',
+      chartHint: `${analyzeData.recordedDays} 天有记录`,
+      activitySummaries: analyzeData.activitySummaries,
+      chartPoints: analyzeData.dailySummaries.map((summary) => ({
+        ...summary,
+        label: dayjs(summary.date).format('M/D'),
+      })),
+      rhythmSegments: [],
+      sleepAverage,
+      stats: [
+        { label: '统计天数', value: String(analyzeRange.days) },
+        { label: '记录天数', value: String(analyzeData.recordedDays) },
+        { label: '睡眠均值', value: sleepAverage ? formatDuration(sleepAverage) : '—' },
+      ],
+    };
+  }, [analyzeData, analyzeRange, selectedDate, viewMode]);
+
+  const changeSelectedDate = (date: dayjs.Dayjs) => {
+    const today = dayjs();
+    setSelectedDate(date.isAfter(today, 'day') ? today : date);
+    setShowAllRhythm(false);
+  };
 
   if (!activityRes.activityTypes || timeEntries === undefined) return <TopLoading />;
 
@@ -186,40 +331,49 @@ export default function TimePage() {
   return (
     <div className={styles.page}>
       <PullToRefresh onRefresh={refreshAll}>
-        <TimeSummaryCard month={month} onMonthChange={setMonth} data={monthData} />
+        <TimeSummaryCard
+          selectedDate={selectedDate}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onDateChange={changeSelectedDate}
+          viewData={viewData}
+        />
 
-        {monthData && monthData.activitySummaries.length > 0 && (
+        {analyzeData && viewData && viewData.activitySummaries.length > 0 && (
           <>
             <ActivityBreakdown
-              summaries={monthData.activitySummaries}
-              totalMinutes={monthData.totalMinutes}
+              summaries={viewData.activitySummaries}
+              totalMinutes={viewData.totalMinutes}
               selectedActivityId={selectedActivityId}
               onSelect={setSelectedActivityId}
             />
 
             <div className={styles.sectionHeader}>
-              <span>每日趋势{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
-              <span className={styles.sectionHint}>{month.format('YYYY 年 M 月')}</span>
+              <span>{viewData.chartTitle}{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
+              <span className={styles.sectionHint}>{viewData.chartHint}</span>
             </div>
             <div className={styles.chartCard}>
               <DailyStackChart
-                data={monthData}
-                activities={monthData.activitySummaries}
+                points={viewData.chartPoints}
+                activities={viewData.activitySummaries}
                 selectedActivityId={selectedActivityId}
               />
             </div>
 
-            <div className={styles.sectionHeader}>
-              <span>24 小时节律{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
-              {monthData.recordedDays > 7 ? (
-                <button type="button" className={styles.linkBtn} onClick={() => setShowAllRhythm((value) => !value)}>
-                  {showAllRhythm ? '收起' : '展开全部'}
-                </button>
-              ) : (
-                <span className={styles.sectionHint}>{monthData.recordedDays} 天</span>
-              )}
-            </div>
-            <RhythmView data={monthData} selectedActivityId={selectedActivityId} showAll={showAllRhythm} />
+            {viewMode === 'day' && viewData.rhythmSegments.length > 0 && (
+              <>
+                <div className={styles.sectionHeader}>
+                  <span>24 小时节律{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
+                  <span className={styles.sectionHint}>{viewData.rangeLabel}</span>
+                </div>
+                <RhythmView
+                  dailySummaries={analyzeData.dailySummaries}
+                  rhythmSegments={viewData.rhythmSegments}
+                  selectedActivityId={selectedActivityId}
+                  showAll={showAllRhythm}
+                />
+              </>
+            )}
           </>
         )}
 
@@ -267,6 +421,7 @@ export default function TimePage() {
       </FloatingBubble>
 
       <Modal
+        className={styles.entryModal}
         visible={visible}
         closeOnMaskClick
         showCloseButton
@@ -285,7 +440,7 @@ export default function TimePage() {
           >
             <div className={styles.modalTitle}>{editingEntry ? '编辑时间记录' : '新增时间记录'}</div>
             <Form.Item name="activityTypeId" className={styles.activityField} rules={[{ required: true, message: '请选择活动' }]}>
-              <Selector className={styles.activitySelector} columns={2} options={selectorOptions} />
+              <Selector className={styles.activitySelector} columns={3} options={selectorOptions} />
             </Form.Item>
             <Form.Item name="customActivityName" label="新项目">
               <Input placeholder="例如：冥想、做饭、画画" />
@@ -331,48 +486,65 @@ export default function TimePage() {
 }
 
 const TimeSummaryCard = ({
-  month,
-  onMonthChange,
-  data,
+  selectedDate,
+  viewMode,
+  onViewModeChange,
+  onDateChange,
+  viewData,
 }: {
-  month: dayjs.Dayjs;
-  onMonthChange: (month: dayjs.Dayjs) => void;
-  data: ReturnType<typeof useTimeMonthAnalyze>['data'];
+  selectedDate: dayjs.Dayjs;
+  viewMode: TimeViewMode;
+  onViewModeChange: (mode: TimeViewMode) => void;
+  onDateChange: (date: dayjs.Dayjs) => void;
+  viewData: TimeViewData | null;
 }) => {
-  const daysInMonth = month.daysInMonth();
-  const sleepAverage = data?.sleepSamples.length
-    ? Math.round(data.sleepSamples.reduce((sum, item) => sum + item.minutes, 0) / data.sleepSamples.length)
-    : 0;
-  const activeDaysAverage = data && data.recordedDays > 0 ? Math.round(data.totalMinutes / data.recordedDays) : 0;
-  const isCurrentMonth = month.isSame(dayjs(), 'month');
+  const stepDays = getViewStepDays(viewMode);
+  const isCurrentPeriod = selectedDate.isSame(dayjs(), 'day');
+  const previousDate = selectedDate.subtract(stepDays, 'day');
+  const nextDate = selectedDate.add(stepDays, 'day');
 
   return (
     <div className={styles.summaryCard}>
+      <Selector
+        className={styles.viewModeSelector}
+        columns={3}
+        options={VIEW_MODE_OPTIONS}
+        value={[viewMode]}
+        onChange={(value) => {
+          const nextMode = value[0] as TimeViewMode | undefined;
+          if (nextMode) onViewModeChange(nextMode);
+        }}
+      />
+
       <div className={styles.summaryHeader}>
-        <button type="button" aria-label="上个月" className={styles.navBtn} onClick={() => onMonthChange(month.subtract(1, 'month'))}>
+        <button type="button" aria-label="上一段" className={styles.navBtn} onClick={() => onDateChange(previousDate)}>
           <LeftOutline />
         </button>
         <div className={styles.monthLabel}>
-          {month.format('YYYY 年 M 月')}
-          {isCurrentMonth && <span className={styles.monthTag}>本月</span>}
+          {viewData?.rangeLabel ?? selectedDate.format('YYYY 年 M 月 D 日')}
+          {isCurrentPeriod && <span className={styles.monthTag}>今天</span>}
         </div>
         <button
           type="button"
-          aria-label="下个月"
+          aria-label="下一段"
           className={styles.navBtn}
-          disabled={isCurrentMonth}
-          onClick={() => onMonthChange(month.add(1, 'month'))}
+          disabled={isCurrentPeriod}
+          onClick={() => onDateChange(nextDate)}
         >
           <RightOutline />
         </button>
       </div>
 
-      <div className={styles.totalLabel}>本月记录时长</div>
-      <div className={styles.totalValue}>{formatDuration(data?.totalMinutes ?? 0)}</div>
+      <div className={styles.totalLabel}>{viewData?.totalLabel ?? '记录时长'}</div>
+      <div className={styles.totalValue}>{formatDuration(viewData?.totalMinutes ?? 0)}</div>
       <div className={styles.statGrid}>
-        <SummaryStat label="记录天数" value={`${data?.recordedDays ?? 0}/${daysInMonth}`} />
-        <SummaryStat label="记录日均" value={activeDaysAverage ? formatDuration(activeDaysAverage) : '—'} />
-        <SummaryStat label="睡眠均值" value={sleepAverage ? formatDuration(sleepAverage) : '—'} />
+        {(viewData?.stats ?? [
+          { label: '活动数', value: '—' },
+          { label: '开始', value: '—' },
+          { label: '结束', value: '—' },
+        ]).map((stat) => (
+          <SummaryStat key={stat.label} label={stat.label} value={stat.value} />
+        ))}
       </div>
     </div>
   );
@@ -435,11 +607,11 @@ const ActivityBreakdown = ({
 );
 
 const DailyStackChart = ({
-  data,
+  points,
   activities,
   selectedActivityId,
 }: {
-  data: AnalyzeData;
+  points: TimeChartPoint[];
   activities: ITimeActivitySummary[];
   selectedActivityId: number | null;
 }) => {
@@ -447,7 +619,7 @@ const DailyStackChart = ({
     const visibleActivities = selectedActivityId
       ? activities.filter((activity) => activity.activityTypeId === selectedActivityId)
       : activities;
-    const labels = data.dailySummaries.map((item) => String(dayjs(item.date).date()));
+    const labels = points.map((item) => item.label);
 
     return {
       color: visibleActivities.map((activity) => activity.color),
@@ -481,34 +653,36 @@ const DailyStackChart = ({
         stack: 'time',
         barMaxWidth: 14,
         emphasis: { focus: 'series' },
-        data: data.dailySummaries.map((day) => Number(((day.byActivity[String(activity.activityTypeId)] ?? 0) / 60).toFixed(2))),
+        data: points.map((point) => Number(((point.byActivity[String(activity.activityTypeId)] ?? 0) / 60).toFixed(2))),
       })),
     };
-  }, [activities, data, selectedActivityId]);
+  }, [activities, points, selectedActivityId]);
 
   return <ReactECharts option={option} style={{ width: '100%', height: 240 }} notMerge lazyUpdate />;
 };
 
 const RhythmView = ({
-  data,
+  dailySummaries,
+  rhythmSegments,
   selectedActivityId,
   showAll,
 }: {
-  data: AnalyzeData;
+  dailySummaries: AnalyzeData['dailySummaries'];
+  rhythmSegments: AnalyzeData['rhythmSegments'];
   selectedActivityId: number | null;
   showAll: boolean;
 }) => {
   const segmentsByDate = useMemo(() => {
-    const map = new Map<string, typeof data.rhythmSegments>();
-    data.rhythmSegments.forEach((segment) => {
+    const map = new Map<string, typeof rhythmSegments>();
+    rhythmSegments.forEach((segment) => {
       if (selectedActivityId && segment.activityTypeId !== selectedActivityId) return;
       const current = map.get(segment.date) ?? [];
       current.push(segment);
       map.set(segment.date, current);
     });
     return map;
-  }, [data.rhythmSegments, selectedActivityId]);
-  const visibleDays = data.dailySummaries.filter((day) => (segmentsByDate.get(day.date)?.length ?? 0) > 0);
+  }, [rhythmSegments, selectedActivityId]);
+  const visibleDays = dailySummaries.filter((day) => (segmentsByDate.get(day.date)?.length ?? 0) > 0);
   const displayDays = showAll ? visibleDays : visibleDays.slice(-7);
 
   if (visibleDays.length === 0) return null;
@@ -590,7 +764,7 @@ const GroupedList = ({
             </div>
             <span className={styles.groupTotal}>{formatDuration(group.total)}</span>
           </div>
-          <List className={styles.list}>
+          <List>
             {group.items.map((entry) => (
               <SwipeAction
                 key={entry.id}

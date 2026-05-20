@@ -462,7 +462,7 @@ const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedLis
             </div>
             <span className={styles.groupTotal}>{formatMoney(g.total)}</span>
           </div>
-          <List className={styles.list}>
+          <List>
             {g.items.map((transaction) => {
               const Icon = getIconFromCategoryId(transaction.category.id);
               const color = getColorFromCategoryId(transaction.category.id);

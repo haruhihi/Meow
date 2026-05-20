@@ -5,13 +5,16 @@ import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
 import { ClockCircleOutline, HistogramOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
 import styles from './index.module.scss';
-import { useUserInfo } from '@utils/user';
 
 const Bottom: FC = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useUserInfo();
   const tabs = [
+    {
+      key: '/meow/category',
+      title: '类别',
+      icon: <UnorderedListOutline />,
+    },
     {
       key: '/meow/bill',
       title: '账单',
@@ -28,14 +31,6 @@ const Bottom: FC = () => {
       icon: <UserOutline />,
     },
   ];
-
-  if (user && [1, 2].includes(user.id)) {
-    tabs.unshift({
-      key: '/meow/category',
-      title: '类别',
-      icon: <UnorderedListOutline />,
-    });
-  }
 
   useEffect(() => {
     if ((window as any).eruda) {

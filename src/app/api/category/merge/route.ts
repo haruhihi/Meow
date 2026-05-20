@@ -1,18 +1,9 @@
 import { prisma } from '@libs/prisma';
 import { success, fail } from '@libs/fetch';
-import { getUID } from '@libs/session';
 import { ICategoryMergeReq, ICategoryMergeRes } from '@dtos/meow';
-
-// Admin-only user ids (same gate as the client-side Category tab).
-const ADMIN_IDS = new Set([1, 2]);
 
 export async function POST(request: Request) {
   try {
-    const uid = await getUID();
-    if (!uid || !ADMIN_IDS.has(uid)) {
-      throw new Error('unauthorized');
-    }
-
     const { fromId, toId } = (await request.json()) as ICategoryMergeReq;
     if (!fromId || !toId) throw new Error('fromId and toId are required');
     if (fromId === toId) throw new Error('cannot merge a category into itself');
