@@ -3,7 +3,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
-import { HistogramOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
+import { ClockCircleOutline, HistogramOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
 import styles from './index.module.scss';
 import { useUserInfo } from '@utils/user';
 
@@ -16,6 +16,11 @@ const Bottom: FC = () => {
       key: '/meow/bill',
       title: '账单',
       icon: <HistogramOutline />,
+    },
+    {
+      key: '/meow/time',
+      title: '时间',
+      icon: <ClockCircleOutline />,
     },
     {
       key: '/meow/me',

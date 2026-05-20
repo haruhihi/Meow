@@ -6,6 +6,7 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "./node_modules/next/dist/bin/next start",
+    "kill": "lsof -tiTCP:3001 -sTCP:LISTEN | xargs -r kill",
     "lint": "next lint",
     "update-db": "prisma format && prisma migrate dev --name update && prisma generate",
     "view": "prisma studio",

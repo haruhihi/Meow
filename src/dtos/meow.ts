@@ -1,4 +1,4 @@
-import { Category, Coupon, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -74,6 +74,107 @@ export interface ITransactionAnalyzeRes {
 
 export interface ITransactionDeleteReq {
   ids: Transaction['id'][];
+}
+
+export type TimeEntryWithActivityType = Prisma.TimeEntryGetPayload<{
+  include: {
+    activityType: true;
+  };
+}>;
+
+export interface IActivityTypeListRes {
+  activityTypes: ActivityType[];
+}
+
+export interface IActivityTypeCreateReq {
+  name: ActivityType['name'];
+}
+
+export interface IActivityTypeCreateRes {
+  activityType: ActivityType;
+}
+
+export interface ITimeEntryCreateReq {
+  activityTypeId: TimeEntry['activityTypeId'];
+  startedAt: number;
+  endedAt: number;
+  note?: TimeEntry['note'];
+}
+
+export interface ITimeEntryCreateRes {
+  timeEntry: TimeEntry;
+}
+
+export interface ITimeEntryUpdateReq extends Partial<ITimeEntryCreateReq> {
+  id: TimeEntry['id'];
+}
+
+export interface ITimeEntryUpdateRes {
+  timeEntry: TimeEntry;
+}
+
+export interface ITimeEntrySearchReq {
+  page: number;
+  pageSize: number;
+}
+
+export interface ITimeEntrySearchRes {
+  timeEntries: TimeEntryWithActivityType[];
+}
+
+export interface ITimeEntryDeleteReq {
+  ids: TimeEntry['id'][];
+}
+
+export interface ITimeEntryAnalyzeReq {
+  activityTypeId?: TimeEntry['activityTypeId'];
+  year: number;
+  month: number;
+  timezoneOffsetMinutes?: number;
+}
+
+export interface ITimeActivitySummary {
+  activityTypeId: ActivityType['id'];
+  name: ActivityType['name'];
+  color: ActivityType['color'];
+  icon: ActivityType['icon'];
+  minutes: number;
+  count: number;
+}
+
+export interface ITimeDailySummary {
+  date: string;
+  minutes: number;
+  byActivity: Record<string, number>;
+  firstStartedAt?: string;
+  lastEndedAt?: string;
+}
+
+export interface ITimeSegment {
+  date: string;
+  activityTypeId: ActivityType['id'];
+  name: ActivityType['name'];
+  color: ActivityType['color'];
+  startMinute: number;
+  endMinute: number;
+  minutes: number;
+}
+
+export interface ISleepSample {
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  minutes: number;
+}
+
+export interface ITimeEntryAnalyzeRes {
+  timeEntries: TimeEntryWithActivityType[];
+  totalMinutes: number;
+  recordedDays: number;
+  activitySummaries: ITimeActivitySummary[];
+  dailySummaries: ITimeDailySummary[];
+  rhythmSegments: ITimeSegment[];
+  sleepSamples: ISleepSample[];
 }
 
 export interface ISignReq {

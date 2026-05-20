@@ -29,6 +29,22 @@ export const CHART_COLORS = [
   '#EC4899', '#84CC16', '#F59E0B', '#6366F1', '#10B981',
 ];
 
+export const TIME_ACTIVITY_COLOR_BY_NAME: Record<string, string> = {
+  '睡眠': '#6D5DF6',
+  '工作': '#008FF5',
+  '短视频': '#FF3D71',
+  '钢琴': '#9C27B0',
+  '运动': '#00B86B',
+  '阅读': '#FF8A00',
+  '学习': '#00A7A7',
+};
+
+export const TIME_ACTIVITY_COLORS = [
+  '#6D5DF6', '#008FF5', '#FF3D71', '#9C27B0', '#00B86B', '#FF8A00', '#00A7A7',
+  '#FFD400', '#00C2FF', '#7ED957', '#FF6B35', '#B15CFF', '#00D1B2', '#FF7AB6',
+  '#3D7DFF', '#C6D500', '#8E7CFF', '#FFB000', '#20C997', '#F72585',
+];
+
 // Stable color per top-level category NAME. Unknown names fall back to
 // hashing so color is still deterministic across renders.
 const TOP_CATEGORY_COLOR: Record<string, string> = {
