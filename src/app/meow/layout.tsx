@@ -42,9 +42,6 @@ const Bottom: FC = () => {
       (window as any).eruda.init();
     }
   }, []);
-  if (pathname === '/meow/texas') {
-    return null;
-  }
   if (pathname === '/meow/analyze') {
     return null;
   }

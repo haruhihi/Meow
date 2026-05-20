@@ -4,19 +4,6 @@ import { getSession } from '@libs/session';
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   console.log('--->', path);
-  // Redirect Locale
-  if (path.startsWith(`/ai-hub`)) {
-    // Use regx get the subPath after /ai-hub/xxx
-    const subPath = path.replace(/^\/ai-hub\//, '');
-    const locales = ['en', 'zh'];
-    const pathnameHasLocale = locales.some((locale) => path.startsWith(`/ai-hub/${locale}`));
-    if (!pathnameHasLocale) {
-      req.nextUrl.pathname = `/ai-hub/en/${subPath}`;
-      return NextResponse.redirect(req.nextUrl);
-    } else {
-      return NextResponse.next();
-    }
-  }
 
   const session = await getSession();
 
