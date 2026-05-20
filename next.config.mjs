@@ -11,13 +11,6 @@ const nextConfig = {
           // Do not set permanent true, or it will be cached which will cause confusing when you build a new app under this path.
           permanent: false,
         },
-        // Basic redirect
-        {
-          source: "/ai-hub",
-          destination: "/ai-hub/home",
-          // Do not set permanent true, or it will be cached which will cause confusing when you build a new app under this path.
-          permanent: false,
-        },
       ];
     },
     transpilePackages: ['antd-mobile'],
