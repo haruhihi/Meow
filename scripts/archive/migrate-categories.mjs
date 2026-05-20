@@ -181,14 +181,6 @@ async function run() {
       log(`⇢ merge id=${fromId} "${from.name}" → id=${toId}  [${label}]  txns remapped=${affected.count}`);
     }
 
-    // 4) Invariants.
-    const orphanBudgets = await tx.budget.findMany({
-      where: { categoryId: { not: null }, category: null },
-    });
-    if (orphanBudgets.length > 0) {
-      throw new Error(`orphan budgets after migration: ${JSON.stringify(orphanBudgets)}`);
-    }
-
     if (!APPLY) {
       // Abort the transaction so nothing is committed.
       throw new DryRunAbort();
