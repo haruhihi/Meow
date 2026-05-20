@@ -18,6 +18,15 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: 'Meow',
   description: 'HH',
+  icons: {
+    icon: '/favicon.ico',
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Meow',
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {

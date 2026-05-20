@@ -7,6 +7,20 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Meow meow meow',
     start_url: '/meow/bill',
     display: 'standalone',
+    icons: [
+      {
+        src: '/web-app-manifest-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/web-app-manifest-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+    ],
     theme_color: '#ffffff',
     background_color: '#003345',
   };
