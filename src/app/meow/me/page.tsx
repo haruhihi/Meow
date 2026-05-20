@@ -111,6 +111,14 @@ export default function App() {
           文章
         </List.Item>
         <List.Item
+          prefix={<AppstoreOutline />}
+          extra={<RightOutline />}
+          onClick={() => router.push('/meow/piano')}
+          description="高低音谱随机识别训练"
+        >
+          钢琴识谱
+        </List.Item>
+        <List.Item
           prefix={<DownlandOutline />}
           extra={<RightOutline />}
           onClick={onExport}
