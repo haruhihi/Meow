@@ -39,7 +39,6 @@ import {
 import { PALETTE } from '@styles/theme';
 import { formatDuration, formatHours, minutesBetween } from '@utils/time';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
-import { TopLoading } from '@components/loading';
 import styles from './time.module.scss';
 
 type TimeFormValues = {
@@ -211,15 +210,22 @@ export default function TimePage() {
     const sleepAverage = analyzeData.sleepSamples.length
       ? Math.round(analyzeData.sleepSamples.reduce((sum, item) => sum + item.minutes, 0) / analyzeData.sleepSamples.length)
       : 0;
+    const divisor = Math.max(analyzeData.recordedDays, 1);
+    const averageMinutes = Math.round(analyzeData.totalMinutes / divisor);
 
     return {
-      totalMinutes: analyzeData.totalMinutes,
+      totalMinutes: averageMinutes,
       recordedDays: analyzeData.recordedDays,
-      totalLabel: viewMode === 'week' ? '近一周记录时长' : '近一月记录时长',
+      totalLabel: viewMode === 'week' ? '近一周记录日均' : '近一月记录日均',
       rangeLabel: `${analyzeRange.start.format('M/D')} - ${rangeEndLabel.format('M/D')}`,
       chartTitle: '每日趋势',
-      chartHint: `${analyzeData.recordedDays} 天有记录`,
-      activitySummaries: analyzeData.activitySummaries,
+      chartHint: analyzeData.recordedDays > 0 ? `记录日均 ${formatDuration(averageMinutes)}` : '暂无记录',
+      activitySummaries: analyzeData.activitySummaries
+        .map((summary) => ({
+          ...summary,
+          minutes: Math.round(summary.minutes / divisor),
+        }))
+        .filter((summary) => summary.minutes > 0),
       chartPoints: analyzeData.dailySummaries.map((summary) => ({
         ...summary,
         label: dayjs(summary.date).format('M/D'),
@@ -229,7 +235,7 @@ export default function TimePage() {
       stats: [
         { label: '统计天数', value: String(analyzeRange.days) },
         { label: '记录天数', value: String(analyzeData.recordedDays) },
-        { label: '睡眠均值', value: sleepAverage ? formatDuration(sleepAverage) : '—' },
+        { label: '区间总时长', value: analyzeData.totalMinutes ? formatDuration(analyzeData.totalMinutes) : '—' },
       ],
     };
   }, [analyzeData, analyzeRange, selectedDate, viewMode]);
@@ -239,8 +245,6 @@ export default function TimePage() {
     setSelectedDate(date.isAfter(today, 'day') ? today : date);
     setShowAllRhythm(false);
   };
-
-  if (!activityRes.activityTypes || timeEntries === undefined) return <TopLoading />;
 
   const openCreate = () => {
     const endedAt = dayjs().second(0).millisecond(0).toDate();

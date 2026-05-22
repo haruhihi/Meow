@@ -63,7 +63,6 @@ export const useTimeEntries = () => {
     loadMore: async () => fetchTimeEntries(page + 1),
     hasMore,
     reQuery: async () => {
-      setTimeEntries(undefined);
       setPage(DEFAULT_PAGE);
       setHasMore(true);
       await fetchTimeEntries(DEFAULT_PAGE);

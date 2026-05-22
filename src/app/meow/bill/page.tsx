@@ -17,7 +17,7 @@ import {
 } from 'antd-mobile';
 import dayjs from 'dayjs';
 import { HandPayCircleOutline, PayCircleOutline, PieOutline } from 'antd-mobile-icons';
-import { RefObject, useMemo, useState } from 'react';
+import { RefObject, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import {
@@ -31,7 +31,6 @@ import {
 import { ITransactionCreateReq, ITransactionCreateRes } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
-import { TopLoading } from '@components/loading';
 import { formatMoney } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
 import { SummaryCard } from './components/summary-card';
@@ -56,13 +55,18 @@ export default function App() {
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
+  const categories = categoryRes?.categories ?? [];
+  const recentTransactions = transactions ?? [];
+
+  useEffect(() => {
+    if (categories.length > 0) primeCategoryResolvers(categories);
+  }, [categories]);
 
   // Resolver: category id -> top-level category name. Built from the current
   // categories payload (or a no-op while loading). Must live BEFORE any early
   // return so the hook order is stable.
   const topNameOf = useMemo(() => {
-    const cats = categoryRes?.categories ?? [];
-    const byId = new Map(cats.map((c) => [c.id, c]));
+    const byId = new Map(categories.map((c) => [c.id, c]));
     return (id: number): string | undefined => {
       let cur = byId.get(id);
       const seen = new Set<number>();
@@ -75,7 +79,7 @@ export default function App() {
       }
       return cur?.name;
     };
-  }, [categoryRes?.categories]);
+  }, [categories]);
 
   const filteredMonthTxns = useMemo(() => {
     const list = monthData?.transactions ?? [];
@@ -84,14 +88,14 @@ export default function App() {
   }, [monthData, selectedTop, topNameOf]);
 
   const filteredRecent = useMemo(() => {
-    const list = transactions ?? [];
+    const list = recentTransactions;
     if (!selectedTop) return list;
     return list.filter((t) => topNameOf(t.category.id) === selectedTop);
-  }, [transactions, selectedTop, topNameOf]);
+  }, [recentTransactions, selectedTop, topNameOf]);
 
   const cascaderOptions = useMemo(
-    () => getCategoryOptions(categoryRes?.categories ?? []),
-    [categoryRes?.categories]
+    () => getCategoryOptions(categories),
+    [categories]
   );
   const flatCategoryOptions = useMemo(
     () => flattenCategoryOptions(cascaderOptions),
@@ -103,7 +107,7 @@ export default function App() {
       flatCategoryOptions.map((option) => [option.value[option.value.length - 1], option])
     );
 
-    [...(monthData?.transactions ?? []), ...(transactions ?? [])].forEach((transaction) => {
+    [...(monthData?.transactions ?? []), ...recentTransactions].forEach((transaction) => {
       const key = String(transaction.category.id);
       const current = ranking.get(key) ?? { count: 0, lastUsedAt: 0 };
       current.count += 1;
@@ -122,7 +126,7 @@ export default function App() {
       .filter((option): option is NonNullable<typeof option> => Boolean(option));
 
     return (rankedOptions.length > 0 ? rankedOptions : flatCategoryOptions).slice(0, 6);
-  }, [flatCategoryOptions, monthData?.transactions, transactions]);
+  }, [flatCategoryOptions, monthData?.transactions, recentTransactions]);
 
   const couponOptions = useMemo(
     () =>
@@ -148,12 +152,6 @@ export default function App() {
       })),
     [paymentCoupons]
   );
-
-  if (!categoryRes || transactions === undefined) {
-    return <TopLoading />;
-  }
-
-  primeCategoryResolvers(categoryRes.categories);
 
   const onClick = () => {
     const now = new Date();
@@ -195,7 +193,7 @@ export default function App() {
             <TopCategories
               month={month}
               transactions={monthData.transactions}
-              categories={categoryRes.categories}
+              categories={categories}
               selected={selectedTop}
               onSelect={setSelectedTop}
             />
@@ -308,6 +306,10 @@ export default function App() {
             }) => {
               if (!values) return;
               const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
+              if (!category?.length) {
+                Toast.show({ content: '请选择分类' });
+                return;
+              }
               const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
               const amountValue = roundMoney(amount);
               const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
@@ -354,6 +356,7 @@ export default function App() {
                 categoryVisible={categoryVisible}
                 setCategoryVisible={(v: boolean) => setCategoryVisible(v)}
                 frequentOptions={frequentCategoryOptions}
+                loading={!categoryRes}
               />
             </Form.Item>
 

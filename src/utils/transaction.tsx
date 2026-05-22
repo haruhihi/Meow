@@ -23,11 +23,10 @@ export const useTransactions = () => {
       page,
       pageSize: DEFAULT_PAGE_SIZE,
     });
-    if (!transactions || page === DEFAULT_PAGE) {
-      setTransactions(res.transactions);
-    } else {
-      setTransactions([...transactions, ...res.transactions]);
-    }
+    setTransactions((current) => {
+      if (!current || page === DEFAULT_PAGE) return res.transactions;
+      return [...current, ...res.transactions];
+    });
 
     if (res.transactions.length < DEFAULT_PAGE_SIZE) {
       setHasMore(false);
@@ -50,10 +49,9 @@ export const useTransactions = () => {
     },
     hasMore,
     reQuery: async () => {
-      setTransactions(undefined);
       setPage(DEFAULT_PAGE);
       setHasMore(true);
-      fetchTransactions(DEFAULT_PAGE);
+      await fetchTransactions(DEFAULT_PAGE);
     },
   };
 };

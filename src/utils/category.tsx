@@ -45,7 +45,6 @@ export const useCategories = () => {
     ? {
         ...res,
         reQuery: () => {
-          setRes(undefined);
           refresh();
         },
       }

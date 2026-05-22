@@ -10,6 +10,7 @@ export const FormCascader: React.FC<{
   categoryVisible: boolean;
   setCategoryVisible: (visiable: boolean) => void;
   frequentOptions?: FlatCategoryOption[];
+  loading?: boolean;
 }> = (props) => {
   const {
     value,
@@ -18,6 +19,7 @@ export const FormCascader: React.FC<{
     categoryVisible,
     setCategoryVisible,
     frequentOptions = [],
+    loading = false,
   } = props;
   const [keyword, setKeyword] = useState('');
   const flatOptions = useMemo(() => flattenCategoryOptions(options), [options]);
@@ -118,28 +120,32 @@ export const FormCascader: React.FC<{
               )}
             </section>
           ) : (
-            <div className={styles.groupList}>
-              {groups.map(([groupLabel, items]) => (
-                <section key={groupLabel} className={styles.section}>
-                  <div className={styles.sectionTitle}>{groupLabel}</div>
-                  <div className={styles.chips}>
-                    {items.map((option) => {
-                      const selected = isSameValue(option.value, value);
-                      return (
-                        <button
-                          key={option.value.join('/')}
-                          type="button"
-                          className={selected ? styles.chipActive : styles.chip}
-                          onClick={() => handleSelect(option.value)}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
+            groups.length > 0 ? (
+              <div className={styles.groupList}>
+                {groups.map(([groupLabel, items]) => (
+                  <section key={groupLabel} className={styles.section}>
+                    <div className={styles.sectionTitle}>{groupLabel}</div>
+                    <div className={styles.chips}>
+                      {items.map((option) => {
+                        const selected = isSameValue(option.value, value);
+                        return (
+                          <button
+                            key={option.value.join('/')}
+                            type="button"
+                            className={selected ? styles.chipActive : styles.chip}
+                            onClick={() => handleSelect(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.empty}>{loading ? '类目加载中' : '暂无类目'}</div>
+            )
           )}
         </div>
       </Popup>
