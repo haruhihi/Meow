@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockHolding, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -248,11 +248,12 @@ export interface ICouponSeedRes {
   skipped: number;
 }
 
-export type StockHoldingWithAccount = Prisma.StockHoldingGetPayload<{
-  include: {
-    account: true;
-  };
-}>;
+export type StockHoldingWithAccount = StockHolding & {
+  account: StockAccount;
+  quote: StockQuote;
+  name: StockQuote['name'];
+  currentPrice: StockQuote['currentPrice'];
+};
 
 export interface IStockAccountCreateReq {
   name: StockAccount['name'];
@@ -279,9 +280,9 @@ export interface IStockAccountDeleteReq {
 export interface IStockHoldingCreateReq {
   accountId: StockHolding['accountId'];
   symbol: StockHolding['symbol'];
-  name: StockHolding['name'];
+  name: StockQuote['name'];
   quantity: StockHolding['quantity'];
-  currentPrice: StockHolding['currentPrice'];
+  currentPrice: StockQuote['currentPrice'];
 }
 
 export interface IStockHoldingCreateRes {
@@ -310,7 +311,7 @@ export interface IStockPortfolioAccountSummary {
 
 export interface IStockPortfolioSymbolSummary {
   symbol: StockHolding['symbol'];
-  name: StockHolding['name'];
+  name: StockQuote['name'];
   quantity: number;
   marketValue: number;
   percent: number;

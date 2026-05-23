@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, Selector, Toast } from 'antd-mobile';
-import { AddCircleOutline, DeleteOutline, EditSOutline, PayCircleOutline } from 'antd-mobile-icons';
+import { AddCircleOutline, PayCircleOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
 import { post } from '@libs/fetch';
@@ -17,6 +17,7 @@ import {
   IStockHoldingDeleteReq,
   IStockHoldingUpdateReq,
   IStockHoldingUpdateRes,
+  IStockPortfolioSymbolSummary,
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
@@ -35,6 +36,12 @@ type HoldingFormValues = {
   currentPrice: string;
 };
 
+type SymbolFormValues = {
+  name: string;
+  currentPrice: string;
+  quantities: Record<string, string>;
+};
+
 const formatQuantity = (value: number) => Number(value.toFixed(4)).toString();
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
 const marketValueOf = (holding: { quantity: number; currentPrice: number }) => holding.quantity * holding.currentPrice;
@@ -44,9 +51,13 @@ export default function StocksPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [holdingModalVisible, setHoldingModalVisible] = useState(false);
+  const [symbolModalVisible, setSymbolModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<StockAccount | null>(null);
   const [editingHolding, setEditingHolding] = useState<StockHoldingWithAccount | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<IStockPortfolioSymbolSummary | null>(null);
   const [defaultAccountId, setDefaultAccountId] = useState<number | null>(null);
+  const [showAccountAllocation, setShowAccountAllocation] = useState(false);
+  const [showAccountDetail, setShowAccountDetail] = useState(false);
   const { data, loading } = useStockPortfolio(refreshKey);
 
   const accounts = data?.accounts ?? [];
@@ -60,6 +71,10 @@ export default function StocksPage() {
         holdings: holdings.filter((holding) => holding.accountId === account.id),
       })),
     [accounts, holdings]
+  );
+  const selectedSymbolHoldings = useMemo(
+    () => holdings.filter((holding) => holding.symbol === selectedSymbol?.symbol),
+    [holdings, selectedSymbol?.symbol]
   );
 
   const refresh = () => setRefreshKey((key) => key + 1);
@@ -80,10 +95,9 @@ export default function StocksPage() {
     setHoldingModalVisible(true);
   };
 
-  const openEditHolding = (holding: StockHoldingWithAccount) => {
-    setEditingHolding(holding);
-    setDefaultAccountId(null);
-    setHoldingModalVisible(true);
+  const openSymbolModal = (summary: IStockPortfolioSymbolSummary) => {
+    setSelectedSymbol(summary);
+    setSymbolModalVisible(true);
   };
 
   const saveAccount = async (values: AccountFormValues) => {
@@ -151,24 +165,6 @@ export default function StocksPage() {
     }
   };
 
-  const adjustHolding = async (holding: StockHoldingWithAccount, delta: number) => {
-    const quantity = holding.quantity + delta;
-    if (quantity < 0) {
-      Toast.show({ content: '股数不能小于 0' });
-      return;
-    }
-
-    try {
-      await post<IStockHoldingUpdateReq, IStockHoldingUpdateRes>('/api/stock/holding/update', {
-        id: holding.id,
-        quantity,
-      });
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `调整失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
   const deleteHolding = async (holding: StockHoldingWithAccount) => {
     const ok = await Dialog.confirm({ title: '删除持仓', content: `确认删除「${holding.symbol} ${holding.name}」吗？` });
     if (!ok) return;
@@ -178,6 +174,26 @@ export default function StocksPage() {
       refresh();
     } catch (error) {
       Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
+    }
+  };
+
+  const saveSymbol = async (values: SymbolFormValues) => {
+    if (!selectedSymbol) return;
+    try {
+      const updates = selectedSymbolHoldings.map((holding) =>
+        post<IStockHoldingUpdateReq, IStockHoldingUpdateRes>('/api/stock/holding/update', {
+          id: holding.id,
+          name: values.name,
+          currentPrice: Number(values.currentPrice),
+          quantity: Number(values.quantities[String(holding.id)]),
+        })
+      );
+      await Promise.all(updates);
+      Toast.show({ content: '股票持仓已保存' });
+      setSymbolModalVisible(false);
+      refresh();
+    } catch (error) {
+      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
     }
   };
 
@@ -197,49 +213,57 @@ export default function StocksPage() {
         </div>
       </section>
 
-      <div className={styles.toolbar}>
-        <Button size="small" color="primary" onClick={openCreateAccount}>
-          <AddCircleOutline /> 新增账户
-        </Button>
-        <Button size="small" color="primary" fill="outline" disabled={accounts.length === 0} onClick={() => openCreateHolding()}>
-          <AddCircleOutline /> 新增持仓
-        </Button>
-      </div>
-
-      {accounts.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionTitle}>账户仓位</div>
-          <div className={styles.accountScroller}>
-            {data?.accountSummaries.map((summary) => (
-              <div key={summary.accountId} className={styles.accountCard}>
-                <div className={styles.cardTopline}>
-                  <span>{summary.name}</span>
-                  <strong>{formatPercent(summary.percent)}</strong>
+      <section className={styles.section}>
+        <button type="button" className={styles.foldHeader} onClick={() => setShowAccountAllocation((value) => !value)}>
+          <span>账户仓位</span>
+          <strong>{showAccountAllocation ? '收起' : '展开'}</strong>
+        </button>
+        {showAccountAllocation && (
+          <>
+            <div className={styles.foldActions}>
+              <Button size="small" color="primary" onClick={openCreateAccount}>
+                <span className={styles.buttonText}><AddCircleOutline /> 新增账户</span>
+              </Button>
+              <Button size="small" color="primary" fill="outline" disabled={accounts.length === 0} onClick={() => openCreateHolding()}>
+                <span className={styles.buttonText}><AddCircleOutline /> 新增持仓</span>
+              </Button>
+            </div>
+            {accounts.length > 0 ? (
+            <div className={styles.accountScroller}>
+              {data?.accountSummaries.map((summary) => (
+                <div key={summary.accountId} className={styles.accountCard}>
+                  <div className={styles.cardTopline}>
+                    <span>{summary.name}</span>
+                    <strong>{formatPercent(summary.percent)}</strong>
+                  </div>
+                  <div className={styles.cardValue}>{formatMoney(summary.marketValue)}</div>
+                  <div className={styles.barTrack}>
+                    <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
+                  </div>
+                  <div className={styles.cardActions}>
+                    <Button size="mini" onClick={() => openEditAccount(accounts.find((account) => account.id === summary.accountId)!)}>
+                      重命名
+                    </Button>
+                    <Button size="mini" fill="outline" color="danger" onClick={() => deleteAccount(accounts.find((account) => account.id === summary.accountId)!)}>
+                      删除
+                    </Button>
+                  </div>
                 </div>
-                <div className={styles.cardValue}>{formatMoney(summary.marketValue)}</div>
-                <div className={styles.barTrack}>
-                  <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
-                </div>
-                <div className={styles.cardActions}>
-                  <Button size="mini" onClick={() => openEditAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                    重命名
-                  </Button>
-                  <Button size="mini" fill="outline" color="danger" onClick={() => deleteAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                    删除
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+              ))}
+            </div>
+            ) : (
+              <Empty style={{ padding: '32px 0' }} description={loading ? '加载中' : '还没有股票账户'} />
+            )}
+          </>
+        )}
+      </section>
 
       {data && data.symbolSummaries.length > 0 && (
         <section className={styles.section}>
           <div className={styles.sectionTitle}>股票占比</div>
           <List className={styles.list}>
             {data.symbolSummaries.map((summary) => (
-              <List.Item key={summary.symbol}>
+              <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable>
                 <div className={styles.symbolRow}>
                   <div className={styles.symbolMain}>
                     <span>{summary.symbol}</span>
@@ -260,47 +284,41 @@ export default function StocksPage() {
       )}
 
       <section className={styles.section}>
-        <div className={styles.sectionTitle}>账户明细</div>
-        {accounts.length === 0 ? (
-          <Empty style={{ padding: '64px 0' }} description={loading ? '加载中' : '先新增一个股票账户'} />
-        ) : (
-          holdingsByAccount.map(({ account, holdings: accountHoldings }) => (
-            <div key={account.id} className={styles.group}>
-              <div className={styles.groupHeader}>
-                <div>
-                  <div className={styles.groupTitle}>{account.name}</div>
-                  <div className={styles.groupMeta}>{accountHoldings.length} 个持仓</div>
+        <button type="button" className={styles.foldHeader} onClick={() => setShowAccountDetail((value) => !value)}>
+          <span>账户明细</span>
+          <strong>{showAccountDetail ? '收起' : '展开'}</strong>
+        </button>
+        {showAccountDetail && (
+          accounts.length === 0 ? (
+            <Empty style={{ padding: '64px 0' }} description={loading ? '加载中' : '先新增一个股票账户'} />
+          ) : (
+            holdingsByAccount.map(({ account, holdings: accountHoldings }) => (
+              <div key={account.id} className={styles.group}>
+                <div className={styles.groupHeader}>
+                  <div>
+                    <div className={styles.groupTitle}>{account.name}</div>
+                    <div className={styles.groupMeta}>{accountHoldings.length} 个持仓</div>
+                  </div>
+                  <Button size="mini" onClick={() => openCreateHolding(account.id)}>新增</Button>
                 </div>
-                <Button size="mini" onClick={() => openCreateHolding(account.id)}>新增</Button>
-              </div>
 
-              {accountHoldings.length > 0 ? (
-                <List className={styles.list}>
-                  {accountHoldings.map((holding) => (
-                    <List.Item
-                      key={holding.id}
-                      prefix={<div className={styles.stockIcon}><PayCircleOutline /></div>}
-                      extra={
-                        <div className={styles.quickActions}>
-                          <Button size="mini" onClick={() => adjustHolding(holding, -1)}>-</Button>
-                          <Button size="mini" onClick={() => adjustHolding(holding, 1)}>+</Button>
-                          <Button size="mini" onClick={() => openEditHolding(holding)}><EditSOutline /></Button>
-                          <Button size="mini" color="danger" fill="outline" onClick={() => deleteHolding(holding)}><DeleteOutline /></Button>
+                {accountHoldings.length > 0 ? (
+                  <List className={styles.list}>
+                    {accountHoldings.map((holding) => (
+                      <List.Item key={holding.id} prefix={<div className={styles.stockIcon}><PayCircleOutline /></div>}>
+                        <div className={styles.itemTitle}>{holding.symbol} · {holding.name}</div>
+                        <div className={styles.itemMeta}>
+                          {formatQuantity(holding.quantity)} 股 × {formatMoney(holding.currentPrice)} = {formatMoney(marketValueOf(holding))}
                         </div>
-                      }
-                    >
-                      <div className={styles.itemTitle}>{holding.symbol} · {holding.name}</div>
-                      <div className={styles.itemMeta}>
-                        {formatQuantity(holding.quantity)} 股 × {formatMoney(holding.currentPrice)} = {formatMoney(marketValueOf(holding))}
-                      </div>
-                    </List.Item>
-                  ))}
-                </List>
-              ) : (
-                <div className={styles.emptyGroup}>这个账户还没有持仓</div>
-              )}
-            </div>
-          ))
+                      </List.Item>
+                    ))}
+                  </List>
+                ) : (
+                  <div className={styles.emptyGroup}>这个账户还没有持仓</div>
+                )}
+              </div>
+            ))
+          )
         )}
       </section>
 
@@ -321,6 +339,16 @@ export default function StocksPage() {
         accountOptions={accountOptions}
         onClose={() => setHoldingModalVisible(false)}
         onSave={saveHolding}
+      />
+
+      <SymbolModal
+        key={selectedSymbol?.symbol ?? 'symbol'}
+        visible={symbolModalVisible}
+        summary={selectedSymbol}
+        holdings={selectedSymbolHoldings}
+        onClose={() => setSymbolModalVisible(false)}
+        onSave={saveSymbol}
+        onDeleteHolding={deleteHolding}
       />
     </div>
   );
@@ -422,7 +450,68 @@ const HoldingModal = ({
         <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
           <Input placeholder="人民币价格" type="number" />
         </Form.Item>
+        <div className={styles.modalHint}>保存现价后，同一股票代码在其他账户中的现价会同步更新。</div>
       </Form>
+    }
+  />
+);
+
+const SymbolModal = ({
+  visible,
+  summary,
+  holdings,
+  onClose,
+  onSave,
+  onDeleteHolding,
+}: {
+  visible: boolean;
+  summary: IStockPortfolioSymbolSummary | null;
+  holdings: StockHoldingWithAccount[];
+  onClose: () => void;
+  onSave: (values: SymbolFormValues) => Promise<void>;
+  onDeleteHolding: (holding: StockHoldingWithAccount) => Promise<void>;
+}) => (
+  <Modal
+    visible={visible}
+    title={summary ? `${summary.symbol} ${summary.name}` : '股票持仓'}
+    closeOnMaskClick
+    showCloseButton
+    onClose={onClose}
+    content={
+      summary && (
+        <Form
+          layout="horizontal"
+          initialValues={{
+            name: summary.name,
+            currentPrice: holdings[0] ? String(holdings[0].currentPrice) : '',
+            quantities: Object.fromEntries(holdings.map((holding) => [String(holding.id), String(holding.quantity)])),
+          }}
+          footer={<Button block type="submit" color="primary">保存</Button>}
+          onFinish={onSave}
+        >
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入股票名称' }]}> 
+            <Input placeholder="股票名称" />
+          </Form.Item>
+          <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
+            <Input placeholder="人民币价格" type="number" />
+          </Form.Item>
+          <div className={styles.modalSectionTitle}>各账户股数</div>
+          {holdings.map((holding) => (
+            <div key={holding.id} className={styles.accountQuantityRow}>
+              <Form.Item
+                name={['quantities', String(holding.id)]}
+                label={holding.account.name}
+                rules={[{ required: true, message: '请输入股数' }]}
+              >
+                <Input placeholder="股数" type="number" />
+              </Form.Item>
+              <Button size="mini" color="danger" fill="outline" onClick={() => onDeleteHolding(holding)}>
+                删除
+              </Button>
+            </div>
+          ))}
+        </Form>
+      )
     }
   />
 );

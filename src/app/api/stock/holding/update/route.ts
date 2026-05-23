@@ -20,8 +20,10 @@ export async function POST(req: Request) {
     const data: {
       accountId?: number;
       symbol?: string;
-      name?: string;
       quantity?: number;
+    } = {};
+    const quoteData: {
+      name?: string;
       currentPrice?: number;
     } = {};
 
@@ -37,19 +39,41 @@ export async function POST(req: Request) {
     if (body.name !== undefined) {
       const name = normalizeName(body.name);
       if (!name) throw new Error('name is required');
-      data.name = name;
+      quoteData.name = name;
     }
     if (body.quantity !== undefined) {
       data.quantity = readNonNegativeNumber(body.quantity, 'quantity');
     }
     if (body.currentPrice !== undefined) {
-      data.currentPrice = readNonNegativeNumber(body.currentPrice, 'currentPrice');
+      quoteData.currentPrice = readNonNegativeNumber(body.currentPrice, 'currentPrice');
     }
-    if (Object.keys(data).length === 0) throw new Error('nothing to update');
+    if (Object.keys(data).length === 0 && Object.keys(quoteData).length === 0) throw new Error('nothing to update');
 
-    const holding = await prisma.stockHolding.update({
-      where: { id: body.id },
-      data,
+    const holding = await prisma.$transaction(async (tx) => {
+      const updatedHolding = Object.keys(data).length > 0
+        ? await tx.stockHolding.update({
+            where: { id: body.id },
+            data,
+          })
+        : existing;
+
+      if (Object.keys(quoteData).length > 0 || data.symbol !== undefined) {
+        const existingQuote = await tx.stockQuote.findUnique({
+          where: { userId_symbol: { userId: uid, symbol: existing.symbol } },
+        });
+        await tx.stockQuote.upsert({
+          where: { userId_symbol: { userId: uid, symbol: updatedHolding.symbol } },
+          create: {
+            userId: uid,
+            symbol: updatedHolding.symbol,
+            name: quoteData.name ?? existingQuote?.name ?? updatedHolding.symbol,
+            currentPrice: quoteData.currentPrice ?? existingQuote?.currentPrice ?? 0,
+          },
+          update: quoteData,
+        });
+      }
+
+      return updatedHolding;
     });
 
     return success<IStockHoldingUpdateRes>({ holding });

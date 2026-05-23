@@ -4,6 +4,7 @@ import type {
   IStockPortfolioSymbolSummary,
   StockHoldingWithAccount,
 } from '@dtos/meow';
+import type { StockAccount, StockHolding, StockQuote } from '@prisma/client';
 
 export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
@@ -33,29 +34,33 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   });
 
   const holdings = await prisma.stockHolding.findMany({
-    where: {
-      userId,
-      ...(trimmedKeyword
-        ? {
-            OR: [
-              { symbol: { contains: trimmedKeyword, mode: 'insensitive' as const } },
-              { name: { contains: trimmedKeyword, mode: 'insensitive' as const } },
-              { account: { name: { contains: trimmedKeyword, mode: 'insensitive' as const } } },
-            ],
-          }
-        : {}),
-    },
+    where: { userId },
     include: { account: true },
     orderBy: [{ account: { sortOrder: 'asc' } }, { accountId: 'asc' }, { symbol: 'asc' }],
   });
+  const quotes = await prisma.stockQuote.findMany({
+    where: { userId },
+  });
+  const quoteBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
+  const holdingsWithQuotes = holdings
+    .map((holding) => attachQuote(holding, quoteBySymbol.get(holding.symbol)))
+    .filter((holding) => {
+      if (!trimmedKeyword) return true;
+      const keyword = trimmedKeyword.toLowerCase();
+      return (
+        holding.symbol.toLowerCase().includes(keyword) ||
+        holding.name.toLowerCase().includes(keyword) ||
+        holding.account.name.toLowerCase().includes(keyword)
+      );
+    });
 
-  const totalMarketValue = roundStockValue(holdings.reduce((sum, holding) => sum + marketValueOf(holding), 0));
-  const accountSummaries = buildAccountSummaries(accounts, holdings, totalMarketValue);
-  const symbolSummaries = buildSymbolSummaries(holdings, totalMarketValue);
+  const totalMarketValue = roundStockValue(holdingsWithQuotes.reduce((sum, holding) => sum + marketValueOf(holding), 0));
+  const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalMarketValue);
+  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalMarketValue);
 
   return {
     accounts,
-    holdings,
+    holdings: holdingsWithQuotes,
     totalMarketValue,
     accountSummaries,
     symbolSummaries,
@@ -68,6 +73,28 @@ export const marketValueOf = (holding: { quantity: number; currentPrice: number 
   roundStockValue(holding.quantity * holding.currentPrice);
 
 const percentOf = (value: number, total: number) => (total > 0 ? value / total : 0);
+
+const attachQuote = (
+  holding: StockHolding & { account: StockAccount },
+  quote?: StockQuote
+): StockHoldingWithAccount => {
+  const resolvedQuote = quote ?? {
+    id: 0,
+    userId: holding.userId,
+    symbol: holding.symbol,
+    name: holding.symbol,
+    currentPrice: 0,
+    createdAt: holding.createdAt,
+    updatedAt: holding.updatedAt,
+  };
+
+  return {
+    ...holding,
+    quote: resolvedQuote,
+    name: resolvedQuote.name,
+    currentPrice: resolvedQuote.currentPrice,
+  };
+};
 
 const buildAccountSummaries = (
   accounts: Awaited<ReturnType<typeof prisma.stockAccount.findMany>>,

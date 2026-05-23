@@ -60,11 +60,11 @@
   }
 }
 
-.toolbar {
-  display: flex;
+.buttonText {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 12px;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .section {
@@ -76,6 +76,46 @@
   color: var(--meow-text);
   font-size: 14px;
   font-weight: 800;
+}
+
+.foldHeader {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - 24px);
+  margin: 0 12px 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--meow-surface);
+  color: var(--meow-text);
+  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+  cursor: pointer;
+
+  span {
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  strong {
+    color: var(--meow-primary);
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+.foldActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px 10px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .accountScroller {
@@ -264,14 +304,30 @@
   text-align: center;
 }
 
+.modalHint {
+  margin: 0 0 10px 76px;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.modalSectionTitle {
+  margin: 14px 0 8px;
+  color: var(--meow-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.accountQuantityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (max-width: 360px) {
   .summaryValue {
     font-size: 26px;
-  }
-
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .quickActions {

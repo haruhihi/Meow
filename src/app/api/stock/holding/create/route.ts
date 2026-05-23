@@ -20,15 +20,29 @@ export async function POST(req: Request) {
     if (!symbol) throw new Error('symbol is required');
     if (!name) throw new Error('name is required');
 
-    const holding = await prisma.stockHolding.create({
-      data: {
-        userId: uid,
-        accountId: body.accountId,
-        symbol,
-        name,
-        quantity,
-        currentPrice,
-      },
+    const holding = await prisma.$transaction(async (tx) => {
+      await tx.stockQuote.upsert({
+        where: { userId_symbol: { userId: uid, symbol } },
+        create: {
+          userId: uid,
+          symbol,
+          name,
+          currentPrice,
+        },
+        update: {
+          name,
+          currentPrice,
+        },
+      });
+
+      return tx.stockHolding.create({
+        data: {
+          userId: uid,
+          accountId: body.accountId,
+          symbol,
+          quantity,
+        },
+      });
     });
 
     return success<IStockHoldingCreateRes>({ holding });
