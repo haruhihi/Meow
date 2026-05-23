@@ -16,10 +16,11 @@ import {
   Selector,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { HandPayCircleOutline, PayCircleOutline, PieOutline } from 'antd-mobile-icons';
+import { ClockCircleOutline, HandPayCircleOutline, PayCircleOutline, PieOutline } from 'antd-mobile-icons';
 import { RefObject, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
+import { useActivityTypes } from '@utils/time-entry';
 import {
   useCategories,
   getCategoryOptions,
@@ -28,20 +29,38 @@ import {
   getColorFromCategoryId,
   primeCategoryResolvers,
 } from '@utils/category';
-import { ITransactionCreateReq, ITransactionCreateRes } from '@dtos/meow';
+import {
+  IActivityTypeCreateReq,
+  IActivityTypeCreateRes,
+  ITimeEntryCreateReq,
+  ITimeEntryCreateRes,
+  ITransactionCreateReq,
+  ITransactionCreateRes,
+} from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
 import { formatMoney } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
+import { formatDuration, minutesBetween } from '@utils/time';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
 import styles from './bill.module.scss';
 
+type TimeFormValues = {
+  activityTypeId?: string[];
+  customActivityName?: string;
+  startedAt: Date;
+  endedAt: Date;
+  note?: string;
+};
+
 export default function App() {
   const router = useRouter();
   const [form] = Form.useForm();
+  const [timeForm] = Form.useForm();
   const [visible, setVisible] = useState(false);
+  const [timeVisible, setTimeVisible] = useState(false);
   const [categoryVisible, setCategoryVisible] = useState(false);
   const [month, setMonth] = useState(dayjs());
   const [refreshKey, setRefreshKey] = useState(0);
@@ -55,6 +74,8 @@ export default function App() {
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
+  const activityRes = useActivityTypes();
+  const activityTypes = activityRes.activityTypes ?? [];
   const categories = categoryRes?.categories ?? [];
   const recentTransactions = transactions ?? [];
 
@@ -152,6 +173,19 @@ export default function App() {
       })),
     [paymentCoupons]
   );
+  const timeActivityOptions = useMemo(
+    () =>
+      activityTypes.map((activityType) => ({
+        value: String(activityType.id),
+        label: (
+          <span className={styles.activityOption}>
+            <span className={styles.activitySwatch} style={{ background: activityType.color }} />
+            <span>{activityType.name}</span>
+          </span>
+        ),
+      })),
+    [activityTypes]
+  );
 
   const onClick = () => {
     const now = new Date();
@@ -168,6 +202,58 @@ export default function App() {
     });
     setVisible(true);
     setCategoryVisible(true);
+  };
+
+  const openTimeCreate = () => {
+    const endedAt = dayjs().second(0).millisecond(0).toDate();
+    const startedAt = dayjs(endedAt).subtract(1, 'hour').toDate();
+    timeForm.resetFields();
+    timeForm.setFieldsValue({
+      activityTypeId: activityTypes[0] ? [String(activityTypes[0].id)] : undefined,
+      customActivityName: undefined,
+      startedAt,
+      endedAt,
+      note: undefined,
+    });
+    setTimeVisible(true);
+  };
+
+  const submitTimeEntry = async (values: TimeFormValues) => {
+    let activityTypeId = Number(values.activityTypeId?.[0]);
+    const customActivityName = values.customActivityName?.trim();
+    if (!values.startedAt || !values.endedAt) {
+      Toast.show({ content: '请选择起止时间' });
+      return;
+    }
+    if (dayjs(values.endedAt).isSame(values.startedAt) || dayjs(values.endedAt).isBefore(values.startedAt)) {
+      Toast.show({ content: '结束时间需要晚于开始时间' });
+      return;
+    }
+
+    if (customActivityName) {
+      const res = await post<IActivityTypeCreateReq, IActivityTypeCreateRes>('/api/time/activity-type/create', {
+        name: customActivityName,
+      });
+      activityTypeId = res.activityType.id;
+    }
+
+    if (!activityTypeId) {
+      Toast.show({ content: '请选择活动或输入新项目' });
+      return;
+    }
+
+    await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
+      activityTypeId,
+      startedAt: dayjs(values.startedAt).valueOf(),
+      endedAt: dayjs(values.endedAt).valueOf(),
+      note: values.note,
+    });
+
+    setTimeVisible(false);
+    Toast.show({
+      content: '时间记录成功',
+      afterClose: () => router.push('/meow/time'),
+    });
   };
 
   return (
@@ -255,6 +341,18 @@ export default function App() {
         onClick={onClick}
       >
         <HandPayCircleOutline fontSize={32} />
+      </FloatingBubble>
+
+      <FloatingBubble
+        style={{
+          '--initial-position-bottom': '168px',
+          '--initial-position-right': '24px',
+          '--edge-distance': '44px',
+          '--background': '#9C27B0',
+        }}
+        onClick={openTimeCreate}
+      >
+        <ClockCircleOutline fontSize={32} />
       </FloatingBubble>
 
       <Modal
@@ -421,6 +519,69 @@ export default function App() {
 
             <Form.Item name="description" label="备注">
               <Input placeholder="请输入备注" type="string" />
+            </Form.Item>
+          </Form>
+        }
+      />
+
+      <Modal
+        visible={timeVisible}
+        closeOnMaskClick
+        showCloseButton
+        onClose={() => setTimeVisible(false)}
+        content={
+          <Form
+            form={timeForm}
+            layout="horizontal"
+            footer={
+              <Button block type="submit" color="primary" size="large">
+                提交并查看时间页
+              </Button>
+            }
+            style={{ marginTop: '20px' }}
+            onFinish={submitTimeEntry}
+          >
+            <div className={styles.modalTitle}>新增时间记录</div>
+            {timeActivityOptions.length > 0 && (
+              <Form.Item name="activityTypeId" className={styles.activityField}>
+                <Selector className={styles.activitySelector} columns={2} options={timeActivityOptions} />
+              </Form.Item>
+            )}
+            <Form.Item name="customActivityName" label="新项目">
+              <Input placeholder="例如：冥想、做饭、画画" />
+            </Form.Item>
+            <Form.Item
+              name="startedAt"
+              label="开始"
+              trigger="onConfirm"
+              rules={[{ required: true, message: '请选择开始时间' }]}
+              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
+            >
+              <DatePicker precision="minute">
+                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
+              </DatePicker>
+            </Form.Item>
+            <Form.Item
+              name="endedAt"
+              label="结束"
+              trigger="onConfirm"
+              rules={[{ required: true, message: '请选择结束时间' }]}
+              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
+            >
+              <DatePicker precision="minute">
+                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
+              </DatePicker>
+            </Form.Item>
+            <Form.Item noStyle shouldUpdate={(prev, next) => prev.startedAt !== next.startedAt || prev.endedAt !== next.endedAt}>
+              {({ getFieldValue }) => {
+                const startedAt = getFieldValue('startedAt');
+                const endedAt = getFieldValue('endedAt');
+                const minutes = startedAt && endedAt ? minutesBetween(startedAt, endedAt) : 0;
+                return minutes > 0 ? <div className={styles.durationHint}>时长 {formatDuration(minutes)}</div> : null;
+              }}
+            </Form.Item>
+            <Form.Item name="note" label="备注">
+              <Input placeholder="可选" />
             </Form.Item>
           </Form>
         }
