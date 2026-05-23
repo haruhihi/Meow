@@ -1,5 +1,6 @@
 import 'server-only';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { getArticleDatabaseUrl } from './database-url';
 
 const globalForArticlePrisma = global as unknown as { articlePrisma?: PrismaClient };
 
@@ -8,15 +9,10 @@ const getArticlePrisma = () => {
     return globalForArticlePrisma.articlePrisma;
   }
 
-  const url = process.env.DATABASE_URL2;
-  if (!url) {
-    throw new Error('DATABASE_URL2 is required to read articles');
-  }
-
   globalForArticlePrisma.articlePrisma = new PrismaClient({
     datasources: {
       db: {
-        url,
+        url: getArticleDatabaseUrl(),
       },
     },
   });

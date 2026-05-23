@@ -12,6 +12,9 @@ import { PrismaClient } from '@prisma/client';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { setAppDatabaseUrl } from '../database-url.mjs';
+
+setAppDatabaseUrl();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOG_DIR = join(__dirname, 'logs');

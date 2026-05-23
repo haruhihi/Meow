@@ -8,9 +8,9 @@
     "start": "./node_modules/next/dist/bin/next start",
     "kill": "lsof -tiTCP:3001 -sTCP:LISTEN | xargs -r kill",
     "lint": "next lint",
-    "update-db": "prisma format && prisma migrate dev --name update && prisma generate",
-    "view": "prisma studio",
-    "p": "prisma",
+    "update-db": "node scripts/with-database-url.mjs prisma format && node scripts/with-database-url.mjs prisma migrate dev --name update && node scripts/with-database-url.mjs prisma generate",
+    "view": "node scripts/with-database-url.mjs prisma studio",
+    "p": "node scripts/with-database-url.mjs prisma",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"
   },
