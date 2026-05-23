@@ -103,6 +103,14 @@ export default function App() {
           券管理
         </List.Item>
         <List.Item
+          prefix={<PayCircleOutline />}
+          extra={<RightOutline />}
+          onClick={() => router.push('/meow/stocks')}
+          description="查看账户持仓和仓位占比"
+        >
+          股票持仓
+        </List.Item>
+        <List.Item
           prefix={<FileOutline />}
           extra={<RightOutline />}
           onClick={() => router.push('/meow/articles')}

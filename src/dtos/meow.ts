@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockHolding, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -246,4 +246,86 @@ export interface ICouponDeleteReq {
 export interface ICouponSeedRes {
   created: number;
   skipped: number;
+}
+
+export type StockHoldingWithAccount = Prisma.StockHoldingGetPayload<{
+  include: {
+    account: true;
+  };
+}>;
+
+export interface IStockAccountCreateReq {
+  name: StockAccount['name'];
+}
+
+export interface IStockAccountCreateRes {
+  account: StockAccount;
+}
+
+export interface IStockAccountUpdateReq {
+  id: StockAccount['id'];
+  name?: StockAccount['name'];
+  sortOrder?: StockAccount['sortOrder'];
+}
+
+export interface IStockAccountUpdateRes {
+  account: StockAccount;
+}
+
+export interface IStockAccountDeleteReq {
+  id: StockAccount['id'];
+}
+
+export interface IStockHoldingCreateReq {
+  accountId: StockHolding['accountId'];
+  symbol: StockHolding['symbol'];
+  name: StockHolding['name'];
+  quantity: StockHolding['quantity'];
+  currentPrice: StockHolding['currentPrice'];
+}
+
+export interface IStockHoldingCreateRes {
+  holding: StockHolding;
+}
+
+export interface IStockHoldingUpdateReq extends Partial<IStockHoldingCreateReq> {
+  id: StockHolding['id'];
+}
+
+export interface IStockHoldingUpdateRes {
+  holding: StockHolding;
+}
+
+export interface IStockHoldingDeleteReq {
+  id: StockHolding['id'];
+}
+
+export interface IStockPortfolioAccountSummary {
+  accountId: StockAccount['id'];
+  name: StockAccount['name'];
+  marketValue: number;
+  percent: number;
+  holdingCount: number;
+}
+
+export interface IStockPortfolioSymbolSummary {
+  symbol: StockHolding['symbol'];
+  name: StockHolding['name'];
+  quantity: number;
+  marketValue: number;
+  percent: number;
+  holdingCount: number;
+  accounts: StockAccount['name'][];
+}
+
+export interface IStockSearchReq {
+  keyword?: string;
+}
+
+export interface IStockSearchRes {
+  accounts: StockAccount[];
+  holdings: StockHoldingWithAccount[];
+  totalMarketValue: number;
+  accountSummaries: IStockPortfolioAccountSummary[];
+  symbolSummaries: IStockPortfolioSymbolSummary[];
 }
