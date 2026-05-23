@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, Selector, Toast } from 'antd-mobile';
+import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, PullToRefresh, Selector, Toast } from 'antd-mobile';
 import { AddCircleOutline, PayCircleOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
@@ -12,6 +12,8 @@ import {
   IStockAccountDeleteReq,
   IStockAccountUpdateReq,
   IStockAccountUpdateRes,
+  IStockCashUpdateReq,
+  IStockCashUpdateRes,
   IStockHoldingCreateReq,
   IStockHoldingCreateRes,
   IStockHoldingDeleteReq,
@@ -42,14 +44,24 @@ type SymbolFormValues = {
   quantities: Record<string, string>;
 };
 
+type CashFormValues = {
+  amount: string;
+};
+
 const formatQuantity = (value: number) => Number(value.toFixed(4)).toString();
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
 const marketValueOf = (holding: { quantity: number; currentPrice: number }) => holding.quantity * holding.currentPrice;
+const formatQuoteTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
 
 export default function StocksPage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [cashModalVisible, setCashModalVisible] = useState(false);
   const [holdingModalVisible, setHoldingModalVisible] = useState(false);
   const [symbolModalVisible, setSymbolModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<StockAccount | null>(null);
@@ -58,11 +70,15 @@ export default function StocksPage() {
   const [defaultAccountId, setDefaultAccountId] = useState<number | null>(null);
   const [showAccountAllocation, setShowAccountAllocation] = useState(false);
   const [showAccountDetail, setShowAccountDetail] = useState(false);
-  const { data, loading } = useStockPortfolio(refreshKey);
+  const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
+  const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
+  const { data, loading, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
 
   const accounts = data?.accounts ?? [];
   const holdings = data?.holdings ?? [];
   const totalMarketValue = data?.totalMarketValue ?? 0;
+  const totalAssetValue = data?.totalAssetValue ?? totalMarketValue;
+  const cashAmount = data?.cashAmount ?? 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
   const holdingsByAccount = useMemo(
     () =>
@@ -78,6 +94,39 @@ export default function StocksPage() {
   );
 
   const refresh = () => setRefreshKey((key) => key + 1);
+
+  const saveCash = async (values: CashFormValues) => {
+    try {
+      await post<IStockCashUpdateReq, IStockCashUpdateRes>('/api/stock/cash/update', {
+        amount: Number(values.amount),
+      });
+      Toast.show({ content: '现金已保存' });
+      setCashModalVisible(false);
+      refresh();
+    } catch (error) {
+      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
+    }
+  };
+
+  const refreshWithQuotes = async () => {
+    if (isQuoteRefreshing) return;
+    setIsQuoteRefreshing(true);
+    try {
+      const res = await refreshQuotes();
+      await reQuery();
+      setQuoteFetchedAt(res.fetchedAt);
+      if (res.failedSymbols.length > 0) {
+        Toast.show({ content: `已更新 ${res.updated} 只，${res.failedSymbols.length} 只未更新` });
+      } else {
+        Toast.show({ content: `已更新 ${res.updated} 只股票` });
+      }
+    } catch (error) {
+      await reQuery();
+      Toast.show({ content: `行情更新失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setIsQuoteRefreshing(false);
+    }
+  };
 
   const openCreateAccount = () => {
     setEditingAccount(null);
@@ -203,15 +252,61 @@ export default function StocksPage() {
         股票持仓
       </NavBar>
 
+      <PullToRefresh onRefresh={() => reQuery()}>
       <section className={styles.summaryCard}>
-        <div className={styles.summaryLabel}>总市值</div>
-        <div className={styles.summaryValue}>{formatMoney(totalMarketValue)}</div>
+        <div className={styles.summaryHeader}>
+          <div className={styles.summaryLabel}>总资产</div>
+          <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
+            {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
+          </button>
+        </div>
+        <div className={styles.summaryValue}>{formatMoney(totalAssetValue)}</div>
+        {quoteFetchedAt && <div className={styles.quoteTime}>行情 {formatQuoteTime(quoteFetchedAt)}</div>}
         <div className={styles.summaryGrid}>
-          <SummaryStat label="账户" value={`${accounts.length}`} />
-          <SummaryStat label="股票" value={`${data?.symbolSummaries.length ?? 0}`} />
-          <SummaryStat label="持仓" value={`${holdings.length}`} />
+          <SummaryStat label="股票" value={formatMoney(totalMarketValue)} />
+          <SummaryStat label="现金" value={formatMoney(cashAmount)} onClick={() => setCashModalVisible(true)} />
+          <SummaryStat label="持仓" value={`${data?.symbolSummaries.length ?? 0}`} />
         </div>
       </section>
+
+      {data && data.sectorSummaries.length > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>股票占比</div>
+          {data.sectorSummaries.map((sector) => (
+            <div key={sector.sector} className={styles.sectorGroup}>
+              <div className={styles.sectorHeader}>
+                <div>
+                  <div className={styles.sectorName}>{sector.sector}</div>
+                  <div className={styles.itemMeta}>{sector.symbolCount} 只 · {formatPercent(sector.percent)}</div>
+                </div>
+                <div className={styles.symbolValue}>{formatMoney(sector.marketValue)}</div>
+              </div>
+              <div className={styles.barTrack}>
+                <span style={{ width: `${Math.min(sector.percent * 100, 100)}%` }} />
+              </div>
+              <List className={styles.sectorList}>
+                {sector.symbols.map((summary) => (
+                  <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable>
+                    <div className={styles.symbolRow}>
+                      <div className={styles.symbolMain}>
+                        <span>{summary.symbol}</span>
+                        <strong>{summary.name}</strong>
+                      </div>
+                      <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
+                    </div>
+                    <div className={styles.itemMeta}>
+                      {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
+                    </div>
+                    <div className={styles.barTrack}>
+                      <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
+                    </div>
+                  </List.Item>
+                ))}
+              </List>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className={styles.section}>
         <button type="button" className={styles.foldHeader} onClick={() => setShowAccountAllocation((value) => !value)}>
@@ -258,31 +353,6 @@ export default function StocksPage() {
         )}
       </section>
 
-      {data && data.symbolSummaries.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionTitle}>股票占比</div>
-          <List className={styles.list}>
-            {data.symbolSummaries.map((summary) => (
-              <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable>
-                <div className={styles.symbolRow}>
-                  <div className={styles.symbolMain}>
-                    <span>{summary.symbol}</span>
-                    <strong>{summary.name}</strong>
-                  </div>
-                  <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
-                </div>
-                <div className={styles.itemMeta}>
-                  {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)} · {summary.accounts.join(' / ')}
-                </div>
-                <div className={styles.barTrack}>
-                  <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
-                </div>
-              </List.Item>
-            ))}
-          </List>
-        </section>
-      )}
-
       <section className={styles.section}>
         <button type="button" className={styles.foldHeader} onClick={() => setShowAccountDetail((value) => !value)}>
           <span>账户明细</span>
@@ -321,6 +391,7 @@ export default function StocksPage() {
           )
         )}
       </section>
+      </PullToRefresh>
 
       <AccountModal
         key={editingAccount?.id ?? 'create-account'}
@@ -328,6 +399,13 @@ export default function StocksPage() {
         account={editingAccount}
         onClose={() => setAccountModalVisible(false)}
         onSave={saveAccount}
+      />
+
+      <CashModal
+        visible={cashModalVisible}
+        amount={cashAmount}
+        onClose={() => setCashModalVisible(false)}
+        onSave={saveCash}
       />
 
       <HoldingModal
@@ -350,15 +428,53 @@ export default function StocksPage() {
         onSave={saveSymbol}
         onDeleteHolding={deleteHolding}
       />
+
+      {isQuoteRefreshing && (
+        <div className={styles.refreshOverlay}>
+          <div className={styles.refreshPanel}>正在刷新行情...</div>
+        </div>
+      )}
     </div>
   );
 }
 
-const SummaryStat = ({ label, value }: { label: string; value: string }) => (
-  <div className={styles.summaryStat}>
+const SummaryStat = ({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) => (
+  <button type="button" className={onClick ? styles.summaryStatButton : styles.summaryStat} onClick={onClick}>
     <strong>{value}</strong>
     <span>{label}</span>
-  </div>
+  </button>
+);
+
+const CashModal = ({
+  visible,
+  amount,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  amount: number;
+  onClose: () => void;
+  onSave: (values: CashFormValues) => Promise<void>;
+}) => (
+  <Modal
+    visible={visible}
+    title="修改现金"
+    closeOnMaskClick
+    showCloseButton
+    onClose={onClose}
+    content={
+      <Form
+        layout="horizontal"
+        initialValues={{ amount: String(amount) }}
+        footer={<Button block type="submit" color="primary">保存</Button>}
+        onFinish={onSave}
+      >
+        <Form.Item name="amount" label="现金" rules={[{ required: true, message: '请输入现金金额' }]}> 
+          <Input placeholder="人民币金额" type="number" />
+        </Form.Item>
+      </Form>
+    }
+  />
 );
 
 const AccountModal = ({

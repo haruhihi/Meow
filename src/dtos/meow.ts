@@ -312,11 +312,20 @@ export interface IStockPortfolioAccountSummary {
 export interface IStockPortfolioSymbolSummary {
   symbol: StockHolding['symbol'];
   name: StockQuote['name'];
+  sector: string;
   quantity: number;
   marketValue: number;
   percent: number;
   holdingCount: number;
   accounts: StockAccount['name'][];
+}
+
+export interface IStockPortfolioSectorSummary {
+  sector: string;
+  marketValue: number;
+  percent: number;
+  symbolCount: number;
+  symbols: IStockPortfolioSymbolSummary[];
 }
 
 export interface IStockSearchReq {
@@ -326,7 +335,38 @@ export interface IStockSearchReq {
 export interface IStockSearchRes {
   accounts: StockAccount[];
   holdings: StockHoldingWithAccount[];
+  cashAmount: number;
   totalMarketValue: number;
+  totalAssetValue: number;
+  cashPercent: number;
   accountSummaries: IStockPortfolioAccountSummary[];
+  sectorSummaries: IStockPortfolioSectorSummary[];
   symbolSummaries: IStockPortfolioSymbolSummary[];
+}
+
+export interface IStockCashUpdateReq {
+  amount: number;
+}
+
+export interface IStockCashUpdateRes {
+  amount: number;
+}
+
+export interface IStockQuoteRefreshReq {
+  symbols?: StockQuote['symbol'][];
+}
+
+export interface IStockQuoteRefreshItem {
+  symbol: StockQuote['symbol'];
+  name?: StockQuote['name'];
+  currentPrice: StockQuote['currentPrice'];
+  source: 'eastmoney' | 'sina';
+}
+
+export interface IStockQuoteRefreshRes {
+  updated: number;
+  failedSymbols: StockQuote['symbol'][];
+  quotes: IStockQuoteRefreshItem[];
+  source: 'eastmoney' | 'sina' | 'mixed';
+  fetchedAt: string;
 }

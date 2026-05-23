@@ -1,10 +1,49 @@
 import { prisma } from '@libs/prisma';
 import type {
   IStockPortfolioAccountSummary,
+  IStockPortfolioSectorSummary,
   IStockPortfolioSymbolSummary,
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import type { StockAccount, StockHolding, StockQuote } from '@prisma/client';
+
+const SECTOR_ORDER = ['消费', '白酒', '红利', '中药', '医药', '其他'];
+
+const SECTOR_BY_SYMBOL: Record<string, string> = {
+  '600519': '白酒',
+  '000858': '白酒',
+  '002304': '白酒',
+  '000568': '白酒',
+  '600809': '白酒',
+  '600600': '消费',
+  '600887': '消费',
+  '603288': '消费',
+  '002507': '消费',
+  '600298': '消费',
+  '603345': '消费',
+  '000651': '消费',
+  '000333': '消费',
+  '601888': '消费',
+  '000423': '中药',
+  '000538': '中药',
+  '000999': '中药',
+  '600085': '中药',
+  '600329': '中药',
+  '600750': '中药',
+  '600436': '中药',
+  '600332': '中药',
+  '000963': '医药',
+  '600161': '医药',
+  '601006': '红利',
+  '601728': '红利',
+  '600941': '红利',
+  '601288': '红利',
+  '600036': '红利',
+  '600900': '红利',
+  '600377': '红利',
+  '601088': '红利',
+  '601318': '红利',
+};
 
 export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
@@ -41,6 +80,9 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const quotes = await prisma.stockQuote.findMany({
     where: { userId },
   });
+  const cash = await prisma.stockCash.findUnique({
+    where: { userId },
+  });
   const quoteBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
   const holdingsWithQuotes = holdings
     .map((holding) => attachQuote(holding, quoteBySymbol.get(holding.symbol)))
@@ -55,14 +97,21 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     });
 
   const totalMarketValue = roundStockValue(holdingsWithQuotes.reduce((sum, holding) => sum + marketValueOf(holding), 0));
-  const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalMarketValue);
-  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalMarketValue);
+  const cashAmount = roundStockValue(cash?.amount ?? 0);
+  const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
+  const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalAssetValue);
+  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue);
+  const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
     accounts,
     holdings: holdingsWithQuotes,
+    cashAmount,
     totalMarketValue,
+    totalAssetValue,
+    cashPercent: percentOf(cashAmount, totalAssetValue),
     accountSummaries,
+    sectorSummaries,
     symbolSummaries,
   };
 };
@@ -124,6 +173,7 @@ const buildSymbolSummaries = (
     const current = bySymbol.get(holding.symbol) ?? {
       symbol: holding.symbol,
       name: holding.name,
+      sector: SECTOR_BY_SYMBOL[holding.symbol] ?? '其他',
       quantity: 0,
       marketValue: 0,
       percent: 0,
@@ -147,4 +197,34 @@ const buildSymbolSummaries = (
       percent: percentOf(summary.marketValue, totalMarketValue),
     }))
     .sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol));
+};
+
+const buildSectorSummaries = (
+  symbols: IStockPortfolioSymbolSummary[],
+  totalAssetValue: number
+): IStockPortfolioSectorSummary[] => {
+  const bySector = new Map<string, IStockPortfolioSectorSummary>();
+
+  symbols.forEach((symbol) => {
+    const current = bySector.get(symbol.sector) ?? {
+      sector: symbol.sector,
+      marketValue: 0,
+      percent: 0,
+      symbolCount: 0,
+      symbols: [],
+    };
+
+    current.marketValue = roundStockValue(current.marketValue + symbol.marketValue);
+    current.symbolCount += 1;
+    current.symbols.push(symbol);
+    bySector.set(symbol.sector, current);
+  });
+
+  return [...bySector.values()]
+    .map((summary) => ({
+      ...summary,
+      percent: percentOf(summary.marketValue, totalAssetValue),
+      symbols: summary.symbols.sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol)),
+    }))
+    .sort((left, right) => SECTOR_ORDER.indexOf(left.sector) - SECTOR_ORDER.indexOf(right.sector));
 };

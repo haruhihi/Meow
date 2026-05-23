@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { post } from '@libs/fetch';
-import { IStockSearchReq, IStockSearchRes } from '@dtos/meow';
+import { IStockQuoteRefreshReq, IStockQuoteRefreshRes, IStockSearchReq, IStockSearchRes } from '@dtos/meow';
 
 export const useStockPortfolio = (refreshKey = 0) => {
   const [data, setData] = useState<IStockSearchRes | null>(null);
@@ -17,6 +17,8 @@ export const useStockPortfolio = (refreshKey = 0) => {
     }
   };
 
+  const refreshQuotes = () => post<IStockQuoteRefreshReq, IStockQuoteRefreshRes>('/api/stock/quote/refresh', {});
+
   useEffect(() => {
     void fetchPortfolio();
   }, [refreshKey]);
@@ -25,5 +27,6 @@ export const useStockPortfolio = (refreshKey = 0) => {
     data,
     loading,
     reQuery: fetchPortfolio,
+    refreshQuotes,
   };
 };
