@@ -25,6 +25,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-stock-sync.txt
 
+      - name: Check database secret
+        env:
+          DATABASE: ${{ secrets.DATABASE }}
+        run: |
+          if [ -z "$DATABASE" ]; then
+            echo "Missing GitHub secret: DATABASE"
+            echo "Add it in Settings -> Secrets and variables -> Actions -> Repository secrets."
+            exit 1
+          fi
+
       - name: Sync fundamentals
         env:
           DATABASE: ${{ secrets.DATABASE }}
