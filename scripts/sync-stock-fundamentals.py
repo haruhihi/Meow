@@ -110,6 +110,16 @@ def find_column(row: dict[str, Any], include: list[str], exclude: list[str] | No
     return None
 
 
+def total_amount_from_value(value: Any) -> float | None:
+    amount = number_from_value(value)
+    if amount is None:
+        return None
+    # Total company financial statement amounts should not look like per-share values.
+    if abs(amount) < 1_000_000:
+        return None
+    return amount
+
+
 def fetch_symbols(conn: psycopg.Connection, explicit_symbols: list[str]) -> list[str]:
     if explicit_symbols:
         return sorted({symbol.strip().upper() for symbol in explicit_symbols if symbol.strip()})
@@ -162,8 +172,9 @@ def fetch_financial_indicator(symbol: str) -> tuple[dt.date | None, float | None
         or number_from_value(find_column(row, ["扣非", "净利润"]))
     )
     net_asset = (
-        number_from_value(find_column(row, ["归属", "净资产"]))
-        or number_from_value(find_column(row, ["净资产"], exclude=["收益率", "roe", "%"]))
+        total_amount_from_value(find_column(row, ["归属", "净资产"], exclude=["每股", "收益率", "roe", "%"]))
+        or total_amount_from_value(find_column(row, ["股东", "权益"], exclude=["每股", "收益率", "roe", "%"]))
+        or total_amount_from_value(find_column(row, ["净资产"], exclude=["每股", "收益率", "roe", "%"]))
     )
     return report_date, deducted_net_profit, net_asset
 
