@@ -420,6 +420,59 @@
   gap: 8px;
 }
 
+.dividendList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dividendItem,
+.dividendItemActive {
+  width: 100%;
+  border: 1px solid var(--meow-border);
+  border-radius: 12px;
+  background: var(--meow-surface-alt);
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.dividendItemActive {
+  border-color: color-mix(in srgb, var(--meow-primary) 48%, var(--meow-border));
+  background: color-mix(in srgb, var(--meow-primary) 10%, var(--meow-surface));
+}
+
+.dividendMain {
+  min-width: 0;
+
+  strong,
+  em {
+    display: block;
+  }
+
+  strong {
+    color: var(--meow-text);
+    font-size: 13px;
+  }
+
+  em {
+    margin-top: 2px;
+    color: var(--meow-text-muted);
+    font-size: 12px;
+    font-style: normal;
+  }
+}
+
+.dividendMark {
+  flex-shrink: 0;
+  color: var(--meow-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 @media (max-width: 360px) {
   .summaryValue {
     font-size: 26px;

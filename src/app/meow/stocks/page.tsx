@@ -23,8 +23,6 @@ import {
   IStockHoldingDeleteReq,
   IStockHoldingUpdateReq,
   IStockHoldingUpdateRes,
-  IStockMetricOverrideUpdateReq,
-  IStockMetricOverrideUpdateRes,
   IStockPortfolioSymbolSummary,
   StockDividendEventWithMarking,
   StockHoldingWithAccount,
@@ -48,7 +46,6 @@ type HoldingFormValues = {
 type SymbolFormValues = {
   name: string;
   currentPrice: string;
-  normalizedDividend?: string;
   quantities: Record<string, string>;
 };
 
@@ -65,6 +62,21 @@ const formatQuoteTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+const formatDate = (value: string | Date) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未知日期';
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+};
+const formatDividendPart = (value: number | null | undefined, prefix: string, suffix = '') =>
+  value && value > 0 ? `${prefix}${Number(value.toFixed(4))}${suffix}` : '';
+const formatDividendPlan = (event: StockDividendEventWithMarking) => {
+  const parts = [
+    formatDividendPart(event.cashPerTen, '10派', '元'),
+    formatDividendPart(event.bonusSharesPerTen, '10送', '股'),
+    formatDividendPart(event.transferSharesPerTen, '10转', '股'),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
 };
 
 export default function StocksPage() {
@@ -262,10 +274,6 @@ export default function StocksPage() {
         })
       );
       await Promise.all(updates);
-      await post<IStockMetricOverrideUpdateReq, IStockMetricOverrideUpdateRes>('/api/stock/metric/override/update', {
-        symbol: selectedSymbol.symbol,
-        normalizedDividend: values.normalizedDividend ? Number(values.normalizedDividend) : null,
-      });
       Toast.show({ content: '股票持仓已保存' });
       setSymbolModalVisible(false);
       refresh();
@@ -630,16 +638,22 @@ const SymbolModal = ({
   visible,
   summary,
   holdings,
+  dividendEvents,
+  dividendLoading,
   onClose,
   onSave,
   onDeleteHolding,
+  onToggleDividendEvent,
 }: {
   visible: boolean;
   summary: IStockPortfolioSymbolSummary | null;
   holdings: StockHoldingWithAccount[];
+  dividendEvents: StockDividendEventWithMarking[];
+  dividendLoading: boolean;
   onClose: () => void;
   onSave: (values: SymbolFormValues) => Promise<void>;
   onDeleteHolding: (holding: StockHoldingWithAccount) => Promise<void>;
+  onToggleDividendEvent: (event: StockDividendEventWithMarking, checked: boolean) => Promise<void>;
 }) => (
   <Modal
     visible={visible}
@@ -654,7 +668,6 @@ const SymbolModal = ({
           initialValues={{
             name: summary.name,
             currentPrice: holdings[0] ? String(holdings[0].currentPrice) : '',
-            normalizedDividend: summary.normalizedDividend != null ? String(summary.normalizedDividend) : '',
             quantities: Object.fromEntries(holdings.map((holding) => [String(holding.id), String(holding.quantity)])),
           }}
           footer={<Button block type="submit" color="primary">保存</Button>}
@@ -666,12 +679,35 @@ const SymbolModal = ({
           <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
             <Input placeholder="人民币价格" type="number" />
           </Form.Item>
-          <Form.Item name="normalizedDividend" label="常态分红"> 
-            <Input placeholder="年度常态分红总额" type="number" />
-          </Form.Item>
           <div className={styles.metricLine}>
             扣非PE {formatOptionalNumber(summary.deductedPe)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)} · 股息 {formatOptionalPercent(summary.normalizedDividendYield)}
           </div>
+          <div className={styles.modalSectionTitle}>分红事件</div>
+          {dividendLoading ? (
+            <div className={styles.emptyGroup}>分红加载中</div>
+          ) : dividendEvents.length > 0 ? (
+            <div className={styles.dividendList}>
+              {dividendEvents.map((event) => {
+                const checked = Boolean(event.marking?.countTowardNormalizedDividend);
+                return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    className={checked ? styles.dividendItemActive : styles.dividendItem}
+                    onClick={() => onToggleDividendEvent(event, !checked)}
+                  >
+                    <span className={styles.dividendMain}>
+                      <strong>{formatDate(event.exDividendDate)}</strong>
+                      <em>{formatDividendPlan(event)}</em>
+                    </span>
+                    <span className={styles.dividendMark}>{checked ? '计入' : '不计入'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.emptyGroup}>暂无分红事件</div>
+          )}
           <div className={styles.modalSectionTitle}>各账户股数</div>
           {holdings.map((holding) => (
             <div key={holding.id} className={styles.accountQuantityRow}>

@@ -2,7 +2,7 @@ import { prisma } from '@libs/prisma';
 import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 import { IStockMetricOverrideUpdateReq, IStockMetricOverrideUpdateRes } from '@dtos/meow';
-import { normalizeSymbol, readNonNegativeNumber, roundStockValue } from '../../helpers';
+import { normalizeSymbol, readNonNegativeNumber, roundStockValue } from '../../../helpers';
 
 export async function POST(req: Request) {
   try {
