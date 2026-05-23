@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -313,11 +313,20 @@ export interface IStockPortfolioSymbolSummary {
   symbol: StockHolding['symbol'];
   name: StockQuote['name'];
   sector: string;
+  currentPrice: number;
   quantity: number;
   marketValue: number;
   percent: number;
   holdingCount: number;
   accounts: StockAccount['name'][];
+  totalShares?: number | null;
+  deductedNetProfit?: number | null;
+  netAsset?: number | null;
+  normalizedDividend?: number | null;
+  reportDate?: string | null;
+  deductedPe?: number | null;
+  deductedRoe?: number | null;
+  normalizedDividendYield?: number | null;
 }
 
 export interface IStockPortfolioSectorSummary {
@@ -350,6 +359,42 @@ export interface IStockCashUpdateReq {
 
 export interface IStockCashUpdateRes {
   amount: number;
+}
+
+export interface IStockMetricOverrideUpdateReq {
+  symbol: StockQuote['symbol'];
+  normalizedDividend?: number | null;
+  note?: string | null;
+}
+
+export interface IStockMetricOverrideUpdateRes {
+  symbol: StockQuote['symbol'];
+  normalizedDividend: number | null;
+  note: string | null;
+}
+
+export type StockDividendEventWithMarking = StockDividendEvent & {
+  marking: Pick<StockDividendMarking, 'countTowardNormalizedDividend' | 'note'> | null;
+};
+
+export interface IStockDividendListReq {
+  symbol?: StockQuote['symbol'];
+}
+
+export interface IStockDividendListRes {
+  events: StockDividendEventWithMarking[];
+}
+
+export interface IStockDividendMarkingUpdateReq {
+  eventId: StockDividendEvent['id'];
+  countTowardNormalizedDividend: boolean;
+  note?: string | null;
+}
+
+export interface IStockDividendMarkingUpdateRes {
+  eventId: StockDividendEvent['id'];
+  countTowardNormalizedDividend: boolean;
+  note: string | null;
 }
 
 export interface IStockQuoteRefreshReq {

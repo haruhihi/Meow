@@ -14,12 +14,19 @@ import {
   IStockAccountUpdateRes,
   IStockCashUpdateReq,
   IStockCashUpdateRes,
+  IStockDividendListReq,
+  IStockDividendListRes,
+  IStockDividendMarkingUpdateReq,
+  IStockDividendMarkingUpdateRes,
   IStockHoldingCreateReq,
   IStockHoldingCreateRes,
   IStockHoldingDeleteReq,
   IStockHoldingUpdateReq,
   IStockHoldingUpdateRes,
+  IStockMetricOverrideUpdateReq,
+  IStockMetricOverrideUpdateRes,
   IStockPortfolioSymbolSummary,
+  StockDividendEventWithMarking,
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
@@ -41,6 +48,7 @@ type HoldingFormValues = {
 type SymbolFormValues = {
   name: string;
   currentPrice: string;
+  normalizedDividend?: string;
   quantities: Record<string, string>;
 };
 
@@ -50,6 +58,8 @@ type CashFormValues = {
 
 const formatQuantity = (value: number) => Number(value.toFixed(4)).toString();
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
+const formatOptionalNumber = (value?: number | null) => (value == null ? '—' : value.toFixed(1));
+const formatOptionalPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
 const marketValueOf = (holding: { quantity: number; currentPrice: number }) => holding.quantity * holding.currentPrice;
 const formatQuoteTime = (value: string) => {
   const date = new Date(value);
@@ -67,6 +77,8 @@ export default function StocksPage() {
   const [editingAccount, setEditingAccount] = useState<StockAccount | null>(null);
   const [editingHolding, setEditingHolding] = useState<StockHoldingWithAccount | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<IStockPortfolioSymbolSummary | null>(null);
+  const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
+  const [dividendLoading, setDividendLoading] = useState(false);
   const [defaultAccountId, setDefaultAccountId] = useState<number | null>(null);
   const [showAccountAllocation, setShowAccountAllocation] = useState(false);
   const [showAccountDetail, setShowAccountDetail] = useState(false);
@@ -144,9 +156,21 @@ export default function StocksPage() {
     setHoldingModalVisible(true);
   };
 
-  const openSymbolModal = (summary: IStockPortfolioSymbolSummary) => {
+  const openSymbolModal = async (summary: IStockPortfolioSymbolSummary) => {
     setSelectedSymbol(summary);
+    setDividendEvents([]);
     setSymbolModalVisible(true);
+    setDividendLoading(true);
+    try {
+      const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', {
+        symbol: summary.symbol,
+      });
+      setDividendEvents(res.events);
+    } catch (error) {
+      Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setDividendLoading(false);
+    }
   };
 
   const saveAccount = async (values: AccountFormValues) => {
@@ -238,11 +262,35 @@ export default function StocksPage() {
         })
       );
       await Promise.all(updates);
+      await post<IStockMetricOverrideUpdateReq, IStockMetricOverrideUpdateRes>('/api/stock/metric/override/update', {
+        symbol: selectedSymbol.symbol,
+        normalizedDividend: values.normalizedDividend ? Number(values.normalizedDividend) : null,
+      });
       Toast.show({ content: '股票持仓已保存' });
       setSymbolModalVisible(false);
       refresh();
     } catch (error) {
       Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
+    }
+  };
+
+  const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
+    try {
+      await post<IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes>('/api/stock/dividend/marking/update', {
+        eventId: event.id,
+        countTowardNormalizedDividend: checked,
+        note: event.marking?.note ?? null,
+      });
+      setDividendEvents((events) =>
+        events.map((item) =>
+          item.id === event.id
+            ? { ...item, marking: { countTowardNormalizedDividend: checked, note: item.marking?.note ?? null } }
+            : item
+        )
+      );
+      refresh();
+    } catch (error) {
+      Toast.show({ content: `标记失败: ${(error as any)?.result ?? error}` });
     }
   };
 
@@ -296,6 +344,9 @@ export default function StocksPage() {
                     </div>
                     <div className={styles.itemMeta}>
                       {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
+                    </div>
+                    <div className={styles.metricLine}>
+                      扣非PE {formatOptionalNumber(summary.deductedPe)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)} · 股息 {formatOptionalPercent(summary.normalizedDividendYield)}
                     </div>
                     <div className={styles.barTrack}>
                       <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
@@ -424,9 +475,12 @@ export default function StocksPage() {
         visible={symbolModalVisible}
         summary={selectedSymbol}
         holdings={selectedSymbolHoldings}
+        dividendEvents={dividendEvents}
+        dividendLoading={dividendLoading}
         onClose={() => setSymbolModalVisible(false)}
         onSave={saveSymbol}
         onDeleteHolding={deleteHolding}
+        onToggleDividendEvent={toggleDividendEvent}
       />
 
       {isQuoteRefreshing && (
@@ -600,6 +654,7 @@ const SymbolModal = ({
           initialValues={{
             name: summary.name,
             currentPrice: holdings[0] ? String(holdings[0].currentPrice) : '',
+            normalizedDividend: summary.normalizedDividend != null ? String(summary.normalizedDividend) : '',
             quantities: Object.fromEntries(holdings.map((holding) => [String(holding.id), String(holding.quantity)])),
           }}
           footer={<Button block type="submit" color="primary">保存</Button>}
@@ -611,6 +666,12 @@ const SymbolModal = ({
           <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
             <Input placeholder="人民币价格" type="number" />
           </Form.Item>
+          <Form.Item name="normalizedDividend" label="常态分红"> 
+            <Input placeholder="年度常态分红总额" type="number" />
+          </Form.Item>
+          <div className={styles.metricLine}>
+            扣非PE {formatOptionalNumber(summary.deductedPe)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)} · 股息 {formatOptionalPercent(summary.normalizedDividendYield)}
+          </div>
           <div className={styles.modalSectionTitle}>各账户股数</div>
           {holdings.map((holding) => (
             <div key={holding.id} className={styles.accountQuantityRow}>

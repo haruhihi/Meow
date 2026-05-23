@@ -377,6 +377,13 @@
   line-height: 1.4;
 }
 
+.metricLine {
+  margin-top: 3px;
+  color: var(--meow-text-sub);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .quickActions {
   display: flex;
   flex-wrap: wrap;

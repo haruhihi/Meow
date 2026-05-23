@@ -5,7 +5,7 @@ import type {
   IStockPortfolioSymbolSummary,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockHolding, StockQuote } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote } from '@prisma/client';
 
 const SECTOR_ORDER = ['消费', '白酒', '红利', '中药', '医药', '其他'];
 
@@ -83,7 +83,36 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cash = await prisma.stockCash.findUnique({
     where: { userId },
   });
+  const symbols = [...new Set(holdings.map((holding) => holding.symbol))];
+  const fundamentals = await prisma.stockFundamental.findMany({
+    where: { symbol: { in: symbols } },
+    orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
+  });
+  const overrides = await prisma.stockMetricOverride.findMany({
+    where: { userId, symbol: { in: symbols } },
+  });
+  const markedDividends = await prisma.stockDividendMarking.findMany({
+    where: {
+      userId,
+      countTowardNormalizedDividend: true,
+      event: { symbol: { in: symbols } },
+    },
+    include: { event: true },
+  });
   const quoteBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
+  const latestFundamentalBySymbol = new Map<string, StockFundamental>();
+  fundamentals.forEach((fundamental) => {
+    if (!latestFundamentalBySymbol.has(fundamental.symbol)) {
+      latestFundamentalBySymbol.set(fundamental.symbol, fundamental);
+    }
+  });
+  const overrideBySymbol = new Map(overrides.map((override) => [override.symbol, override]));
+  const markedDividendEventsBySymbol = new Map<string, StockDividendEvent[]>();
+  markedDividends.forEach((marking) => {
+    const current = markedDividendEventsBySymbol.get(marking.event.symbol) ?? [];
+    current.push(marking.event);
+    markedDividendEventsBySymbol.set(marking.event.symbol, current);
+  });
   const holdingsWithQuotes = holdings
     .map((holding) => attachQuote(holding, quoteBySymbol.get(holding.symbol)))
     .filter((holding) => {
@@ -100,7 +129,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue);
+  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue, latestFundamentalBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -164,7 +193,10 @@ const buildAccountSummaries = (
 
 const buildSymbolSummaries = (
   holdings: StockHoldingWithAccount[],
-  totalMarketValue: number
+  totalMarketValue: number,
+  fundamentalBySymbol: Map<string, StockFundamental>,
+  overrideBySymbol: Map<string, StockMetricOverride>,
+  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
 ): IStockPortfolioSymbolSummary[] => {
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
 
@@ -174,6 +206,7 @@ const buildSymbolSummaries = (
       symbol: holding.symbol,
       name: holding.name,
       sector: SECTOR_BY_SYMBOL[holding.symbol] ?? '其他',
+      currentPrice: holding.currentPrice,
       quantity: 0,
       marketValue: 0,
       percent: 0,
@@ -195,8 +228,50 @@ const buildSymbolSummaries = (
       ...summary,
       quantity: roundStockValue(summary.quantity),
       percent: percentOf(summary.marketValue, totalMarketValue),
+      ...buildComputedMetrics(
+        summary,
+        fundamentalBySymbol.get(summary.symbol),
+        overrideBySymbol.get(summary.symbol),
+        markedDividendEventsBySymbol.get(summary.symbol) ?? []
+      ),
     }))
     .sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol));
+};
+
+const buildComputedMetrics = (
+  summary: IStockPortfolioSymbolSummary,
+  fundamental?: StockFundamental,
+  override?: StockMetricOverride,
+  dividendEvents: StockDividendEvent[] = []
+) => {
+  const totalShares = fundamental?.totalShares ?? null;
+  const deductedNetProfit = fundamental?.deductedNetProfit ?? null;
+  const netAsset = fundamental?.netAsset ?? null;
+  const eventNormalizedDividend = sumMarkedDividendEvents(dividendEvents, totalShares);
+  const normalizedDividend = eventNormalizedDividend ?? override?.normalizedDividend ?? null;
+  const companyMarketCap = totalShares && totalShares > 0 ? summary.currentPrice * totalShares : null;
+
+  return {
+    totalShares,
+    deductedNetProfit,
+    netAsset,
+    normalizedDividend,
+    reportDate: fundamental?.reportDate.toISOString() ?? null,
+    deductedPe: companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null,
+    deductedRoe: deductedNetProfit && netAsset && netAsset > 0 ? deductedNetProfit / netAsset : null,
+    normalizedDividendYield: companyMarketCap && normalizedDividend && normalizedDividend > 0 ? normalizedDividend / companyMarketCap : null,
+  };
+};
+
+const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: number | null) => {
+  if (events.length === 0) return null;
+  const total = events.reduce((sum, event) => {
+    const cashPerTen = event.cashPerTen;
+    const baseShares = event.dividendBaseShares ?? totalShares;
+    if (!cashPerTen || cashPerTen <= 0 || !baseShares || baseShares <= 0) return sum;
+    return sum + (cashPerTen / 10) * baseShares;
+  }, 0);
+  return total > 0 ? roundStockValue(total) : null;
 };
 
 const buildSectorSummaries = (

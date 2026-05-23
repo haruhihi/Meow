@@ -29,6 +29,83 @@ model User {
   StockHolding StockHolding[] @relation
   StockQuote   StockQuote[]   @relation
   StockCash    StockCash?     @relation
+  StockMetricOverride StockMetricOverride[] @relation
+  StockDividendMarking StockDividendMarking[] @relation
+}
+
+model StockDividendEvent {
+  id                    Int      @id @default(autoincrement())
+  symbol                String   @db.VarChar(32)
+  announcementDate      DateTime?
+  recordDate            DateTime?
+  exDividendDate        DateTime
+  paymentDate           DateTime?
+  cashPerTen            Float?
+  bonusSharesPerTen     Float?
+  transferSharesPerTen  Float?
+  dividendBaseShares    Float?
+  status                String?  @db.VarChar(80)
+  description           String?  @db.VarChar(255)
+  source                String   @db.VarChar(80)
+  fetchedAt             DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  markings StockDividendMarking[] @relation
+
+  @@unique([symbol, exDividendDate])
+  @@index([symbol])
+  @@index([exDividendDate])
+}
+
+model StockDividendMarking {
+  id                            Int      @id @default(autoincrement())
+  userId                        Int
+  eventId                       Int
+  countTowardNormalizedDividend Boolean  @default(false)
+  note                          String?  @db.VarChar(255)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  user  User               @relation(fields: [userId], references: [id])
+  event StockDividendEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+}
+
+model StockFundamental {
+  id                  Int      @id @default(autoincrement())
+  symbol              String   @db.VarChar(32)
+  reportDate          DateTime
+  totalShares         Float?
+  deductedNetProfit   Float?
+  netAsset            Float?
+  source              String   @db.VarChar(80)
+  fetchedAt           DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([symbol, reportDate])
+  @@index([symbol])
+  @@index([reportDate])
+}
+
+model StockMetricOverride {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  symbol             String   @db.VarChar(32)
+  normalizedDividend Float?
+  note               String?  @db.VarChar(255)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, symbol])
+  @@index([userId])
+  @@index([symbol])
 }
 
 model StockCash {
