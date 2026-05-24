@@ -2,7 +2,7 @@ name: Sync stock dividends
 
 on:
   schedule:
-    - cron: '40 20 * * 0'
+    - cron: '40 20 * * *'
   workflow_dispatch:
 
 jobs:
@@ -40,4 +40,4 @@ jobs:
       - name: Sync dividends
         env:
           DATABASE: ${{ secrets.DATABASE }}
-        run: node scripts/sync-stock-dividends.mjs
+        run: node scripts/sync-stock-dividends.mjs --sleep 1500

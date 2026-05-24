@@ -37,6 +37,7 @@ model StockDividendEvent {
   id                    Int      @id @default(autoincrement())
   eventKey              String   @unique @db.VarChar(160)
   symbol                String   @db.VarChar(32)
+  reportPeriod          String?  @db.VarChar(80)
   announcementDate      DateTime?
   recordDate            DateTime?
   exDividendDate        DateTime?

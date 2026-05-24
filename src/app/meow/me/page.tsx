@@ -8,7 +8,6 @@ import {
   DownlandOutline,
   AppstoreOutline,
   FileOutline,
-  RightOutline,
 } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { useUserInfo } from '@utils/user';
@@ -74,29 +73,9 @@ export default function App() {
         </div>
       </div>
 
-      <div className={styles.card}>
-        <div className={styles.cardTitle}>
-          <PayCircleOutline /> 券管理
-        </div>
-        <div className={styles.couponRow}>
-          <div>
-            <div className={styles.couponLabel}>共享券池</div>
-            <div className={styles.couponValue}>创建、修改、删除券</div>
-          </div>
-          <Button
-            color="primary"
-            size="small"
-            onClick={() => router.push('/meow/coupons')}
-          >
-            进入
-          </Button>
-        </div>
-      </div>
-
       <List header="设置" className={styles.list}>
         <List.Item
           prefix={<PayCircleOutline />}
-          extra={<RightOutline />}
           onClick={() => router.push('/meow/coupons')}
           description="管理共享券，生成默认月度券"
         >
@@ -104,7 +83,6 @@ export default function App() {
         </List.Item>
         <List.Item
           prefix={<PayCircleOutline />}
-          extra={<RightOutline />}
           onClick={() => router.push('/meow/stocks')}
           description="查看账户持仓和仓位占比"
         >
@@ -112,7 +90,6 @@ export default function App() {
         </List.Item>
         <List.Item
           prefix={<FileOutline />}
-          extra={<RightOutline />}
           onClick={() => router.push('/meow/articles')}
           description="浏览已同步文章列表"
         >
@@ -120,7 +97,6 @@ export default function App() {
         </List.Item>
         <List.Item
           prefix={<AppstoreOutline />}
-          extra={<RightOutline />}
           onClick={() => router.push('/meow/piano')}
           description="高低音谱随机识别训练"
         >
@@ -128,7 +104,6 @@ export default function App() {
         </List.Item>
         <List.Item
           prefix={<DownlandOutline />}
-          extra={<RightOutline />}
           onClick={onExport}
           description={`导出 ${month.format('YYYY-MM')} 所有账单为 CSV`}
         >

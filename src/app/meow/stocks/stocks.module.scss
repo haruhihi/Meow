@@ -1,12 +1,16 @@
 .page {
   min-height: 100%;
   padding-bottom: 92px;
-  background: var(--meow-bg);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.18), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
 }
 
 .navbar {
-  background: var(--meow-surface);
-  border-bottom: 1px solid var(--meow-border);
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.14);
+  backdrop-filter: blur(12px);
 }
 
 .summaryCard {
@@ -14,8 +18,10 @@
   padding: 16px;
   border-radius: 16px;
   color: #fff;
-  background: linear-gradient(135deg, #1F2330 0%, #5B7CFA 100%);
-  box-shadow: 0 8px 20px rgba(31, 35, 48, 0.12);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 34%),
+    linear-gradient(135deg, #12b8a6 0%, #3b82f6 52%, #f97316 100%);
+  box-shadow: 0 12px 28px rgba(20, 184, 166, 0.22);
 }
 
 .summaryHeader {
@@ -31,9 +37,9 @@
 }
 
 .quoteButton {
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
   padding: 5px 10px;
   font-size: 12px;
@@ -94,9 +100,10 @@
   padding: 9px;
   border: 0;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
   text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 
   strong,
   span {
@@ -238,14 +245,14 @@
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: var(--meow-border);
+  background: rgba(20, 184, 166, 0.14);
   overflow: hidden;
 
   span {
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--meow-primary);
+    background: linear-gradient(90deg, #14b8a6 0%, #38bdf8 48%, #fb923c 100%);
   }
 }
 
@@ -267,8 +274,8 @@
   margin: 0 12px 12px;
   padding: 12px;
   border-radius: 14px;
-  background: var(--meow-surface);
-  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
 }
 
 .sectorHeader {
@@ -302,8 +309,8 @@
     flex-shrink: 0;
     padding: 2px 7px;
     border-radius: 8px;
-    color: var(--meow-primary);
-    background: color-mix(in srgb, var(--meow-primary) 12%, transparent);
+    color: #0f766e;
+    background: #ccfbf1;
     font-size: 12px;
     font-weight: 800;
   }
@@ -378,10 +385,54 @@
 }
 
 .metricLine {
-  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
   color: var(--meow-text-sub);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.metricTagValue,
+.metricTagTtm,
+.metricTagAsset,
+.metricTagQuality,
+.metricTagDividend {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0;
+  color: var(--meow-text-sub);
+  font-weight: 500;
+  white-space: nowrap;
+
+  strong {
+    margin: 0 2px;
+    color: var(--metric-color);
+    font-size: 12px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.metricTagValue {
+  --metric-color: #2563eb;
+}
+
+.metricTagTtm {
+  --metric-color: #0891b2;
+}
+
+.metricTagAsset {
+  --metric-color: #7c3aed;
+}
+
+.metricTagQuality {
+  --metric-color: #e11d48;
+}
+
+.metricTagDividend {
+  --metric-color: #059669;
 }
 
 .quickActions {
@@ -466,6 +517,26 @@
   }
 }
 
+.dividendTagPlan,
+.dividendTagDone {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.dividendTagPlan {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.dividendTagDone {
+  color: var(--meow-primary);
+  background: color-mix(in srgb, var(--meow-primary) 12%, transparent);
+}
+
 .dividendMark {
   flex-shrink: 0;
   color: var(--meow-primary);
@@ -476,6 +547,10 @@
 @media (max-width: 360px) {
   .summaryValue {
     font-size: 26px;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .quickActions {

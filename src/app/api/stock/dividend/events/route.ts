@@ -42,8 +42,14 @@ export async function POST(req: Request) {
       orderBy: [{ exDividendDate: 'desc' }, { announcementDate: 'desc' }, { id: 'desc' }],
     });
 
+    const sortedEvents = events.sort((left, right) => {
+      const leftTime = (left.exDividendDate ?? left.announcementDate)?.getTime() ?? 0;
+      const rightTime = (right.exDividendDate ?? right.announcementDate)?.getTime() ?? 0;
+      return rightTime - leftTime || right.id - left.id;
+    });
+
     return success<IStockDividendListRes>({
-      events: events.map((event): StockDividendEventWithMarking => {
+      events: sortedEvents.map((event): StockDividendEventWithMarking => {
         const { markings, ...rest } = event;
         return {
           ...rest,

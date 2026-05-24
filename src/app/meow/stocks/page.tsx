@@ -79,6 +79,7 @@ const formatDividendPlan = (event: StockDividendEventWithMarking) => {
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
 };
+const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 export default function StocksPage() {
   const router = useRouter();
@@ -101,9 +102,15 @@ export default function StocksPage() {
 
   const accounts = data?.accounts ?? [];
   const holdings = data?.holdings ?? [];
+  const symbolSummaries = data?.symbolSummaries ?? [];
   const totalMarketValue = data?.totalMarketValue ?? 0;
   const totalAssetValue = data?.totalAssetValue ?? totalMarketValue;
   const cashAmount = data?.cashAmount ?? 0;
+  const expectedDividend = symbolSummaries.reduce(
+    (sum, summary) => sum + summary.marketValue * (summary.normalizedDividendYield ?? 0),
+    0
+  );
+  const portfolioDividendYield = totalMarketValue > 0 ? expectedDividend / totalMarketValue : 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
   const holdingsByAccount = useMemo(
     () =>
@@ -322,7 +329,9 @@ export default function StocksPage() {
         <div className={styles.summaryGrid}>
           <SummaryStat label="股票" value={formatMoney(totalMarketValue)} />
           <SummaryStat label="现金" value={formatMoney(cashAmount)} onClick={() => setCashModalVisible(true)} />
-          <SummaryStat label="持仓" value={`${data?.symbolSummaries.length ?? 0}`} />
+          <SummaryStat label="持仓" value={`${symbolSummaries.length}`} />
+          <SummaryStat label="预期分红" value={formatMoney(expectedDividend)} />
+          <SummaryStat label="综合股息率" value={formatPercent(portfolioDividendYield)} />
         </div>
       </section>
 
@@ -343,7 +352,7 @@ export default function StocksPage() {
               </div>
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => (
-                  <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable>
+                  <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable arrow={false}>
                     <div className={styles.symbolRow}>
                       <div className={styles.symbolMain}>
                         <span>{summary.symbol}</span>
@@ -354,12 +363,7 @@ export default function StocksPage() {
                     <div className={styles.itemMeta}>
                       {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
                     </div>
-                    <div className={styles.metricLine}>
-                      扣非PE静 {formatOptionalNumber(summary.deductedPe)} · 扣非PE TTM {formatOptionalNumber(summary.deductedPeTtm)} · PB {formatOptionalNumber(summary.pb)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)}
-                    </div>
-                    <div className={styles.metricLine}>
-                      股息 {formatOptionalPercent(summary.normalizedDividendYield)} · FCF/分红 {formatOptionalNumber(summary.fcfDividendCoverage)} · 经营现金/扣非 {formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}
-                    </div>
+                    <StockMetricLines summary={summary} />
                     <div className={styles.barTrack}>
                       <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
                     </div>
@@ -509,6 +513,20 @@ const SummaryStat = ({ label, value, onClick }: { label: string; value: string; 
     <strong>{value}</strong>
     <span>{label}</span>
   </button>
+);
+
+const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
+  <>
+    <div className={styles.metricLine}>
+      <span className={styles.metricTagValue}>扣非 PE: <strong>{formatOptionalNumber(summary.deductedPe)}</strong>(静)</span>
+      <span className={styles.metricTagTtm}><strong>{formatOptionalNumber(summary.deductedPeTtm)}</strong>(TTM)</span>
+      <span className={styles.metricTagAsset}>PB <strong>{formatOptionalNumber(summary.pb)}</strong></span>
+    </div>
+    <div className={styles.metricLine}>
+      <span className={styles.metricTagQuality}>扣非 ROE: <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong>(TTM)</span>
+      <span className={styles.metricTagDividend}>股息率: <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
+    </div>
+  </>
 );
 
 const CashModal = ({
@@ -683,12 +701,7 @@ const SymbolModal = ({
           <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
             <Input placeholder="人民币价格" type="number" />
           </Form.Item>
-          <div className={styles.metricLine}>
-            扣非PE静 {formatOptionalNumber(summary.deductedPe)} · 扣非PE TTM {formatOptionalNumber(summary.deductedPeTtm)} · PB {formatOptionalNumber(summary.pb)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)}
-          </div>
-          <div className={styles.metricLine}>
-            股息 {formatOptionalPercent(summary.normalizedDividendYield)} · FCF/分红 {formatOptionalNumber(summary.fcfDividendCoverage)} · 经营现金/扣非 {formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}
-          </div>
+          <StockMetricLines summary={summary} />
           <div className={styles.modalSectionTitle}>分红事件</div>
           {dividendLoading ? (
             <div className={styles.emptyGroup}>分红加载中</div>
@@ -704,8 +717,14 @@ const SymbolModal = ({
                     onClick={() => onToggleDividendEvent(event, !checked)}
                   >
                     <span className={styles.dividendMain}>
-                      <strong>{formatDate(event.exDividendDate ?? event.announcementDate)}</strong>
+                      <strong>
+                        {event.reportPeriod ?? '未知报告期'}
+                        <span className={isDividendPlan(event) ? styles.dividendTagPlan : styles.dividendTagDone}>
+                          {isDividendPlan(event) ? '预案' : '实施'}
+                        </span>
+                      </strong>
                       <em>{formatDividendPlan(event)}</em>
+                      <em>除权除息 {formatDate(event.exDividendDate)}</em>
                     </span>
                     <span className={styles.dividendMark}>{checked ? '已计入' : '计入'}</span>
                   </button>

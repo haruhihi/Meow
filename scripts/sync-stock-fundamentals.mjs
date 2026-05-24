@@ -18,7 +18,7 @@ const parseArgs = () => {
   const symbols = [];
   let limit = 0;
   let dryRun = false;
-  let sleep = 800;
+  let sleep = 1500;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -118,14 +118,40 @@ const mapByReportDate = (items) => {
   return map;
 };
 
-const sumLastFour = (items, fieldName) => {
-  const values = (items ?? [])
+const valueOfAny = (item, fieldNames) => {
+  for (const fieldName of fieldNames) {
+    const value = valueOf(item?.[fieldName]);
+    if (value != null) return value;
+  }
+  return null;
+};
+
+const findReportByYearMonth = (items, year, month) =>
+  (items ?? []).find((item) => {
+    const date = dateFromMillis(item.report_date);
+    return date?.getFullYear() === year && date.getMonth() + 1 === month;
+  });
+
+const trailingTwelveMonths = (items, fieldNames) => {
+  const sortedItems = (items ?? [])
     .slice()
-    .sort((left, right) => Number(right.report_date ?? 0) - Number(left.report_date ?? 0))
-    .slice(0, 4)
-    .map((item) => valueOf(item?.[fieldName]));
-  if (values.length < 4 || values.some((value) => value == null)) return null;
-  return values.reduce((sum, value) => sum + value, 0);
+    .sort((left, right) => Number(right.report_date ?? 0) - Number(left.report_date ?? 0));
+  const latest = sortedItems[0];
+  const latestDate = dateFromMillis(latest?.report_date);
+  const latestValue = valueOfAny(latest, fieldNames);
+  if (!latest || !latestDate || latestValue == null) return null;
+
+  const latestYear = latestDate.getFullYear();
+  const latestMonth = latestDate.getMonth() + 1;
+  if (latestMonth === 12) return latestValue;
+
+  const previousAnnual = findReportByYearMonth(sortedItems, latestYear - 1, 12);
+  const previousSamePeriod = findReportByYearMonth(sortedItems, latestYear - 1, latestMonth);
+  const previousAnnualValue = valueOfAny(previousAnnual, fieldNames);
+  const previousSamePeriodValue = valueOfAny(previousSamePeriod, fieldNames);
+  if (previousAnnualValue == null || previousSamePeriodValue == null) return null;
+
+  return latestValue + previousAnnualValue - previousSamePeriodValue;
 };
 
 const fetchFundamentals = async (symbol) => {
@@ -133,13 +159,15 @@ const fetchFundamentals = async (symbol) => {
   const { cookieHeader } = await createXueqiuSession(xueqiuSymbol);
   if (!cookieHeader) throw new Error('missing xueqiu anonymous cookie');
 
-  const [incomePayload, balancePayload, cashFlowPayload, incomeAllPayload, cashFlowAllPayload] = await Promise.all([
-    fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader),
-    fetchXueqiuJson(financeUrl('balance', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader),
-    fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader),
-    fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader),
-    fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader),
-  ]);
+  const incomePayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
+  await sleepMs(300);
+  const balancePayload = await fetchXueqiuJson(financeUrl('balance', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
+  await sleepMs(300);
+  const cashFlowPayload = await fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
+  await sleepMs(300);
+  const incomeAllPayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader);
+  await sleepMs(300);
+  const cashFlowAllPayload = await fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader);
 
   const incomeByDate = mapByReportDate(incomePayload.data?.list ?? []);
   const balanceByDate = mapByReportDate(balancePayload.data?.list ?? []);
@@ -148,11 +176,11 @@ const fetchFundamentals = async (symbol) => {
   const incomeAll = incomeAllPayload.data?.list ?? [];
   const cashFlowAll = cashFlowAllPayload.data?.list ?? [];
   const ttm = {
-    deductedNetProfitTtm: sumLastFour(incomeAll, 'net_profit_after_nrgal_atsolc'),
-    netProfitTtm: sumLastFour(incomeAll, 'net_profit_atsopc') ?? sumLastFour(incomeAll, 'net_profit'),
-    revenueTtm: sumLastFour(incomeAll, 'revenue') ?? sumLastFour(incomeAll, 'total_revenue'),
-    operatingCashFlowTtm: sumLastFour(cashFlowAll, 'ncf_from_oa'),
-    capitalExpenditureTtm: sumLastFour(cashFlowAll, 'cash_paid_for_assets'),
+    deductedNetProfitTtm: trailingTwelveMonths(incomeAll, ['net_profit_after_nrgal_atsolc']),
+    netProfitTtm: trailingTwelveMonths(incomeAll, ['net_profit_atsopc', 'net_profit']),
+    revenueTtm: trailingTwelveMonths(incomeAll, ['revenue', 'total_revenue']),
+    operatingCashFlowTtm: trailingTwelveMonths(cashFlowAll, ['ncf_from_oa']),
+    capitalExpenditureTtm: trailingTwelveMonths(cashFlowAll, ['cash_paid_for_assets']),
   };
 
   return dates.map((date) => {

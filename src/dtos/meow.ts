@@ -338,6 +338,7 @@ export interface IStockPortfolioSymbolSummary {
   deductedPeTtm?: number | null;
   pb?: number | null;
   deductedRoe?: number | null;
+  deductedRoeTtm?: number | null;
   normalizedDividendYield?: number | null;
   freeCashFlow?: number | null;
   freeCashFlowTtm?: number | null;

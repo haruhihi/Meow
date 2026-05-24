@@ -19,7 +19,7 @@ const parseArgs = () => {
   const symbols = [];
   let limit = 0;
   let dryRun = false;
-  let sleep = 800;
+  let sleep = 1500;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -127,6 +127,7 @@ const buildEventKey = (symbol, eventDate, description) => {
 
 const parseDividendItem = (symbol, item) => {
   const description = String(item.plan_explain ?? '').trim();
+  const reportPeriod = String(item.dividend_year ?? '').trim() || null;
   const cashPerTen = parseNumber(description, /10\s*派\s*(\d+(?:\.\d+)?)/);
   const bonusSharesPerTen = parseNumber(description, /10\s*送\s*(\d+(?:\.\d+)?)/);
   const transferSharesPerTen = parseNumber(description, /10\s*转\s*(\d+(?:\.\d+)?)/);
@@ -143,6 +144,7 @@ const parseDividendItem = (symbol, item) => {
   return {
     eventKey: buildEventKey(symbol, eventDate, description || String(item.dividend_year ?? '')),
     symbol,
+    reportPeriod,
     announcementDate,
     recordDate,
     exDividendDate,
@@ -168,6 +170,7 @@ const upsertDividendEvent = async (event) => {
     create: event,
     update: {
       announcementDate: event.announcementDate,
+      reportPeriod: event.reportPeriod,
       recordDate: event.recordDate,
       exDividendDate: event.exDividendDate,
       paymentDate: event.paymentDate,
@@ -201,7 +204,7 @@ const main = async () => {
         continue;
       }
       for (const event of events) {
-        console.log(`[${symbol}] ex=${event.exDividendDate?.toISOString().slice(0, 10) ?? 'N/A'} announcement=${event.announcementDate?.toISOString().slice(0, 10) ?? 'N/A'} cash10=${event.cashPerTen} bonus10=${event.bonusSharesPerTen} transfer10=${event.transferSharesPerTen} status=${event.status}`);
+        console.log(`[${symbol}] period=${event.reportPeriod ?? 'N/A'} ex=${event.exDividendDate?.toISOString().slice(0, 10) ?? 'N/A'} announcement=${event.announcementDate?.toISOString().slice(0, 10) ?? 'N/A'} cash10=${event.cashPerTen} bonus10=${event.bonusSharesPerTen} transfer10=${event.transferSharesPerTen} status=${event.status}`);
         if (!args.dryRun) await upsertDividendEvent(event);
         written += 1;
       }
