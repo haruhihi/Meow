@@ -63,7 +63,8 @@ const formatQuoteTime = (value: string) => {
   if (Number.isNaN(date.getTime())) return '';
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
-const formatDate = (value: string | Date) => {
+const formatDate = (value?: string | Date | null) => {
+  if (!value) return '未知日期';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '未知日期';
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;

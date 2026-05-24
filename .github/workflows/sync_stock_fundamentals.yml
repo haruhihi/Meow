@@ -30,6 +30,13 @@ jobs:
             exit 1
           fi
 
+      - name: Install dependencies
+        env:
+          DATABASE: ${{ secrets.DATABASE }}
+        run: |
+          printf 'DATABASE=%s\n' "$DATABASE" >> .env
+          npm install
+
       - name: Sync fundamentals
         env:
           DATABASE: ${{ secrets.DATABASE }}
