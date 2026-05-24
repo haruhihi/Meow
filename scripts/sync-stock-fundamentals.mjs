@@ -240,7 +240,7 @@ const main = async () => {
         continue;
       }
       for (const item of items) {
-        console.log(`[${symbol}] report=${item.reportDate.toISOString().slice(0, 10)} totalShares=${item.totalShares} deductedNetProfit=${item.deductedNetProfit} netAsset=${item.netAsset} operatingCashFlow=${item.operatingCashFlow}`);
+        console.log(`[${symbol}] report=${item.reportDate.toISOString().slice(0, 10)} totalShares=${item.totalShares} deductedNetProfit=${item.deductedNetProfit} deductedNetProfitTtm=${item.deductedNetProfitTtm} netAsset=${item.netAsset} operatingCashFlow=${item.operatingCashFlow} operatingCashFlowTtm=${item.operatingCashFlowTtm}`);
         if (!args.dryRun) await upsertFundamental(item);
       }
       ok += 1;
