@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "StockFundamental" ADD COLUMN "deductedNetProfitTtm" DOUBLE PRECISION,
+ADD COLUMN "netProfitTtm" DOUBLE PRECISION,
+ADD COLUMN "revenueTtm" DOUBLE PRECISION,
+ADD COLUMN "operatingCashFlowTtm" DOUBLE PRECISION,
+ADD COLUMN "capitalExpenditureTtm" DOUBLE PRECISION;

@@ -22,15 +22,24 @@ export async function POST(req: Request) {
       return success<IStockDividendListRes>({ events: [] });
     }
 
+    const since = new Date();
+    since.setFullYear(since.getFullYear() - 2);
+
     const events = await prisma.stockDividendEvent.findMany({
-      where: { symbol: { in: symbols } },
+      where: {
+        symbol: { in: symbols },
+        OR: [
+          { exDividendDate: { gte: since } },
+          { exDividendDate: null, announcementDate: { gte: since } },
+        ],
+      },
       include: {
         markings: {
           where: { userId: uid },
           select: { countTowardNormalizedDividend: true, note: true },
         },
       },
-      orderBy: [{ exDividendDate: 'desc' }, { id: 'desc' }],
+      orderBy: [{ exDividendDate: 'desc' }, { announcementDate: 'desc' }, { id: 'desc' }],
     });
 
     return success<IStockDividendListRes>({

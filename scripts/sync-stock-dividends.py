@@ -14,23 +14,24 @@ import os
 import re
 import sys
 import time
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-import akshare as ak
-import pandas as pd
 import psycopg
+import requests
 
 APP_DATABASE_NAME = "postgres"
-SOURCE = "akshare"
+SOURCE = "xueqiu"
 
 
 @dataclass
 class DividendEvent:
     symbol: str
-    ex_dividend_date: dt.date
+    event_key: str
+    ex_dividend_date: dt.date | None
     announcement_date: dt.date | None = None
     record_date: dt.date | None = None
     payment_date: dt.date | None = None
@@ -69,7 +70,7 @@ def database_url() -> str:
 def number_from_value(value: Any) -> float | None:
     if value is None:
         return None
-    if isinstance(value, (int, float)) and pd.notna(value):
+    if isinstance(value, (int, float)):
         return float(value)
     text = str(value).strip().replace(",", "")
     if not text or text in {"--", "-", "nan", "None"}:
@@ -92,10 +93,12 @@ def number_from_value(value: Any) -> float | None:
 
 
 def date_from_value(value: Any) -> dt.date | None:
-    if value is None or pd.isna(value):
+    if value is None:
         return None
-    if isinstance(value, (dt.date, dt.datetime, pd.Timestamp)):
-        return pd.Timestamp(value).date()
+    if isinstance(value, dt.datetime):
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
     text = str(value)
     match = re.search(r"(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})", text)
     if match:
@@ -103,6 +106,18 @@ def date_from_value(value: Any) -> dt.date | None:
     match = re.search(r"(20\d{2})(\d{2})(\d{2})", text)
     if match:
         return dt.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    match = re.search(r"(20\d{2}).*年报", text)
+    if match:
+        return dt.date(int(match.group(1)), 12, 31)
+    match = re.search(r"(20\d{2}).*三季", text)
+    if match:
+        return dt.date(int(match.group(1)), 9, 30)
+    match = re.search(r"(20\d{2}).*中报", text)
+    if match:
+        return dt.date(int(match.group(1)), 6, 30)
+    match = re.search(r"(20\d{2}).*一季", text)
+    if match:
+        return dt.date(int(match.group(1)), 3, 31)
     return None
 
 
@@ -123,8 +138,26 @@ def fetch_symbols(conn: psycopg.Connection, explicit_symbols: list[str]) -> list
         return [row[0] for row in cur.fetchall()]
 
 
-def event_key(event: DividendEvent) -> tuple[str, dt.date]:
-    return event.symbol, event.ex_dividend_date
+def xueqiu_symbol(symbol: str) -> str:
+    return f"SH{symbol}" if symbol.startswith("6") else f"SZ{symbol}"
+
+
+def build_event_key(symbol: str, event_date: dt.date, description: str | None) -> str:
+    digest = hashlib.md5((description or "").encode("utf-8")).hexdigest()[:12]
+    return f"{symbol}:{event_date.isoformat()}:{digest}"
+
+
+def date_from_millis(value: Any) -> dt.date | None:
+    if value is None:
+        return None
+    try:
+        return dt.datetime.fromtimestamp(int(value) / 1000).date()
+    except Exception:
+        return None
+
+
+def event_key(event: DividendEvent) -> str:
+    return event.event_key
 
 
 def merge_event(target: DividendEvent, source: DividendEvent) -> DividendEvent:
@@ -141,20 +174,81 @@ def merge_event(target: DividendEvent, source: DividendEvent) -> DividendEvent:
 
 
 def parse_dividend_row(symbol: str, row: dict[str, Any]) -> DividendEvent | None:
+    announcement_date = date_from_value(find_column(row, ["公告"])) or date_from_value(find_column(row, ["预案", "日期"]))
     ex_date = (
         date_from_value(find_column(row, ["除权", "除息"]))
         or date_from_value(find_column(row, ["除息"]))
         or date_from_value(find_column(row, ["实施", "日期"]))
-        or date_from_value(find_column(row, ["日期"]))
     )
-    if not ex_date:
-        return None
 
     cash = (
         number_from_value(find_column(row, ["派", "现金"], exclude=["比例"]))
         or number_from_value(find_column(row, ["派息"]))
         or number_from_value(find_column(row, ["现金", "分红"]))
     )
+
+
+def parse_xueqiu_dividend_item(symbol: str, item: dict[str, Any]) -> DividendEvent | None:
+    description = str(item.get("plan_explain") or "").strip() or None
+    text = description or ""
+    cash = None
+    bonus = None
+    transfer = None
+
+    match = re.search(r"10\s*派\s*(\d+(?:\.\d+)?)", text)
+    if match:
+        cash = float(match.group(1))
+    match = re.search(r"10\s*送\s*(\d+(?:\.\d+)?)", text)
+    if match:
+        bonus = float(match.group(1))
+    match = re.search(r"10\s*转\s*(\d+(?:\.\d+)?)", text)
+    if match:
+        transfer = float(match.group(1))
+
+    ex_date = date_from_millis(item.get("ashare_ex_dividend_date") or item.get("ex_dividend_date"))
+    record_date = date_from_millis(item.get("equity_date"))
+    payment_date = date_from_millis(item.get("dividend_date"))
+    announcement_date = date_from_value(item.get("dividend_year"))
+    event_date = ex_date or announcement_date or record_date or payment_date
+    if not event_date:
+        return None
+    if cash is None and bonus is None and transfer is None:
+        return None
+
+    status_match = re.search(r"\(([^)）]+)[)）]", text)
+    status = status_match.group(1) if status_match else None
+    return DividendEvent(
+        symbol=symbol,
+        event_key=build_event_key(symbol, event_date, description or str(item.get("dividend_year") or "")),
+        ex_dividend_date=ex_date,
+        announcement_date=announcement_date,
+        record_date=record_date,
+        payment_date=payment_date,
+        cash_per_ten=cash,
+        bonus_shares_per_ten=bonus,
+        transfer_shares_per_ten=transfer,
+        status=status,
+        description=description,
+    )
+
+
+def fetch_xueqiu_dividend_events(symbol: str, size: int = 30) -> list[DividendEvent]:
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0",
+        "Referer": f"https://xueqiu.com/S/{xueqiu_symbol(symbol)}",
+    })
+    session.get(f"https://xueqiu.com/snowman/S/{xueqiu_symbol(symbol)}/detail#/FHPS", timeout=20)
+    response = session.get(
+        "https://stock.xueqiu.com/v5/stock/f10/cn/bonus.json",
+        params={"symbol": xueqiu_symbol(symbol), "size": size, "page": 1, "extend": "true"},
+        timeout=20,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    items = payload.get("data", {}).get("items", [])
+    events = [parse_xueqiu_dividend_item(symbol, item) for item in items]
+    return [event for event in events if event]
     bonus = number_from_value(find_column(row, ["送"], exclude=["转"]))
     transfer = number_from_value(find_column(row, ["转"]))
     base_shares = (
@@ -178,10 +272,17 @@ def parse_dividend_row(symbol: str, row: dict[str, Any]) -> DividendEvent | None
         if match:
             transfer = float(match.group(1))
 
+    event_date = ex_date or announcement_date or date_from_value(find_column(row, ["日期"]))
+    if not event_date:
+        return None
+    if cash is None and bonus is None and transfer is None:
+        return None
+
     return DividendEvent(
         symbol=symbol,
+        event_key=build_event_key(symbol, event_date, description or text),
         ex_dividend_date=ex_date,
-        announcement_date=date_from_value(find_column(row, ["公告"])) or date_from_value(find_column(row, ["预案", "日期"])),
+        announcement_date=announcement_date,
         record_date=date_from_value(find_column(row, ["登记"])),
         payment_date=date_from_value(find_column(row, ["派息"])) or date_from_value(find_column(row, ["到账"])),
         cash_per_ten=cash,
@@ -193,7 +294,9 @@ def parse_dividend_row(symbol: str, row: dict[str, Any]) -> DividendEvent | None
     )
 
 
-def call_akshare_function(name: str, symbol: str) -> pd.DataFrame | None:
+def call_akshare_function(name: str, symbol: str) -> Any:
+    import akshare as ak
+
     func = getattr(ak, name, None)
     if not func:
         return None
@@ -210,12 +313,20 @@ def call_akshare_function(name: str, symbol: str) -> pd.DataFrame | None:
 
 
 def fetch_dividend_events(symbol: str) -> list[DividendEvent]:
+    try:
+        events = fetch_xueqiu_dividend_events(symbol)
+        if events:
+            print(f"[{symbol}] xueqiu bonus events={len(events)}")
+            return sorted(events, key=lambda item: item.ex_dividend_date or item.announcement_date or dt.date.min, reverse=True)
+    except Exception as exc:
+        print(f"[{symbol}] xueqiu bonus failed: {exc}", file=sys.stderr)
+
     function_names = [
         "stock_dividend_benefit_em",
         "stock_bonus_em",
         "stock_dividend_cninfo",
     ]
-    events: dict[tuple[str, dt.date], DividendEvent] = {}
+    events: dict[str, DividendEvent] = {}
 
     for name in function_names:
         try:
@@ -233,7 +344,7 @@ def fetch_dividend_events(symbol: str) -> list[DividendEvent]:
             key = event_key(event)
             events[key] = merge_event(events[key], event) if key in events else event
 
-    return sorted(events.values(), key=lambda item: item.ex_dividend_date, reverse=True)
+    return sorted(events.values(), key=lambda item: item.ex_dividend_date or item.announcement_date or dt.date.min, reverse=True)
 
 
 def upsert_dividend_event(conn: psycopg.Connection, event: DividendEvent) -> None:
@@ -241,10 +352,10 @@ def upsert_dividend_event(conn: psycopg.Connection, event: DividendEvent) -> Non
         cur.execute(
             '''
             INSERT INTO "StockDividendEvent"
-              ("symbol", "announcementDate", "recordDate", "exDividendDate", "paymentDate", "cashPerTen", "bonusSharesPerTen", "transferSharesPerTen", "dividendBaseShares", "status", "description", "source", "fetchedAt", "createdAt", "updatedAt")
+                            ("eventKey", "symbol", "announcementDate", "recordDate", "exDividendDate", "paymentDate", "cashPerTen", "bonusSharesPerTen", "transferSharesPerTen", "dividendBaseShares", "status", "description", "source", "fetchedAt", "createdAt", "updatedAt")
             VALUES
-              (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT ("symbol", "exDividendDate") DO UPDATE SET
+                            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        ON CONFLICT ("eventKey") DO UPDATE SET
               "announcementDate" = COALESCE(EXCLUDED."announcementDate", "StockDividendEvent"."announcementDate"),
               "recordDate" = COALESCE(EXCLUDED."recordDate", "StockDividendEvent"."recordDate"),
               "paymentDate" = COALESCE(EXCLUDED."paymentDate", "StockDividendEvent"."paymentDate"),
@@ -259,6 +370,7 @@ def upsert_dividend_event(conn: psycopg.Connection, event: DividendEvent) -> Non
               "updatedAt" = CURRENT_TIMESTAMP
             ''',
             (
+                event.event_key,
                 event.symbol,
                 event.announcement_date,
                 event.record_date,
@@ -300,7 +412,7 @@ def main() -> int:
                     failed.append(symbol)
                     continue
                 for event in events:
-                    print(f"[{symbol}] ex={event.ex_dividend_date} cash10={event.cash_per_ten} bonus10={event.bonus_shares_per_ten} transfer10={event.transfer_shares_per_ten} status={event.status}")
+                    print(f"[{symbol}] ex={event.ex_dividend_date} announcement={event.announcement_date} cash10={event.cash_per_ten} bonus10={event.bonus_shares_per_ten} transfer10={event.transfer_shares_per_ten} status={event.status}")
                     if not args.dry_run:
                         upsert_dividend_event(conn, event)
                         written += 1

@@ -354,7 +354,10 @@ export default function StocksPage() {
                       {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
                     </div>
                     <div className={styles.metricLine}>
-                      扣非PE {formatOptionalNumber(summary.deductedPe)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)} · 股息 {formatOptionalPercent(summary.normalizedDividendYield)}
+                      扣非PE静 {formatOptionalNumber(summary.deductedPe)} · 扣非PE TTM {formatOptionalNumber(summary.deductedPeTtm)} · PB {formatOptionalNumber(summary.pb)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)}
+                    </div>
+                    <div className={styles.metricLine}>
+                      股息 {formatOptionalPercent(summary.normalizedDividendYield)} · FCF/分红 {formatOptionalNumber(summary.fcfDividendCoverage)} · 经营现金/扣非 {formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}
                     </div>
                     <div className={styles.barTrack}>
                       <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
@@ -680,7 +683,10 @@ const SymbolModal = ({
             <Input placeholder="人民币价格" type="number" />
           </Form.Item>
           <div className={styles.metricLine}>
-            扣非PE {formatOptionalNumber(summary.deductedPe)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)} · 股息 {formatOptionalPercent(summary.normalizedDividendYield)}
+            扣非PE静 {formatOptionalNumber(summary.deductedPe)} · 扣非PE TTM {formatOptionalNumber(summary.deductedPeTtm)} · PB {formatOptionalNumber(summary.pb)} · 扣非ROE {formatOptionalPercent(summary.deductedRoe)}
+          </div>
+          <div className={styles.metricLine}>
+            股息 {formatOptionalPercent(summary.normalizedDividendYield)} · FCF/分红 {formatOptionalNumber(summary.fcfDividendCoverage)} · 经营现金/扣非 {formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}
           </div>
           <div className={styles.modalSectionTitle}>分红事件</div>
           {dividendLoading ? (
@@ -697,10 +703,10 @@ const SymbolModal = ({
                     onClick={() => onToggleDividendEvent(event, !checked)}
                   >
                     <span className={styles.dividendMain}>
-                      <strong>{formatDate(event.exDividendDate)}</strong>
+                      <strong>{formatDate(event.exDividendDate ?? event.announcementDate)}</strong>
                       <em>{formatDividendPlan(event)}</em>
                     </span>
-                    <span className={styles.dividendMark}>{checked ? '计入' : '不计入'}</span>
+                    <span className={styles.dividendMark}>{checked ? '已计入' : '计入'}</span>
                   </button>
                 );
               })}

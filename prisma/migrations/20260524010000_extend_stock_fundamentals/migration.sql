@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "StockFundamental" ADD COLUMN "reportName" VARCHAR(80),
+ADD COLUMN "netProfit" DOUBLE PRECISION,
+ADD COLUMN "revenue" DOUBLE PRECISION,
+ADD COLUMN "totalAssets" DOUBLE PRECISION,
+ADD COLUMN "operatingCashFlow" DOUBLE PRECISION,
+ADD COLUMN "capitalExpenditure" DOUBLE PRECISION;

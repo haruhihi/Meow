@@ -246,20 +246,52 @@ const buildComputedMetrics = (
 ) => {
   const totalShares = fundamental?.totalShares ?? null;
   const deductedNetProfit = fundamental?.deductedNetProfit ?? null;
+  const deductedNetProfitTtm = fundamental?.deductedNetProfitTtm ?? null;
+  const netProfit = fundamental?.netProfit ?? null;
+  const netProfitTtm = fundamental?.netProfitTtm ?? null;
+  const revenue = fundamental?.revenue ?? null;
+  const revenueTtm = fundamental?.revenueTtm ?? null;
   const netAsset = fundamental?.netAsset ?? null;
+  const totalAssets = fundamental?.totalAssets ?? null;
+  const operatingCashFlow = fundamental?.operatingCashFlow ?? null;
+  const operatingCashFlowTtm = fundamental?.operatingCashFlowTtm ?? null;
+  const capitalExpenditure = fundamental?.capitalExpenditure ?? null;
+  const capitalExpenditureTtm = fundamental?.capitalExpenditureTtm ?? null;
   const eventNormalizedDividend = sumMarkedDividendEvents(dividendEvents, totalShares);
   const normalizedDividend = eventNormalizedDividend ?? override?.normalizedDividend ?? null;
   const companyMarketCap = totalShares && totalShares > 0 ? summary.currentPrice * totalShares : null;
+  const freeCashFlow = operatingCashFlow != null && capitalExpenditure != null
+    ? operatingCashFlow - capitalExpenditure
+    : null;
+  const freeCashFlowTtm = operatingCashFlowTtm != null && capitalExpenditureTtm != null
+    ? operatingCashFlowTtm - capitalExpenditureTtm
+    : null;
 
   return {
     totalShares,
     deductedNetProfit,
+    deductedNetProfitTtm,
+    netProfit,
+    netProfitTtm,
+    revenue,
+    revenueTtm,
     netAsset,
+    totalAssets,
+    operatingCashFlow,
+    operatingCashFlowTtm,
+    capitalExpenditure,
+    capitalExpenditureTtm,
     normalizedDividend,
     reportDate: fundamental?.reportDate.toISOString() ?? null,
     deductedPe: companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null,
+    deductedPeTtm: companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null,
+    pb: companyMarketCap && netAsset && netAsset > 0 ? roundStockValue(companyMarketCap / netAsset) : null,
     deductedRoe: deductedNetProfit && netAsset && netAsset > 0 ? deductedNetProfit / netAsset : null,
     normalizedDividendYield: companyMarketCap && normalizedDividend && normalizedDividend > 0 ? normalizedDividend / companyMarketCap : null,
+    freeCashFlow: freeCashFlow != null ? roundStockValue(freeCashFlow) : null,
+    freeCashFlowTtm: freeCashFlowTtm != null ? roundStockValue(freeCashFlowTtm) : null,
+    fcfDividendCoverage: freeCashFlowTtm != null && normalizedDividend && normalizedDividend > 0 ? freeCashFlowTtm / normalizedDividend : null,
+    operatingCashFlowToDeductedNetProfit: operatingCashFlowTtm != null && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? operatingCashFlowTtm / deductedNetProfitTtm : null,
   };
 };
 

@@ -35,10 +35,11 @@ model User {
 
 model StockDividendEvent {
   id                    Int      @id @default(autoincrement())
+  eventKey              String   @unique @db.VarChar(160)
   symbol                String   @db.VarChar(32)
   announcementDate      DateTime?
   recordDate            DateTime?
-  exDividendDate        DateTime
+  exDividendDate        DateTime?
   paymentDate           DateTime?
   cashPerTen            Float?
   bonusSharesPerTen     Float?
@@ -53,8 +54,8 @@ model StockDividendEvent {
 
   markings StockDividendMarking[] @relation
 
-  @@unique([symbol, exDividendDate])
   @@index([symbol])
+  @@index([announcementDate])
   @@index([exDividendDate])
 }
 
@@ -79,9 +80,20 @@ model StockFundamental {
   id                  Int      @id @default(autoincrement())
   symbol              String   @db.VarChar(32)
   reportDate          DateTime
+  reportName          String?  @db.VarChar(80)
   totalShares         Float?
   deductedNetProfit   Float?
+  deductedNetProfitTtm Float?
+  netProfit           Float?
+  netProfitTtm        Float?
+  revenue             Float?
+  revenueTtm          Float?
   netAsset            Float?
+  totalAssets         Float?
+  operatingCashFlow   Float?
+  operatingCashFlowTtm Float?
+  capitalExpenditure  Float?
+  capitalExpenditureTtm Float?
   source              String   @db.VarChar(80)
   fetchedAt           DateTime @default(now())
   createdAt           DateTime @default(now())

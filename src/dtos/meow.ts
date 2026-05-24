@@ -321,12 +321,28 @@ export interface IStockPortfolioSymbolSummary {
   accounts: StockAccount['name'][];
   totalShares?: number | null;
   deductedNetProfit?: number | null;
+  deductedNetProfitTtm?: number | null;
+  netProfit?: number | null;
+  netProfitTtm?: number | null;
+  revenue?: number | null;
+  revenueTtm?: number | null;
   netAsset?: number | null;
+  totalAssets?: number | null;
+  operatingCashFlow?: number | null;
+  operatingCashFlowTtm?: number | null;
+  capitalExpenditure?: number | null;
+  capitalExpenditureTtm?: number | null;
   normalizedDividend?: number | null;
   reportDate?: string | null;
   deductedPe?: number | null;
+  deductedPeTtm?: number | null;
+  pb?: number | null;
   deductedRoe?: number | null;
   normalizedDividendYield?: number | null;
+  freeCashFlow?: number | null;
+  freeCashFlowTtm?: number | null;
+  fcfDividendCoverage?: number | null;
+  operatingCashFlowToDeductedNetProfit?: number | null;
 }
 
 export interface IStockPortfolioSectorSummary {
