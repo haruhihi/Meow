@@ -76,6 +76,13 @@ const VIEW_MODE_OPTIONS = [
   { label: '近一月', value: 'month' },
 ];
 
+const START_TIME_SHORTCUTS = [
+  { label: '现在', minutesAgo: 0 },
+  { label: '0.5h', minutesAgo: 30 },
+  { label: '1h', minutesAgo: 60 },
+  { label: '2h', minutesAgo: 120 },
+];
+
 const buildActivitySummaries = ({
   byActivity,
   baseSummaries,
@@ -463,6 +470,20 @@ export default function TimePage() {
                 {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
               </DatePicker>
             </Form.Item>
+            <div className={styles.startTimeShortcuts}>
+              {START_TIME_SHORTCUTS.map((shortcut) => (
+                <button
+                  key={shortcut.label}
+                  type="button"
+                  onClick={() => {
+                    const startedAt = dayjs().second(0).millisecond(0).subtract(shortcut.minutesAgo, 'minute').toDate();
+                    form.setFieldsValue({ startedAt });
+                  }}
+                >
+                  {shortcut.label}
+                </button>
+              ))}
+            </div>
             <Form.Item
               name="endedAt"
               label="结束"

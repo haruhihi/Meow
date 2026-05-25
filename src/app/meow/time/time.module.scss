@@ -475,6 +475,25 @@
   font-size: 12px;
 }
 
+.startTimeShortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px 90px;
+
+  button {
+    border: 1px solid color-mix(in srgb, var(--meow-primary) 22%, var(--meow-border));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--meow-primary) 8%, #ffffff);
+    color: var(--meow-primary);
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    cursor: pointer;
+  }
+}
+
 .loadMore {
   display: flex;
   justify-content: center;
