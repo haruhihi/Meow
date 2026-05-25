@@ -104,10 +104,13 @@ const buildActivitySummaries = ({
 };
 
 const getAnalyzeRange = (selectedDate: dayjs.Dayjs, viewMode: TimeViewMode) => {
-  const end = selectedDate.startOf('day').add(1, 'day');
+  const selectedDayStart = selectedDate.startOf('day');
+  if (viewMode === 'day') return { start: selectedDayStart, end: selectedDayStart.add(1, 'day'), days: 1 };
+
+  const todayStart = dayjs().startOf('day');
+  const end = selectedDate.isSame(todayStart, 'day') ? todayStart : selectedDayStart.add(1, 'day');
   if (viewMode === 'week') return { start: end.subtract(7, 'day'), end, days: 7 };
-  if (viewMode === 'month') return { start: end.subtract(30, 'day'), end, days: 30 };
-  return { start: selectedDate.startOf('day'), end, days: 1 };
+  return { start: end.subtract(30, 'day'), end, days: 30 };
 };
 
 const getViewStepDays = (viewMode: TimeViewMode) => {
