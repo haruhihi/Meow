@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { post } from '@libs/fetch';
-import { IStockQuoteRefreshReq, IStockQuoteRefreshRes, IStockSearchReq, IStockSearchRes } from '@dtos/meow';
+import {
+  IStockAiReportListReq,
+  IStockAiReportListRes,
+  IStockQuoteRefreshReq,
+  IStockQuoteRefreshRes,
+  IStockSearchReq,
+  IStockSearchRes,
+} from '@dtos/meow';
 
 export const useStockPortfolio = (refreshKey = 0) => {
   const [data, setData] = useState<IStockSearchRes | null>(null);
@@ -28,5 +35,31 @@ export const useStockPortfolio = (refreshKey = 0) => {
     loading,
     reQuery: fetchPortfolio,
     refreshQuotes,
+  };
+};
+
+export const useStockAiReports = (refreshKey = 0, symbol?: string) => {
+  const [reports, setReports] = useState<IStockAiReportListRes['reports']>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const res = await post<IStockAiReportListReq, IStockAiReportListRes>('/api/stock/ai-report/list', { symbol });
+      setReports(res.reports);
+      return res;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchReports();
+  }, [refreshKey, symbol]);
+
+  return {
+    reports,
+    loading,
+    reQuery: fetchReports,
   };
 };

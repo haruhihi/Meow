@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -431,4 +431,24 @@ export interface IStockQuoteRefreshRes {
   quotes: IStockQuoteRefreshItem[];
   source: 'eastmoney' | 'sina' | 'mixed';
   fetchedAt: string;
+}
+
+export interface IStockAiReportSourceLink {
+  title: string;
+  url: string;
+}
+
+export type StockAiReportListItem = Omit<StockAiReport, 'sourceLinks' | 'reportDate' | 'createdAt' | 'updatedAt'> & {
+  sourceLinks: IStockAiReportSourceLink[];
+  reportDate: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface IStockAiReportListReq {
+  symbol?: StockQuote['symbol'];
+}
+
+export interface IStockAiReportListRes {
+  reports: StockAiReportListItem[];
 }
