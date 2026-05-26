@@ -5,7 +5,7 @@ import { Empty, NavBar } from 'antd-mobile';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
 import { useAiReports } from '@utils/ai-report';
-import styles from './report.module.scss';
+import styles from '../../ai-reports/[id]/report.module.scss';
 
 const formatDate = (value?: string | Date | null) => {
   if (!value) return '未知日期';
@@ -14,18 +14,15 @@ const formatDate = (value?: string | Date | null) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export default function AiReportDetailPage({ params }: { params: { id: string } }) {
+export default function LifeReportDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { reports, loading } = useAiReports();
-  const report = useMemo(() => {
-    if (params.id === 'life-latest') return reports.find((item) => item.kind === 'life') ?? null;
-    return reports.find((item) => item.reportKey === params.id) ?? null;
-  }, [params.id, reports]);
+  const report = useMemo(() => reports.find((item) => item.kind === 'life' && item.reportKey === params.id) ?? null, [params.id, reports]);
 
   return (
     <main className={styles.page}>
       <NavBar onBack={() => router.back()} className={styles.navbar}>
-        AI报告
+        作息报告
       </NavBar>
 
       {report ? (
@@ -42,19 +39,6 @@ export default function AiReportDetailPage({ params }: { params: { id: string } 
           <article className={styles.content}>
             <ReactMarkdown>{report.content}</ReactMarkdown>
           </article>
-
-          {report.sourceLinks.length > 0 && (
-            <section className={styles.sources}>
-              <h2>源数据</h2>
-              <div className={styles.sourceList}>
-                {report.sourceLinks.map((source) => (
-                  <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-                    {source.title}
-                  </a>
-                ))}
-              </div>
-            </section>
-          )}
         </>
       ) : (
         <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '报告不存在'} />

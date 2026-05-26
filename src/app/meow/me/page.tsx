@@ -50,16 +50,23 @@ export default function App() {
         <List.Item
           prefix={<FileOutline />}
           onClick={() => router.push('/meow/ai-reports')}
-          description="查看基本面与事件跟踪文章"
+          description="查看作息分析与基本面研报"
         >
-          AI研报
+          AI报告
+        </List.Item>
+        <List.Item
+          prefix={<FileOutline />}
+          onClick={() => router.push('/meow/life-reports')}
+          description="查看作息分析文章列表"
+        >
+          作息报告
         </List.Item>
         <List.Item
           prefix={<FileOutline />}
           onClick={() => router.push('/meow/articles')}
           description="浏览已同步文章列表"
         >
-          文章
+          剑客文章
         </List.Item>
         <List.Item
           prefix={<AppstoreOutline />}

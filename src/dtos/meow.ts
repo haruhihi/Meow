@@ -179,6 +179,52 @@ export interface ITimeEntryAnalyzeRes {
   sleepSamples: ISleepSample[];
 }
 
+export interface UserLifeAnalysisProfileItem {
+  id: number;
+  userId: number;
+  profile: Prisma.JsonValue;
+  prompt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IUserLifeAnalysisProfileUpsertReq {
+  profile: Prisma.JsonValue;
+  prompt: string;
+}
+
+export interface IUserLifeAnalysisProfileUpsertRes {
+  profile: UserLifeAnalysisProfileItem;
+}
+
+export interface UserLifeAnalysisReportListItem {
+  id: number;
+  userId: number;
+  reportKey: string;
+  title: string;
+  summary: string;
+  prompt: string;
+  inputSnapshot: Prisma.JsonValue;
+  content: string;
+  periodStart: string;
+  periodEnd: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IUserLifeAnalysisProfileRes {
+  profile: UserLifeAnalysisProfileItem;
+}
+
+export interface IUserLifeAnalysisReportListReq {
+  ensureLatest?: boolean;
+  timezoneOffsetMinutes?: number;
+}
+
+export interface IUserLifeAnalysisReportListRes {
+  reports: UserLifeAnalysisReportListItem[];
+}
+
 export interface ISignReq {
   account: string;
   password: string;
