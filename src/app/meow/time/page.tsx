@@ -301,12 +301,15 @@ export default function TimePage() {
       await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', payload);
     }
 
-    Toast.show({
-      content: editingEntry ? '已更新' : '记录成功',
-      afterClose: () => {
-        setVisible(false);
-        void refreshAll();
-      },
+    await new Promise<void>((resolve) => {
+      Toast.show({
+        content: editingEntry ? '已更新' : '记录成功',
+        afterClose: () => {
+          setVisible(false);
+          void refreshAll();
+          resolve();
+        },
+      });
     });
   };
 

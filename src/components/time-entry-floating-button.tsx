@@ -2,6 +2,7 @@
 
 import { FloatingBubble, Toast } from 'antd-mobile';
 import dayjs from 'dayjs';
+import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { post } from '@libs/fetch';
 import {
@@ -36,6 +37,7 @@ export const TimeEntryFloatingButton = ({
   onClick,
   onQuickCreateSuccess,
 }: TimeEntryFloatingButtonProps) => {
+  const router = useRouter();
   const clickTimerRef = useRef<number | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -68,7 +70,10 @@ export const TimeEntryFloatingButton = ({
         endedAt: startedAt.add(1, 'minute').valueOf(),
       });
 
-      Toast.show({ content: '占位时间记录成功' });
+      Toast.show({
+        content: '占位时间记录成功',
+        afterClose: () => router.push('/meow/time'),
+      });
       void Promise.resolve(onQuickCreateSuccess?.()).catch(() => undefined);
     } catch {
       Toast.show({ content: '占位时间记录失败' });
@@ -78,6 +83,8 @@ export const TimeEntryFloatingButton = ({
   };
 
   const handleClick = () => {
+    if (creating) return;
+
     if (clickTimerRef.current != null) {
       clearClickTimer();
       void quickCreatePlaceholder();
@@ -97,6 +104,8 @@ export const TimeEntryFloatingButton = ({
         '--initial-position-right': '24px',
         '--edge-distance': '44px',
         '--background': background,
+        opacity: creating ? 0.55 : 1,
+        pointerEvents: creating ? 'none' : 'auto',
       }}
       onClick={handleClick}
     >

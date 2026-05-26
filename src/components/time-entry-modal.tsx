@@ -8,8 +8,9 @@ import {
   Modal,
   Selector,
 } from 'antd-mobile';
-import type { DatePickerRef, FormInstance, SelectorOption } from 'antd-mobile';
+import type { DatePickerRef, SelectorOption } from 'antd-mobile';
 import dayjs from 'dayjs';
+import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
 import { formatDuration, minutesBetween } from '@utils/time';
 import styles from './time-entry-modal.module.scss';
@@ -28,9 +29,11 @@ type ActivityTypeOption = {
   color: string;
 };
 
+type TimeEntryFormInstance = ReturnType<typeof Form.useForm>[0];
+
 type TimeEntryModalProps = {
   visible: boolean;
-  form: FormInstance;
+  form: TimeEntryFormInstance;
   title: string;
   submitText: string;
   activityTypes: ActivityTypeOption[];
@@ -54,6 +57,7 @@ export const TimeEntryModal = ({
   onClose,
   onFinish,
 }: TimeEntryModalProps) => {
+  const [submitting, setSubmitting] = useState(false);
   const activityOptions: SelectorOption<string>[] = activityTypes.map((activityType) => ({
     value: String(activityType.id),
     label: (
@@ -63,6 +67,21 @@ export const TimeEntryModal = ({
       </span>
     ),
   }));
+
+  useEffect(() => {
+    if (!visible) setSubmitting(false);
+  }, [visible]);
+
+  const handleFinish = async (values: TimeEntryFormValues) => {
+    if (submitting) return;
+
+    try {
+      setSubmitting(true);
+      await onFinish(values);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Modal
@@ -76,12 +95,12 @@ export const TimeEntryModal = ({
           form={form}
           layout="horizontal"
           footer={
-            <Button block type="submit" color="primary" size="large">
+            <Button block type="submit" color="primary" size="large" loading={submitting} disabled={submitting}>
               {submitText}
             </Button>
           }
           className={styles.form}
-          onFinish={onFinish}
+          onFinish={handleFinish}
         >
           <div className={styles.modalTitle}>{title}</div>
           {activityOptions.length > 0 && (

@@ -61,6 +61,7 @@ export default function App() {
   const [showTrend, setShowTrend] = useState(true);
   const [includeCouponDiscount, setIncludeCouponDiscount] = useState(true);
   const [payTime, setPayTime] = useState(dayjs());
+  const [transactionSubmitting, setTransactionSubmitting] = useState(false);
 
   const categoryRes = useCategories();
   const { transactions, reQuery, loadMore, hasMore } = useTransactions();
@@ -229,9 +230,14 @@ export default function App() {
     });
 
     setTimeVisible(false);
-    Toast.show({
-      content: '时间记录成功',
-      afterClose: () => router.push('/meow/time'),
+    await new Promise<void>((resolve) => {
+      Toast.show({
+        content: '时间记录成功',
+        afterClose: () => {
+          router.push('/meow/time');
+          resolve();
+        },
+      });
     });
   };
 
@@ -342,7 +348,7 @@ export default function App() {
             form={form}
             layout="horizontal"
             footer={
-              <Button block type="submit" color="primary" size="large">
+              <Button block type="submit" color="primary" size="large" loading={transactionSubmitting} disabled={transactionSubmitting}>
                 提交
               </Button>
             }
@@ -379,50 +385,60 @@ export default function App() {
               couponId?: string[];
               couponDiscount?: string;
             }) => {
-              if (!values) return;
-              const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
-              if (!category?.length) {
-                Toast.show({ content: '请选择分类' });
-                return;
+              if (transactionSubmitting) return;
+
+              try {
+                setTransactionSubmitting(true);
+                if (!values) return;
+                const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
+                if (!category?.length) {
+                  Toast.show({ content: '请选择分类' });
+                  return;
+                }
+                const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
+                const amountValue = roundMoney(amount);
+                const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
+                const selectedCoupon = selectedCouponId
+                  ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
+                  : undefined;
+                if (discount < 0) {
+                  Toast.show({ content: '抵扣金额不能小于 0' });
+                  return;
+                }
+                if (isMoneyGreater(discount, amountValue)) {
+                  Toast.show({ content: '抵扣金额不能超过消费金额' });
+                  return;
+                }
+                if (discount > 0 && !selectedCoupon) {
+                  Toast.show({ content: '请选择要使用的券' });
+                  return;
+                }
+                if (selectedCoupon && isMoneyGreater(discount, selectedCoupon.remainingAmount)) {
+                  Toast.show({ content: '抵扣金额不能超过券余额' });
+                  return;
+                }
+                await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', {
+                  amount: amountValue,
+                  categoryId: Number(category[category.length - 1]),
+                  date: dayjs(time).unix() * 1000,
+                  description,
+                  couponId: selectedCouponId,
+                  couponDiscount: discount,
+                });
+                await new Promise<void>((resolve) => {
+                  Toast.show({
+                    content: '记录成功',
+                    afterClose: () => {
+                      setVisible(false);
+                      reQuery();
+                      setRefreshKey((k) => k + 1);
+                      resolve();
+                    },
+                  });
+                });
+              } finally {
+                setTransactionSubmitting(false);
               }
-              const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
-              const amountValue = roundMoney(amount);
-              const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
-              const selectedCoupon = selectedCouponId
-                ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
-                : undefined;
-              if (discount < 0) {
-                Toast.show({ content: '抵扣金额不能小于 0' });
-                return;
-              }
-              if (isMoneyGreater(discount, amountValue)) {
-                Toast.show({ content: '抵扣金额不能超过消费金额' });
-                return;
-              }
-              if (discount > 0 && !selectedCoupon) {
-                Toast.show({ content: '请选择要使用的券' });
-                return;
-              }
-              if (selectedCoupon && isMoneyGreater(discount, selectedCoupon.remainingAmount)) {
-                Toast.show({ content: '抵扣金额不能超过券余额' });
-                return;
-              }
-              await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', {
-                amount: amountValue,
-                categoryId: Number(category[category.length - 1]),
-                date: dayjs(time).unix() * 1000,
-                description,
-                couponId: selectedCouponId,
-                couponDiscount: discount,
-              });
-              Toast.show({
-                content: '记录成功',
-                afterClose: () => {
-                  setVisible(false);
-                  reQuery();
-                  setRefreshKey((k) => k + 1);
-                },
-              });
             }}
           >
             <Form.Item name="category" label="分类" rules={[{ required: true, message: '请选择分类' }]}>
