@@ -15,6 +15,16 @@ const geistMono = localFont({
   weight: '100 900',
 });
 
+const serviceWorkerRegistration = `
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (error) {
+        console.warn('Service worker registration failed:', error);
+      });
+    });
+  }
+`;
+
 export const metadata: Metadata = {
   title: 'Meow',
   description: 'HH',
@@ -56,6 +66,13 @@ export default function RootLayout({
           }}
           strategy="afterInteractive"
         />
+        {process.env.NODE_ENV === 'production' && (
+          <Script
+            id="register-service-worker"
+            dangerouslySetInnerHTML={{ __html: serviceWorkerRegistration }}
+            strategy="afterInteractive"
+          />
+        )}
         <Script src="https://cdn.jsdelivr.net/npm/eruda" strategy="beforeInteractive" />
       </body>
     </html>
