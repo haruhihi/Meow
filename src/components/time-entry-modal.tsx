@@ -112,6 +112,9 @@ export const TimeEntryModal = ({
           onFinish={handleFinish}
         >
           <div className={styles.modalTitle}>{title}</div>
+          <Form.Item name="activityTypeId" hidden>
+            <input type="hidden" />
+          </Form.Item>
           {sortedActivityTypes.length > 0 && (
             <Form.Item noStyle shouldUpdate={(prev, next) => prev.activityTypeId !== next.activityTypeId}>
               {({ getFieldValue }) => {
