@@ -316,9 +316,7 @@ export default function StocksPage() {
         股票持仓
       </NavBar>
 
-      <PullToRefresh onRefresh={async () => {
-        await reQuery();
-      }}>
+      <PullToRefresh onRefresh={() => reQuery()}>
       <section className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
           <div className={styles.summaryLabel}>总资产</div>

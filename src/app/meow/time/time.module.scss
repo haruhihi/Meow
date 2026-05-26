@@ -221,8 +221,7 @@
   min-width: 0;
 }
 
-.activityDot,
-.optionSwatch {
+.activityDot {
   width: 9px;
   height: 9px;
   border-radius: 999px;
@@ -411,87 +410,6 @@
   font-size: 14px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-}
-
-.activityOption {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  min-width: 0;
-
-  span:last-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-.entryModal {
-  :global(.adm-center-popup-wrap) {
-    width: 80vw;
-  }
-}
-
-.activitySelector {
-  :global(.adm-selector-item) {
-    min-width: 0;
-    text-align: left;
-    border-radius: 12px;
-    border: 1px solid var(--meow-border);
-    background: var(--meow-surface-alt);
-    padding: 8px 7px;
-  }
-
-  :global(.adm-selector-item-active) {
-    border-color: color-mix(in srgb, var(--meow-primary) 50%, var(--meow-border));
-    color: var(--meow-primary);
-  }
-}
-
-.modalTitle {
-  margin-left: 15px;
-  margin-bottom: 12px;
-  color: var(--meow-text);
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.activityField {
-  --border-inner: none;
-
-  :global(.adm-list-item-content) {
-    border-bottom: 0;
-  }
-
-  :global(.adm-form-item-child) {
-    min-width: 0;
-  }
-}
-
-.durationHint {
-  margin: 0 0 8px 90px;
-  color: var(--meow-text-sub);
-  font-size: 12px;
-}
-
-.startTimeShortcuts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 0 8px 90px;
-
-  button {
-    border: 1px solid color-mix(in srgb, var(--meow-primary) 22%, var(--meow-border));
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--meow-primary) 8%, #ffffff);
-    color: var(--meow-primary);
-    padding: 4px 9px;
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.35;
-    cursor: pointer;
-  }
 }
 
 .loadMore {

@@ -21,6 +21,8 @@ import { RefObject, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import { useActivityTypes } from '@utils/time-entry';
+import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
+import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
 import {
   useCategories,
   getCategoryOptions,
@@ -41,19 +43,10 @@ import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
 import { formatMoney } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
-import { formatDuration, minutesBetween } from '@utils/time';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
 import styles from './bill.module.scss';
-
-type TimeFormValues = {
-  activityTypeId?: string[];
-  customActivityName?: string;
-  startedAt: Date;
-  endedAt: Date;
-  note?: string;
-};
 
 export default function App() {
   const router = useRouter();
@@ -74,7 +67,7 @@ export default function App() {
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
-  const activityRes = useActivityTypes();
+  const activityRes = useActivityTypes(refreshKey);
   const activityTypes = activityRes.activityTypes ?? [];
   const categories = categoryRes?.categories ?? [];
   const recentTransactions = transactions ?? [];
@@ -173,20 +166,6 @@ export default function App() {
       })),
     [paymentCoupons]
   );
-  const timeActivityOptions = useMemo(
-    () =>
-      activityTypes.map((activityType) => ({
-        value: String(activityType.id),
-        label: (
-          <span className={styles.activityOption}>
-            <span className={styles.activitySwatch} style={{ background: activityType.color }} />
-            <span>{activityType.name}</span>
-          </span>
-        ),
-      })),
-    [activityTypes]
-  );
-
   const onClick = () => {
     const now = new Date();
     setPayTime(dayjs(now));
@@ -218,7 +197,7 @@ export default function App() {
     setTimeVisible(true);
   };
 
-  const submitTimeEntry = async (values: TimeFormValues) => {
+  const submitTimeEntry = async (values: TimeEntryFormValues) => {
     let activityTypeId = Number(values.activityTypeId?.[0]);
     const customActivityName = values.customActivityName?.trim();
     if (!values.startedAt || !values.endedAt) {
@@ -343,17 +322,15 @@ export default function App() {
         <HandPayCircleOutline fontSize={32} />
       </FloatingBubble>
 
-      <FloatingBubble
-        style={{
-          '--initial-position-bottom': '168px',
-          '--initial-position-right': '24px',
-          '--edge-distance': '44px',
-          '--background': '#9C27B0',
-        }}
+      <TimeEntryFloatingButton
+        initialPositionBottom="168px"
+        background="#9C27B0"
+        activityTypes={activityTypes}
         onClick={openTimeCreate}
+        onQuickCreateSuccess={activityRes.reQuery}
       >
         <ClockCircleOutline fontSize={32} />
-      </FloatingBubble>
+      </TimeEntryFloatingButton>
 
       <Modal
         visible={visible}
@@ -524,67 +501,14 @@ export default function App() {
         }
       />
 
-      <Modal
+      <TimeEntryModal
         visible={timeVisible}
-        closeOnMaskClick
-        showCloseButton
+        form={timeForm}
+        title="新增时间记录"
+        submitText="提交并查看时间页"
+        activityTypes={activityTypes}
         onClose={() => setTimeVisible(false)}
-        content={
-          <Form
-            form={timeForm}
-            layout="horizontal"
-            footer={
-              <Button block type="submit" color="primary" size="large">
-                提交并查看时间页
-              </Button>
-            }
-            style={{ marginTop: '20px' }}
-            onFinish={submitTimeEntry}
-          >
-            <div className={styles.modalTitle}>新增时间记录</div>
-            {timeActivityOptions.length > 0 && (
-              <Form.Item name="activityTypeId" className={styles.activityField}>
-                <Selector className={styles.activitySelector} columns={2} options={timeActivityOptions} />
-              </Form.Item>
-            )}
-            <Form.Item name="customActivityName" label="新项目">
-              <Input placeholder="例如：冥想、做饭、画画" />
-            </Form.Item>
-            <Form.Item
-              name="startedAt"
-              label="开始"
-              trigger="onConfirm"
-              rules={[{ required: true, message: '请选择开始时间' }]}
-              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
-            >
-              <DatePicker precision="minute">
-                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
-              </DatePicker>
-            </Form.Item>
-            <Form.Item
-              name="endedAt"
-              label="结束"
-              trigger="onConfirm"
-              rules={[{ required: true, message: '请选择结束时间' }]}
-              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
-            >
-              <DatePicker precision="minute">
-                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
-              </DatePicker>
-            </Form.Item>
-            <Form.Item noStyle shouldUpdate={(prev, next) => prev.startedAt !== next.startedAt || prev.endedAt !== next.endedAt}>
-              {({ getFieldValue }) => {
-                const startedAt = getFieldValue('startedAt');
-                const endedAt = getFieldValue('endedAt');
-                const minutes = startedAt && endedAt ? minutesBetween(startedAt, endedAt) : 0;
-                return minutes > 0 ? <div className={styles.durationHint}>时长 {formatDuration(minutes)}</div> : null;
-              }}
-            </Form.Item>
-            <Form.Item name="note" label="备注">
-              <Input placeholder="可选" />
-            </Form.Item>
-          </Form>
-        }
+        onFinish={submitTimeEntry}
       />
     </div>
   );

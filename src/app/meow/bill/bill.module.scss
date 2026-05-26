@@ -221,56 +221,6 @@
   }
 }
 
-.activityOption {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  min-width: 0;
-}
-
-.activitySwatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.activitySelector {
-  :global(.adm-selector-item) {
-    min-width: 0;
-    text-align: left;
-    border-radius: 12px;
-    border: 1px solid var(--meow-border);
-    background: var(--meow-surface-alt);
-    padding: 8px 10px;
-  }
-
-  :global(.adm-selector-item-active) {
-    border-color: color-mix(in srgb, var(--meow-primary) 50%, var(--meow-border));
-    color: var(--meow-primary);
-  }
-}
-
-.modalTitle {
-  margin-bottom: 12px;
-  color: var(--meow-text);
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.activityField {
-  :global(.adm-form-item-child) {
-    min-width: 0;
-  }
-}
-
-.durationHint {
-  margin: 0 0 8px 76px;
-  color: var(--meow-text-sub);
-  font-size: 12px;
-}
-
 .loadMore {
   display: flex;
   justify-content: center;

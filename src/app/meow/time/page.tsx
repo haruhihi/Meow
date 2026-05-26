@@ -2,14 +2,9 @@
 
 import {
   Button,
-  DatePicker,
-  DatePickerRef,
   Empty,
-  FloatingBubble,
   Form,
-  Input,
   List,
-  Modal,
   PullToRefresh,
   Selector,
   SwipeAction,
@@ -23,8 +18,10 @@ import {
 } from 'antd-mobile-icons';
 import dayjs from 'dayjs';
 import ReactECharts from 'echarts-for-react';
-import { RefObject, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { post } from '@libs/fetch';
+import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
+import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
 import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,
@@ -40,14 +37,6 @@ import { PALETTE } from '@styles/theme';
 import { formatDuration, formatHours, minutesBetween } from '@utils/time';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
 import styles from './time.module.scss';
-
-type TimeFormValues = {
-  activityTypeId: string[];
-  customActivityName?: string;
-  startedAt: Date;
-  endedAt: Date;
-  note?: string;
-};
 
 type AnalyzeData = NonNullable<ReturnType<typeof useTimeRangeAnalyze>['data']>;
 type TimeViewMode = 'day' | 'week' | 'month';
@@ -74,13 +63,6 @@ const VIEW_MODE_OPTIONS = [
   { label: '按日', value: 'day' },
   { label: '近一周', value: 'week' },
   { label: '近一月', value: 'month' },
-];
-
-const START_TIME_SHORTCUTS = [
-  { label: '现在', minutesAgo: 0 },
-  { label: '0.5h', minutesAgo: 30 },
-  { label: '1h', minutesAgo: 60 },
-  { label: '2h', minutesAgo: 120 },
 ];
 
 const buildActivitySummaries = ({
@@ -151,20 +133,6 @@ export default function TimePage() {
     if (!selectedActivityId) return list;
     return list.filter((entry) => entry.activityTypeId === selectedActivityId);
   }, [timeEntries, selectedActivityId]);
-
-  const selectorOptions = useMemo(
-    () =>
-      activityTypes.map((activityType) => ({
-        value: String(activityType.id),
-        label: (
-          <span className={styles.activityOption}>
-            <span className={styles.optionSwatch} style={{ background: activityType.color }} />
-            <span>{activityType.name}</span>
-          </span>
-        ),
-      })),
-    [activityTypes]
-  );
 
   const latestEndedAt = useMemo(() => {
     const list = timeEntries ?? [];
@@ -293,7 +261,7 @@ export default function TimePage() {
     setRefreshKey((value) => value + 1);
   };
 
-  const submitEntry = async (values: TimeFormValues) => {
+  const submitEntry = async (values: TimeEntryFormValues) => {
     let activityTypeId = Number(values.activityTypeId?.[0]);
     const customActivityName = values.customActivityName?.trim();
     if (!values.startedAt || !values.endedAt) {
@@ -422,92 +390,24 @@ export default function TimePage() {
         <div className={styles.endSpacer} />
       </PullToRefresh>
 
-      <FloatingBubble
-        style={{
-          '--initial-position-bottom': '100px',
-          '--initial-position-right': '24px',
-          '--edge-distance': '44px',
-          '--background': 'var(--meow-primary)',
-        }}
+      <TimeEntryFloatingButton
+        initialPositionBottom="100px"
+        background="var(--meow-primary)"
+        activityTypes={activityTypes}
         onClick={openCreate}
+        onQuickCreateSuccess={refreshAll}
       >
         <AddCircleOutline fontSize={32} />
-      </FloatingBubble>
+      </TimeEntryFloatingButton>
 
-      <Modal
-        className={styles.entryModal}
+      <TimeEntryModal
         visible={visible}
-        closeOnMaskClick
-        showCloseButton
+        form={form}
+        title={editingEntry ? '编辑时间记录' : '新增时间记录'}
+        submitText={editingEntry ? '保存' : '提交'}
+        activityTypes={activityTypes}
         onClose={() => setVisible(false)}
-        content={
-          <Form
-            form={form}
-            layout="horizontal"
-            footer={
-              <Button block type="submit" color="primary" size="large">
-                {editingEntry ? '保存' : '提交'}
-              </Button>
-            }
-            style={{ marginTop: '20px' }}
-            onFinish={submitEntry}
-          >
-            <div className={styles.modalTitle}>{editingEntry ? '编辑时间记录' : '新增时间记录'}</div>
-            <Form.Item name="activityTypeId" className={styles.activityField} rules={[{ required: true, message: '请选择活动' }]}>
-              <Selector className={styles.activitySelector} columns={3} options={selectorOptions} />
-            </Form.Item>
-            <Form.Item name="customActivityName" label="新项目">
-              <Input placeholder="例如：冥想、做饭、画画" />
-            </Form.Item>
-            <Form.Item
-              name="startedAt"
-              label="开始"
-              trigger="onConfirm"
-              rules={[{ required: true, message: '请选择开始时间' }]}
-              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
-            >
-              <DatePicker precision="minute">
-                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
-              </DatePicker>
-            </Form.Item>
-            <div className={styles.startTimeShortcuts}>
-              {START_TIME_SHORTCUTS.map((shortcut) => (
-                <button
-                  key={shortcut.label}
-                  type="button"
-                  onClick={() => {
-                    const startedAt = dayjs().second(0).millisecond(0).subtract(shortcut.minutesAgo, 'minute').toDate();
-                    form.setFieldsValue({ startedAt });
-                  }}
-                >
-                  {shortcut.label}
-                </button>
-              ))}
-            </div>
-            <Form.Item
-              name="endedAt"
-              label="结束"
-              trigger="onConfirm"
-              rules={[{ required: true, message: '请选择结束时间' }]}
-              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
-            >
-              <DatePicker precision="minute">
-                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择时间')}
-              </DatePicker>
-            </Form.Item>
-            <Form.Item noStyle shouldUpdate={(prev, next) => prev.startedAt !== next.startedAt || prev.endedAt !== next.endedAt}>
-              {({ getFieldValue }) => {
-                const startedAt = getFieldValue('startedAt');
-                const endedAt = getFieldValue('endedAt');
-                const minutes = startedAt && endedAt ? minutesBetween(startedAt, endedAt) : 0;
-                return minutes > 0 ? <div className={styles.durationHint}>时长 {formatDuration(minutes)}</div> : null;
-              }}
-            </Form.Item>
-            <Form.Item name="note" label="备注">
-              <Input placeholder="可选" />
-            </Form.Item>
-          </Form>
-        }
+        onFinish={submitEntry}
       />
     </div>
   );
