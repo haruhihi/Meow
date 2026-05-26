@@ -6,6 +6,8 @@ const CACHEABLE_PATHS = new Set([
   '/apple-touch-icon.png',
   '/web-app-manifest-192x192.png',
   '/web-app-manifest-512x512.png',
+  '/web-app-maskable-192x192.png',
+  '/web-app-maskable-512x512.png',
   '/manifest.webmanifest',
   '/manifest.json',
 ]);
