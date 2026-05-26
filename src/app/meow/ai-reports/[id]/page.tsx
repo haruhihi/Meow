@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
-import { useAiReports } from '@utils/ai-report';
+import { useStockAiReports } from '@utils/stock';
 import styles from './report.module.scss';
 
 const formatDate = (value?: string | Date | null) => {
@@ -16,11 +16,8 @@ const formatDate = (value?: string | Date | null) => {
 
 export default function AiReportDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { reports, loading } = useAiReports();
-  const report = useMemo(() => {
-    if (params.id === 'life-latest') return reports.find((item) => item.kind === 'life') ?? null;
-    return reports.find((item) => item.reportKey === params.id) ?? null;
-  }, [params.id, reports]);
+  const { reports, loading } = useStockAiReports();
+  const report = useMemo(() => reports.find((item) => String(item.id) === params.id) ?? null, [params.id, reports]);
 
   return (
     <main className={styles.page}>
@@ -32,7 +29,7 @@ export default function AiReportDetailPage({ params }: { params: { id: string } 
         <>
           <header className={styles.header}>
             <div className={styles.meta}>
-              <span>{report.badge}</span>
+              <span>{report.symbol}</span>
               <em>{formatDate(report.reportDate)}</em>
             </div>
             <h1>{report.title}</h1>
@@ -57,7 +54,7 @@ export default function AiReportDetailPage({ params }: { params: { id: string } 
           )}
         </>
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '报告不存在'} />
+        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '研报不存在'} />
       )}
     </main>
   );

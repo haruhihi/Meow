@@ -3,7 +3,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
-import { ClockCircleOutline, HistogramOutline, UnorderedListOutline, UserOutline } from 'antd-mobile-icons';
+import { ClockCircleOutline, HistogramOutline, PayCircleOutline, UserOutline } from 'antd-mobile-icons';
 import styles from './index.module.scss';
 
 const Bottom: FC = () => {
@@ -11,9 +11,9 @@ const Bottom: FC = () => {
   const pathname = usePathname();
   const tabs = [
     {
-      key: '/meow/category',
-      title: '类别',
-      icon: <UnorderedListOutline />,
+      key: '/meow/stocks',
+      title: '股票',
+      icon: <PayCircleOutline />,
     },
     {
       key: '/meow/bill',

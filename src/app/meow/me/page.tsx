@@ -5,6 +5,7 @@ import {
   PayCircleOutline,
   AppstoreOutline,
   FileOutline,
+  UnorderedListOutline,
 } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { useUserInfo } from '@utils/user';
@@ -41,11 +42,11 @@ export default function App() {
           券管理
         </List.Item>
         <List.Item
-          prefix={<PayCircleOutline />}
-          onClick={() => router.push('/meow/stocks')}
-          description="查看账户持仓和仓位占比"
+          prefix={<UnorderedListOutline />}
+          onClick={() => router.push('/meow/category')}
+          description="维护账单分类和层级"
         >
-          股票持仓
+          编辑类目
         </List.Item>
         <List.Item
           prefix={<FileOutline />}

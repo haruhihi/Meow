@@ -2,7 +2,7 @@
 
 import { Empty, NavBar } from 'antd-mobile';
 import { useRouter } from 'next/navigation';
-import { useAiReports } from '@utils/ai-report';
+import { useStockAiReports } from '@utils/stock';
 import styles from './reports.module.scss';
 
 const formatDate = (value?: string | Date | null) => {
@@ -14,7 +14,7 @@ const formatDate = (value?: string | Date | null) => {
 
 export default function AiReportsPage() {
   const router = useRouter();
-  const { reports, loading } = useAiReports();
+  const { reports, loading } = useStockAiReports();
 
   return (
     <main className={styles.page}>
@@ -24,20 +24,20 @@ export default function AiReportsPage() {
 
       <header className={styles.header}>
         <h1>AI报告</h1>
-        <p>作息分析、基本面研报与后续跟踪点</p>
+        <p>基本面、事件冲击与后续跟踪点</p>
       </header>
 
       {reports.length > 0 ? (
         <section className={styles.reportList}>
           {reports.map((report) => (
             <button
-              key={report.reportKey}
+              key={report.id}
               type="button"
               className={styles.reportCard}
-              onClick={() => router.push(`/meow/ai-reports/${report.reportKey}`)}
+              onClick={() => router.push(`/meow/ai-reports/${report.id}`)}
             >
               <div className={styles.reportTopline}>
-                <span>{report.badge}</span>
+                <span>{report.symbol}</span>
                 <em>{formatDate(report.reportDate)}</em>
               </div>
               <strong>{report.title}</strong>
@@ -46,7 +46,7 @@ export default function AiReportsPage() {
           ))}
         </section>
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '暂无报告'} />
+        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '暂无研报'} />
       )}
     </main>
   );

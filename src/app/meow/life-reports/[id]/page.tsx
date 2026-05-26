@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
-import { useAiReports } from '@utils/ai-report';
+import { useLifeReports } from '@utils/ai-report';
 import styles from '../../ai-reports/[id]/report.module.scss';
 
 const formatDate = (value?: string | Date | null) => {
@@ -16,8 +16,8 @@ const formatDate = (value?: string | Date | null) => {
 
 export default function LifeReportDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { reports, loading } = useAiReports();
-  const report = useMemo(() => reports.find((item) => item.kind === 'life' && item.reportKey === params.id) ?? null, [params.id, reports]);
+  const { reports, loading } = useLifeReports();
+  const report = useMemo(() => reports.find((item) => item.reportKey === params.id) ?? null, [params.id, reports]);
 
   return (
     <main className={styles.page}>

@@ -2,7 +2,7 @@
 
 import { Empty, NavBar } from 'antd-mobile';
 import { useRouter } from 'next/navigation';
-import { useAiReports } from '@utils/ai-report';
+import { useLifeReports } from '@utils/ai-report';
 import styles from '../ai-reports/reports.module.scss';
 
 const formatDate = (value?: string | Date | null) => {
@@ -14,8 +14,7 @@ const formatDate = (value?: string | Date | null) => {
 
 export default function LifeReportsPage() {
   const router = useRouter();
-  const { reports, loading } = useAiReports();
-  const lifeReports = reports.filter((report) => report.kind === 'life');
+  const { reports, loading } = useLifeReports();
 
   return (
     <main className={styles.page}>
@@ -28,9 +27,9 @@ export default function LifeReportsPage() {
         <p>睡眠、时间分配、运动恢复与节律优化</p>
       </header>
 
-      {lifeReports.length > 0 ? (
+      {reports.length > 0 ? (
         <section className={styles.reportList}>
-          {lifeReports.map((report) => (
+          {reports.map((report) => (
             <button
               key={report.reportKey}
               type="button"
