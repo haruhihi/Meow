@@ -1,0 +1,58 @@
+name: Sync stock snapshots
+
+on:
+  schedule:
+    - cron: '0 21 28-31 * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check month end
+        id: month_end
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(date -u -d tomorrow +%d)" = "01" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Not the last UTC day of the month; skipping."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.month_end.outputs.should_run == 'true'
+
+      - name: Set up Node.js
+        if: steps.month_end.outputs.should_run == 'true'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.x'
+
+      - name: Check database secret
+        if: steps.month_end.outputs.should_run == 'true'
+        env:
+          DATABASE: ${{ secrets.DATABASE }}
+        run: |
+          if [ -z "$DATABASE" ]; then
+            echo "Missing GitHub secret: DATABASE"
+            echo "Add it in Settings -> Secrets and variables -> Actions -> Repository secrets."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        if: steps.month_end.outputs.should_run == 'true'
+        env:
+          DATABASE: ${{ secrets.DATABASE }}
+        run: |
+          printf 'DATABASE=%s\n' "$DATABASE" >> .env
+          npm install
+
+      - name: Sync snapshots
+        if: steps.month_end.outputs.should_run == 'true'
+        env:
+          DATABASE: ${{ secrets.DATABASE }}
+        run: node scripts/sync-stock-snapshots.mjs --source github-action

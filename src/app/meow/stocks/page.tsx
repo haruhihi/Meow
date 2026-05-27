@@ -24,6 +24,8 @@ import {
   IStockHoldingUpdateReq,
   IStockHoldingUpdateRes,
   IStockPortfolioSymbolSummary,
+  IStockSnapshotCreateReq,
+  IStockSnapshotCreateRes,
   StockDividendEventWithMarking,
   StockHoldingWithAccount,
 } from '@dtos/meow';
@@ -98,6 +100,8 @@ export default function StocksPage() {
   const [showAccountDetail, setShowAccountDetail] = useState(false);
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
   const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
+  const [isSnapshotSaving, setIsSnapshotSaving] = useState(false);
+  const [snapshotConflict, setSnapshotConflict] = useState<IStockSnapshotCreateRes | null>(null);
   const { data, loading, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
 
   const accounts = data?.accounts ?? [];
@@ -157,6 +161,28 @@ export default function StocksPage() {
       Toast.show({ content: `行情更新失败: ${(error as any)?.result ?? error}` });
     } finally {
       setIsQuoteRefreshing(false);
+    }
+  };
+
+  const saveSnapshot = async (duplicatePolicy?: IStockSnapshotCreateReq['duplicatePolicy']) => {
+    if (isSnapshotSaving) return;
+    setIsSnapshotSaving(true);
+    if (duplicatePolicy) setSnapshotConflict(null);
+    try {
+      const res = await post<IStockSnapshotCreateReq, IStockSnapshotCreateRes>('/api/stock/snapshot/create', {
+        duplicatePolicy,
+      });
+      if (res.status === 'exists') {
+        setSnapshotConflict(res);
+        return;
+      }
+      if (res.status === 'created' && res.snapshot) {
+        Toast.show({ content: `快照已保存：${formatDate(res.snapshot.snapshotAt)}` });
+      }
+    } catch (error) {
+      Toast.show({ content: `快照保存失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setIsSnapshotSaving(false);
     }
   };
 
@@ -320,9 +346,17 @@ export default function StocksPage() {
       <section className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
           <div className={styles.summaryLabel}>总资产</div>
-          <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
-            {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
-          </button>
+          <div className={styles.summaryActions}>
+            <button type="button" className={styles.quoteButton} onClick={() => router.push('/meow/stocks/snapshots')}>
+              快照列表
+            </button>
+            <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
+              {isSnapshotSaving ? '保存中...' : '存快照'}
+            </button>
+            <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
+              {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
+            </button>
+          </div>
         </div>
         <div className={styles.summaryValue}>{formatMoney(totalAssetValue)}</div>
         {quoteFetchedAt && <div className={styles.quoteTime}>行情 {formatQuoteTime(quoteFetchedAt)}</div>}
@@ -499,9 +533,30 @@ export default function StocksPage() {
         onToggleDividendEvent={toggleDividendEvent}
       />
 
-      {isQuoteRefreshing && (
+      <Modal
+        visible={Boolean(snapshotConflict)}
+        title="本月已有快照"
+        closeOnMaskClick
+        showCloseButton
+        onClose={() => setSnapshotConflict(null)}
+        content={
+          <div className={styles.snapshotConflict}>
+            <p>
+              本月已经保存 {snapshotConflict?.existingSnapshotCount ?? 0} 条快照。
+              {snapshotConflict?.latestSnapshot ? ` 最近一次是 ${formatDate(snapshotConflict.latestSnapshot.snapshotAt)}。` : ''}
+            </p>
+            <div className={styles.snapshotConflictActions}>
+              <Button block fill="outline" onClick={() => setSnapshotConflict(null)}>放弃</Button>
+              <Button block color="danger" fill="outline" loading={isSnapshotSaving} onClick={() => saveSnapshot('replace')}>覆盖</Button>
+              <Button block color="primary" loading={isSnapshotSaving} onClick={() => saveSnapshot('append')}>追加</Button>
+            </div>
+          </div>
+        }
+      />
+
+      {(isQuoteRefreshing || isSnapshotSaving) && (
         <div className={styles.refreshOverlay}>
-          <div className={styles.refreshPanel}>正在刷新行情...</div>
+          <div className={styles.refreshPanel}>{isSnapshotSaving ? '正在保存快照...' : '正在刷新行情...'}</div>
         </div>
       )}
     </div>
@@ -525,6 +580,10 @@ const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     <div className={styles.metricLine}>
       <span className={styles.metricTagQuality}>扣非 ROE: <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong>(TTM)</span>
       <span className={styles.metricTagDividend}>股息率: <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
+    </div>
+    <div className={styles.metricLine}>
+      <span className={styles.metricTagQuality}>含金量: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)</span>
+      <span className={styles.metricTagDividend}>分红覆盖: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong></span>
     </div>
   </>
 );

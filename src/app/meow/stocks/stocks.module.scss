@@ -36,6 +36,13 @@
   opacity: 0.78;
 }
 
+.summaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .quoteButton {
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 999px;
@@ -131,6 +138,21 @@
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+.snapshotConflict {
+  p {
+    margin: 0 0 14px;
+    color: var(--meow-text-sub);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
+
+.snapshotConflictActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .section {

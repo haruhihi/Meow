@@ -1,0 +1,152 @@
+.page {
+  min-height: 100%;
+  padding-bottom: 96px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(20, 184, 166, 0.14), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #f6fff9 100%);
+  color: var(--meow-text);
+}
+
+.navbar {
+  background: rgba(255, 255, 255, 0.86);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.header {
+  padding: 18px 18px 10px;
+
+  h1,
+  p {
+    margin: 0;
+  }
+
+  h1 {
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: 900;
+  }
+
+  p {
+    margin-top: 4px;
+    color: var(--meow-text-muted);
+    font-size: 13px;
+  }
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 8px 12px 0;
+}
+
+.summaryCard,
+.chartCard,
+.snapshotCard {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
+}
+
+.summaryCard {
+  padding: 12px;
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    color: #0f766e;
+    font-size: 20px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--meow-text-muted);
+    font-size: 12px;
+  }
+}
+
+.chartCard {
+  margin: 12px;
+  padding: 10px 4px 0;
+}
+
+.snapshotList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.snapshotCard {
+  padding: 12px;
+
+  p {
+    margin: 10px 0 0;
+    color: var(--meow-text-muted);
+    font-size: 12px;
+  }
+}
+
+.snapshotTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  strong {
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  span {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    border-radius: 8px;
+    color: #0f766e;
+    background: #ccfbf1;
+    font-size: 12px;
+    font-weight: 800;
+  }
+}
+
+.snapshotStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+
+  div {
+    min-width: 0;
+    padding: 8px;
+    border-radius: 10px;
+    background: var(--meow-surface-alt);
+  }
+
+  b,
+  em {
+    display: block;
+  }
+
+  b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--meow-text);
+    font-size: 14px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  em {
+    margin-top: 3px;
+    color: var(--meow-text-muted);
+    font-size: 11px;
+    font-style: normal;
+  }
+}

@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -414,6 +414,47 @@ export interface IStockSearchRes {
   accountSummaries: IStockPortfolioAccountSummary[];
   sectorSummaries: IStockPortfolioSectorSummary[];
   symbolSummaries: IStockPortfolioSymbolSummary[];
+}
+
+export interface IStockSnapshotSummary {
+  totalMarketValue: number;
+  totalAssetValue: number;
+  cashAmount: number;
+  expectedDividend: number;
+  portfolioDividendYield: number;
+  holdingCount: number;
+  symbolCount: number;
+}
+
+export interface StockSnapshotListItem {
+  id: StockSnapshot['id'];
+  snapshotAt: string;
+  snapshotMonth: StockSnapshot['snapshotMonth'];
+  source: StockSnapshot['source'];
+  summary: IStockSnapshotSummary;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IStockSnapshotCreateReq {
+  duplicatePolicy?: 'abort' | 'append' | 'replace';
+  source?: StockSnapshot['source'];
+  snapshotAt?: string;
+}
+
+export interface IStockSnapshotCreateRes {
+  status: 'created' | 'exists' | 'aborted';
+  snapshot?: StockSnapshotListItem;
+  existingSnapshotCount?: number;
+  latestSnapshot?: StockSnapshotListItem | null;
+}
+
+export interface IStockSnapshotListReq {
+  limit?: number;
+}
+
+export interface IStockSnapshotListRes {
+  snapshots: StockSnapshotListItem[];
 }
 
 export interface IStockCashUpdateReq {
