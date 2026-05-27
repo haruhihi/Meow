@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, PullToRefresh, Selector, Toast } from 'antd-mobile';
+import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
 import { AddCircleOutline, PayCircleOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
@@ -60,6 +60,7 @@ const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && v
 const formatOptionalNumber = (value?: number | null) => (value == null ? '—' : value.toFixed(1));
 const formatOptionalPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
 const marketValueOf = (holding: { quantity: number; currentPrice: number }) => holding.quantity * holding.currentPrice;
+const percentOf = (value: number, total: number) => (total > 0 ? value / total : 0);
 const formatQuoteTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -98,6 +99,7 @@ export default function StocksPage() {
   const [defaultAccountId, setDefaultAccountId] = useState<number | null>(null);
   const [showAccountAllocation, setShowAccountAllocation] = useState(false);
   const [showAccountDetail, setShowAccountDetail] = useState(false);
+  const [includeCashInPosition, setIncludeCashInPosition] = useState(true);
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
   const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
   const [isSnapshotSaving, setIsSnapshotSaving] = useState(false);
@@ -110,12 +112,33 @@ export default function StocksPage() {
   const totalMarketValue = data?.totalMarketValue ?? 0;
   const totalAssetValue = data?.totalAssetValue ?? totalMarketValue;
   const cashAmount = data?.cashAmount ?? 0;
+  const positionTotalValue = includeCashInPosition ? totalAssetValue : totalMarketValue;
   const expectedDividend = symbolSummaries.reduce(
     (sum, summary) => sum + summary.marketValue * (summary.normalizedDividendYield ?? 0),
     0
   );
   const portfolioDividendYield = totalMarketValue > 0 ? expectedDividend / totalMarketValue : 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
+  const accountSummaries = useMemo(
+    () =>
+      (data?.accountSummaries ?? []).map((summary) => ({
+        ...summary,
+        percent: percentOf(summary.marketValue, positionTotalValue),
+      })),
+    [data?.accountSummaries, positionTotalValue]
+  );
+  const sectorSummaries = useMemo(
+    () =>
+      (data?.sectorSummaries ?? []).map((sector) => ({
+        ...sector,
+        percent: percentOf(sector.marketValue, positionTotalValue),
+        symbols: sector.symbols.map((summary) => ({
+          ...summary,
+          percent: percentOf(summary.marketValue, positionTotalValue),
+        })),
+      })),
+    [data?.sectorSummaries, positionTotalValue]
+  );
   const holdingsByAccount = useMemo(
     () =>
       accounts.map((account) => ({
@@ -347,6 +370,10 @@ export default function StocksPage() {
         <div className={styles.summaryHeader}>
           <div className={styles.summaryLabel}>总资产</div>
           <div className={styles.summaryActions}>
+            <label className={styles.positionToggle}>
+              <span>计现金</span>
+              <Switch checked={includeCashInPosition} onChange={setIncludeCashInPosition} />
+            </label>
             <button type="button" className={styles.quoteButton} onClick={() => router.push('/meow/stocks/snapshots')}>
               快照列表
             </button>
@@ -369,10 +396,10 @@ export default function StocksPage() {
         </div>
       </section>
 
-      {data && data.sectorSummaries.length > 0 && (
+      {data && sectorSummaries.length > 0 && (
         <section className={styles.section}>
           <div className={styles.sectionTitle}>股票占比</div>
-          {data.sectorSummaries.map((sector) => (
+          {sectorSummaries.map((sector) => (
             <div key={sector.sector} className={styles.sectorGroup}>
               <div className={styles.sectorHeader}>
                 <div>
@@ -426,7 +453,7 @@ export default function StocksPage() {
             </div>
             {accounts.length > 0 ? (
             <div className={styles.accountScroller}>
-              {data?.accountSummaries.map((summary) => (
+              {accountSummaries.map((summary) => (
                 <div key={summary.accountId} className={styles.accountCard}>
                   <div className={styles.cardTopline}>
                     <span>{summary.name}</span>
