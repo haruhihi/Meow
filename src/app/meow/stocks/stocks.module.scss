@@ -7,12 +7,6 @@
     linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
 }
 
-.navbar {
-  background: rgba(255, 255, 255, 0.82);
-  border-bottom: 1px solid rgba(20, 184, 166, 0.14);
-  backdrop-filter: blur(12px);
-}
-
 .summaryCard {
   margin: 12px;
   padding: 16px;
@@ -27,20 +21,16 @@
 .summaryHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
-}
-
-.summaryLabel {
-  font-size: 12px;
-  opacity: 0.78;
 }
 
 .summaryActions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
+  width: 100%;
 }
 
 .quoteButton {
@@ -82,11 +72,46 @@
 }
 
 .summaryValue {
-  margin-top: 4px;
   font-size: 30px;
   line-height: 1.1;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.summaryValueRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.assetInlineStats {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 3px;
+
+  span,
+  button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  button {
+    cursor: pointer;
+
+    &:disabled {
+      cursor: default;
+    }
+  }
 }
 
 .quoteTime {
@@ -99,6 +124,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
   flex-shrink: 0;
   padding: 4px 7px;
   border-radius: 999px;

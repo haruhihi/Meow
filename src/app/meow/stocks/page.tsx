@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Button, Dialog, Empty, Form, Input, List, Modal, NavBar, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Dialog, Empty, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
 import { AddCircleOutline, PayCircleOutline } from 'antd-mobile-icons';
-import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
 import { post } from '@libs/fetch';
 import {
@@ -30,7 +29,7 @@ import {
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
-import { useStockPortfolio } from '@utils/stock';
+import { useStockPortfolio, useStockSnapshotDetail, useStockSnapshots } from '@utils/stock';
 import styles from './stocks.module.scss';
 
 type AccountFormValues = {
@@ -85,7 +84,6 @@ const formatDividendPlan = (event: StockDividendEventWithMarking) => {
 const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 export default function StocksPage() {
-  const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [cashModalVisible, setCashModalVisible] = useState(false);
@@ -104,14 +102,21 @@ export default function StocksPage() {
   const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
   const [isSnapshotSaving, setIsSnapshotSaving] = useState(false);
   const [snapshotConflict, setSnapshotConflict] = useState<IStockSnapshotCreateRes | null>(null);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<number | null>(null);
+  const [snapshotPickerVisible, setSnapshotPickerVisible] = useState(false);
   const { data, loading, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
+  const { snapshots, reQuery: reQuerySnapshots } = useStockSnapshots(refreshKey);
+  const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
-  const accounts = data?.accounts ?? [];
-  const holdings = data?.holdings ?? [];
-  const symbolSummaries = data?.symbolSummaries ?? [];
-  const totalMarketValue = data?.totalMarketValue ?? 0;
-  const totalAssetValue = data?.totalAssetValue ?? totalMarketValue;
-  const cashAmount = data?.cashAmount ?? 0;
+  const isSnapshotView = selectedSnapshotId != null;
+  const activeData = isSnapshotView ? selectedSnapshot?.portfolio ?? null : data;
+  const isActiveLoading = isSnapshotView ? snapshotLoading : loading;
+  const accounts = activeData?.accounts ?? [];
+  const holdings = activeData?.holdings ?? [];
+  const symbolSummaries = activeData?.symbolSummaries ?? [];
+  const totalMarketValue = activeData?.totalMarketValue ?? 0;
+  const totalAssetValue = activeData?.totalAssetValue ?? totalMarketValue;
+  const cashAmount = activeData?.cashAmount ?? 0;
   const positionTotalValue = includeCashInPosition ? totalAssetValue : totalMarketValue;
   const expectedDividend = symbolSummaries.reduce(
     (sum, summary) => sum + summary.marketValue * (summary.normalizedDividendYield ?? 0),
@@ -119,17 +124,30 @@ export default function StocksPage() {
   );
   const portfolioDividendYield = totalMarketValue > 0 ? expectedDividend / totalMarketValue : 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
+  const snapshotOptions = useMemo(() => [
+    { label: '当前持仓', value: 'current' },
+    ...[...snapshots].reverse().map((snapshot) => ({
+      label: formatDate(snapshot.snapshotAt),
+      value: String(snapshot.id),
+    })),
+  ], [snapshots]);
+  const selectedSnapshotValue = selectedSnapshotId == null ? 'current' : String(selectedSnapshotId);
+  const selectedSnapshotLabel = selectedSnapshotId == null
+    ? '当前持仓'
+    : selectedSnapshot
+      ? formatDate(selectedSnapshot.snapshotAt)
+      : '快照加载中';
   const accountSummaries = useMemo(
     () =>
-      (data?.accountSummaries ?? []).map((summary) => ({
+      (activeData?.accountSummaries ?? []).map((summary) => ({
         ...summary,
         percent: percentOf(summary.marketValue, positionTotalValue),
       })),
-    [data?.accountSummaries, positionTotalValue]
+    [activeData?.accountSummaries, positionTotalValue]
   );
   const sectorSummaries = useMemo(
     () =>
-      (data?.sectorSummaries ?? []).map((sector) => ({
+      (activeData?.sectorSummaries ?? []).map((sector) => ({
         ...sector,
         percent: percentOf(sector.marketValue, positionTotalValue),
         symbols: sector.symbols.map((summary) => ({
@@ -137,7 +155,7 @@ export default function StocksPage() {
           percent: percentOf(summary.marketValue, positionTotalValue),
         })),
       })),
-    [data?.sectorSummaries, positionTotalValue]
+    [activeData?.sectorSummaries, positionTotalValue]
   );
   const holdingsByAccount = useMemo(
     () =>
@@ -152,7 +170,30 @@ export default function StocksPage() {
     [holdings, selectedSymbol?.symbol]
   );
 
+  useEffect(() => {
+    if (!isSnapshotView) return;
+    setAccountModalVisible(false);
+    setCashModalVisible(false);
+    setHoldingModalVisible(false);
+    setSymbolModalVisible(false);
+    setEditingAccount(null);
+    setEditingHolding(null);
+    setSelectedSymbol(null);
+  }, [isSnapshotView]);
+
   const refresh = () => setRefreshKey((key) => key + 1);
+
+  const refreshActive = async () => {
+    if (isSnapshotView) {
+      await Promise.all([reQuerySnapshots(), reQuerySnapshot()]);
+      return;
+    }
+    await reQuery();
+  };
+
+  const changeSnapshot = (value: string) => {
+    setSelectedSnapshotId(value === 'current' ? null : Number(value));
+  };
 
   const saveCash = async (values: CashFormValues) => {
     try {
@@ -200,6 +241,7 @@ export default function StocksPage() {
         return;
       }
       if (res.status === 'created' && res.snapshot) {
+        await reQuerySnapshots();
         Toast.show({ content: `快照已保存：${formatDate(res.snapshot.snapshotAt)}` });
       }
     } catch (error) {
@@ -361,42 +403,49 @@ export default function StocksPage() {
 
   return (
     <div className={styles.page}>
-      <NavBar onBack={() => router.back()} className={styles.navbar}>
-        股票持仓
-      </NavBar>
-
-      <PullToRefresh onRefresh={() => reQuery()}>
+      <PullToRefresh onRefresh={refreshActive}>
       <section className={styles.summaryCard}>
         <div className={styles.summaryHeader}>
-          <div className={styles.summaryLabel}>总资产</div>
           <div className={styles.summaryActions}>
+            <button type="button" className={styles.quoteButton} onClick={() => setSnapshotPickerVisible(true)}>
+              {selectedSnapshotLabel}
+            </button>
+            {!isSnapshotView && (
+              <>
+                <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
+                  {isSnapshotSaving ? '保存中...' : '存快照'}
+                </button>
+                <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
+                  {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
+                </button>
+              </>
+            )}
             <label className={styles.positionToggle}>
               <span>计现金</span>
               <Switch checked={includeCashInPosition} onChange={setIncludeCashInPosition} />
             </label>
-            <button type="button" className={styles.quoteButton} onClick={() => router.push('/meow/stocks/snapshots')}>
-              快照列表
-            </button>
-            <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
-              {isSnapshotSaving ? '保存中...' : '存快照'}
-            </button>
-            <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
-              {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
-            </button>
           </div>
         </div>
-        <div className={styles.summaryValue}>{formatMoney(totalAssetValue)}</div>
-        {quoteFetchedAt && <div className={styles.quoteTime}>行情 {formatQuoteTime(quoteFetchedAt)}</div>}
+        <div className={styles.summaryValueRow}>
+          <div className={styles.summaryValue}>{formatMoney(totalAssetValue)}</div>
+          <div className={styles.assetInlineStats}>
+            <span>股票 {formatMoney(totalMarketValue)}</span>
+            <button type="button" disabled={isSnapshotView} onClick={() => setCashModalVisible(true)}>现金 {formatMoney(cashAmount)}</button>
+          </div>
+        </div>
+        {isSnapshotView && selectedSnapshot ? (
+          <div className={styles.quoteTime}>快照 {formatDate(selectedSnapshot.snapshotAt)} · {selectedSnapshot.source === 'manual' ? '手动' : selectedSnapshot.source}</div>
+        ) : (
+          quoteFetchedAt && <div className={styles.quoteTime}>行情 {formatQuoteTime(quoteFetchedAt)}</div>
+        )}
         <div className={styles.summaryGrid}>
-          <SummaryStat label="股票" value={formatMoney(totalMarketValue)} />
-          <SummaryStat label="现金" value={formatMoney(cashAmount)} onClick={() => setCashModalVisible(true)} />
           <SummaryStat label="持仓" value={`${symbolSummaries.length}`} />
           <SummaryStat label="预期分红" value={formatMoney(expectedDividend)} />
           <SummaryStat label="综合股息率" value={formatPercent(portfolioDividendYield)} />
         </div>
       </section>
 
-      {data && sectorSummaries.length > 0 && (
+      {activeData && sectorSummaries.length > 0 && (
         <section className={styles.section}>
           <div className={styles.sectionTitle}>股票占比</div>
           {sectorSummaries.map((sector) => (
@@ -413,7 +462,7 @@ export default function StocksPage() {
               </div>
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => (
-                  <List.Item key={summary.symbol} onClick={() => openSymbolModal(summary)} clickable arrow={false}>
+                  <List.Item key={summary.symbol} onClick={isSnapshotView ? undefined : () => openSymbolModal(summary)} clickable={!isSnapshotView} arrow={false}>
                     <div className={styles.symbolRow}>
                       <div className={styles.symbolMain}>
                         <span>{summary.symbol}</span>
@@ -443,14 +492,16 @@ export default function StocksPage() {
         </button>
         {showAccountAllocation && (
           <>
-            <div className={styles.foldActions}>
-              <Button size="small" color="primary" onClick={openCreateAccount}>
-                <span className={styles.buttonText}><AddCircleOutline /> 新增账户</span>
-              </Button>
-              <Button size="small" color="primary" fill="outline" disabled={accounts.length === 0} onClick={() => openCreateHolding()}>
-                <span className={styles.buttonText}><AddCircleOutline /> 新增持仓</span>
-              </Button>
-            </div>
+            {!isSnapshotView && (
+              <div className={styles.foldActions}>
+                <Button size="small" color="primary" onClick={openCreateAccount}>
+                  <span className={styles.buttonText}><AddCircleOutline /> 新增账户</span>
+                </Button>
+                <Button size="small" color="primary" fill="outline" disabled={accounts.length === 0} onClick={() => openCreateHolding()}>
+                  <span className={styles.buttonText}><AddCircleOutline /> 新增持仓</span>
+                </Button>
+              </div>
+            )}
             {accounts.length > 0 ? (
             <div className={styles.accountScroller}>
               {accountSummaries.map((summary) => (
@@ -463,19 +514,21 @@ export default function StocksPage() {
                   <div className={styles.barTrack}>
                     <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
                   </div>
-                  <div className={styles.cardActions}>
-                    <Button size="mini" onClick={() => openEditAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                      重命名
-                    </Button>
-                    <Button size="mini" fill="outline" color="danger" onClick={() => deleteAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                      删除
-                    </Button>
-                  </div>
+                  {!isSnapshotView && (
+                    <div className={styles.cardActions}>
+                      <Button size="mini" onClick={() => openEditAccount(accounts.find((account) => account.id === summary.accountId)!)}>
+                        重命名
+                      </Button>
+                      <Button size="mini" fill="outline" color="danger" onClick={() => deleteAccount(accounts.find((account) => account.id === summary.accountId)!)}>
+                        删除
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
             ) : (
-              <Empty style={{ padding: '32px 0' }} description={loading ? '加载中' : '还没有股票账户'} />
+              <Empty style={{ padding: '32px 0' }} description={isActiveLoading ? '加载中' : '还没有股票账户'} />
             )}
           </>
         )}
@@ -488,7 +541,7 @@ export default function StocksPage() {
         </button>
         {showAccountDetail && (
           accounts.length === 0 ? (
-            <Empty style={{ padding: '64px 0' }} description={loading ? '加载中' : '先新增一个股票账户'} />
+            <Empty style={{ padding: '64px 0' }} description={isActiveLoading ? '加载中' : '先新增一个股票账户'} />
           ) : (
             holdingsByAccount.map(({ account, holdings: accountHoldings }) => (
               <div key={account.id} className={styles.group}>
@@ -497,7 +550,7 @@ export default function StocksPage() {
                     <div className={styles.groupTitle}>{account.name}</div>
                     <div className={styles.groupMeta}>{accountHoldings.length} 个持仓</div>
                   </div>
-                  <Button size="mini" onClick={() => openCreateHolding(account.id)}>新增</Button>
+                  {!isSnapshotView && <Button size="mini" onClick={() => openCreateHolding(account.id)}>新增</Button>}
                 </div>
 
                 {accountHoldings.length > 0 ? (
@@ -579,6 +632,18 @@ export default function StocksPage() {
             </div>
           </div>
         }
+      />
+
+      <Picker
+        title="切换持仓"
+        columns={[snapshotOptions]}
+        visible={snapshotPickerVisible}
+        value={[selectedSnapshotValue]}
+        onClose={() => setSnapshotPickerVisible(false)}
+        onConfirm={(value) => {
+          const nextValue = value[0];
+          if (nextValue != null) changeSnapshot(String(nextValue));
+        }}
       />
 
       {(isQuoteRefreshing || isSnapshotSaving) && (

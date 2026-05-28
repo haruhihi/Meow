@@ -7,8 +7,11 @@ import {
   IStockQuoteRefreshRes,
   IStockSearchReq,
   IStockSearchRes,
+  IStockSnapshotDetailReq,
+  IStockSnapshotDetailRes,
   IStockSnapshotListReq,
   IStockSnapshotListRes,
+  StockSnapshotDetail,
 } from '@dtos/meow';
 
 export const useStockPortfolio = (refreshKey = 0) => {
@@ -89,5 +92,36 @@ export const useStockSnapshots = (refreshKey = 0, limit = 120) => {
     snapshots,
     loading,
     reQuery: fetchSnapshots,
+  };
+};
+
+export const useStockSnapshotDetail = (snapshotId: number | null) => {
+  const [snapshot, setSnapshot] = useState<StockSnapshotDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSnapshot = async () => {
+    if (!snapshotId) {
+      setSnapshot(null);
+      return null;
+    }
+
+    setLoading(true);
+    try {
+      const res = await post<IStockSnapshotDetailReq, IStockSnapshotDetailRes>('/api/stock/snapshot/detail', { id: snapshotId });
+      setSnapshot(res.snapshot);
+      return res;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchSnapshot();
+  }, [snapshotId]);
+
+  return {
+    snapshot,
+    loading,
+    reQuery: fetchSnapshot,
   };
 };

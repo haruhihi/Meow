@@ -1,6 +1,6 @@
 import { prisma } from '@libs/prisma';
 import { Prisma, StockSnapshot } from '@prisma/client';
-import { IStockSnapshotSummary, StockSnapshotListItem } from '@dtos/meow';
+import { IStockSearchRes, IStockSnapshotSummary, StockSnapshotDetail, StockSnapshotListItem } from '@dtos/meow';
 import { buildStockPortfolio, roundStockValue } from '../helpers';
 
 export const STOCK_SNAPSHOT_SCHEMA_VERSION = 1;
@@ -149,6 +149,29 @@ export const toStockSnapshotListItem = (snapshot: StockSnapshot): StockSnapshotL
   createdAt: snapshot.createdAt.toISOString(),
   updatedAt: snapshot.updatedAt.toISOString(),
 });
+
+const portfolioFromPayload = (payload: Prisma.JsonValue): IStockSearchRes => {
+  const value = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const portfolio = value.portfolio && typeof value.portfolio === 'object' && !Array.isArray(value.portfolio)
+    ? value.portfolio
+    : null;
+
+  if (!portfolio) throw new Error('snapshot portfolio not found');
+  return portfolio as unknown as IStockSearchRes;
+};
+
+export const toStockSnapshotDetail = (snapshot: StockSnapshot): StockSnapshotDetail => ({
+  ...toStockSnapshotListItem(snapshot),
+  portfolio: portfolioFromPayload(snapshot.payload),
+});
+
+export const getStockSnapshotDetail = async (userId: number, id: number) => {
+  const snapshot = await prisma.stockSnapshot.findFirst({
+    where: { userId, id },
+  });
+  if (!snapshot) throw new Error('snapshot not found');
+  return toStockSnapshotDetail(snapshot);
+};
 
 export const listStockSnapshots = async (userId: number, limit = 60) => {
   const snapshots = await prisma.stockSnapshot.findMany({

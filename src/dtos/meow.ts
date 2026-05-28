@@ -436,6 +436,18 @@ export interface StockSnapshotListItem {
   updatedAt: string;
 }
 
+export interface StockSnapshotDetail extends StockSnapshotListItem {
+  portfolio: IStockSearchRes;
+}
+
+export interface IStockSnapshotDetailReq {
+  id: StockSnapshot['id'];
+}
+
+export interface IStockSnapshotDetailRes {
+  snapshot: StockSnapshotDetail;
+}
+
 export interface IStockSnapshotCreateReq {
   duplicatePolicy?: 'abort' | 'append' | 'replace';
   source?: StockSnapshot['source'];
