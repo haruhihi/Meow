@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     const timeEntries = await prisma.timeEntry.findMany({
       where: { userId: Number(userId) },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { endedAt: 'desc' },
       skip: page * pageSize,
       take: pageSize,
       include: { activityType: true },

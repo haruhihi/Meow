@@ -150,12 +150,10 @@ export default function TimePage() {
       byActivity: {},
     };
     const selectedDayStart = selectedDate.startOf('day');
-    const selectedDayEnd = selectedDayStart.add(1, 'day');
     const selectedDayEntryCounts = new Map<number, number>();
     analyzeData.timeEntries.forEach((entry) => {
-      const startedAt = dayjs(entry.startedAt);
       const endedAt = dayjs(entry.endedAt);
-      if (startedAt.isBefore(selectedDayEnd) && endedAt.isAfter(selectedDayStart)) {
+      if (endedAt.isSame(selectedDayStart, 'day')) {
         selectedDayEntryCounts.set(entry.activityTypeId, (selectedDayEntryCounts.get(entry.activityTypeId) ?? 0) + 1);
       }
     });
@@ -672,7 +670,7 @@ const GroupedList = ({
   const groups = useMemo(() => {
     const map = new Map<string, TimeEntryWithActivityType[]>();
     entries.forEach((entry) => {
-      const key = dayjs(entry.startedAt).format('YYYY-MM-DD');
+      const key = dayjs(entry.endedAt).format('YYYY-MM-DD');
       const current = map.get(key) ?? [];
       current.push(entry);
       map.set(key, current);

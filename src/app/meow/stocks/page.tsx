@@ -597,6 +597,20 @@ const SummaryStat = ({ label, value, onClick }: { label: string; value: string; 
   </button>
 );
 
+const MetricHelp = ({ label, formula, align = 'end' }: { label: string; formula: string; align?: 'start' | 'end' }) => (
+  <span className={[styles.metricHelpWrap, align === 'start' ? styles.metricHelpWrapStart : ''].join(' ')}>
+    <button
+      type="button"
+      className={styles.metricHelpButton}
+      aria-label={`${label}计算方式`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      ?
+    </button>
+    <span className={styles.metricTooltip} role="tooltip">{formula}</span>
+  </span>
+);
+
 const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <>
     <div className={styles.metricLine}>
@@ -609,8 +623,8 @@ const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }
       <span className={styles.metricTagDividend}>股息率: <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
     </div>
     <div className={styles.metricLine}>
-      <span className={styles.metricTagQuality}>含金量: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)</span>
-      <span className={styles.metricTagDividend}>分红覆盖: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong></span>
+      <span className={styles.metricTagQuality}>含金量<MetricHelp label="含金量" formula="经营现金流TTM / 扣非净利润TTM" align="start" />: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)</span>
+      <span className={styles.metricTagDividend}>分红覆盖<MetricHelp label="分红覆盖" formula="自由现金流TTM / 常态分红" />: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong></span>
     </div>
   </>
 );

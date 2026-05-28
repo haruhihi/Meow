@@ -482,6 +482,63 @@
   --metric-color: #059669;
 }
 
+.metricHelpWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 3px;
+}
+
+.metricHelpButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.metricTooltip {
+  position: absolute;
+  right: -8px;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  width: max-content;
+  max-width: min(180px, calc(100vw - 24px));
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.metricHelpWrapStart .metricTooltip {
+  right: auto;
+  left: -8px;
+}
+
+.metricHelpWrap:hover .metricTooltip,
+.metricHelpWrap:focus-within .metricTooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .quickActions {
   display: flex;
   flex-wrap: wrap;

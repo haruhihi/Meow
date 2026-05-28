@@ -55,10 +55,9 @@ export async function POST(req: Request) {
       where: {
         userId: Number(userId),
         ...(activityTypeId ? { activityTypeId: Number(activityTypeId) } : {}),
-        startedAt: { lt: range.end },
-        endedAt: { gt: range.start },
+        endedAt: { gte: range.start, lt: range.end },
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { endedAt: 'desc' },
       include: { activityType: true },
     });
 
