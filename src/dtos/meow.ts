@@ -477,6 +477,37 @@ export interface IStockCashUpdateRes {
   amount: number;
 }
 
+export interface IStockRebalanceHoldingUpdate {
+  id: StockHolding['id'];
+  quantity: StockHolding['quantity'];
+}
+
+export interface IStockRebalanceHoldingDelete {
+  id: StockHolding['id'];
+}
+
+export interface IStockRebalanceHoldingCreate {
+  accountId: StockHolding['accountId'];
+  symbol: StockHolding['symbol'];
+  name: StockQuote['name'];
+  quantity: StockHolding['quantity'];
+  currentPrice: StockQuote['currentPrice'];
+}
+
+export interface IStockRebalanceSaveReq {
+  cashAmount: number;
+  holdingUpdates: IStockRebalanceHoldingUpdate[];
+  holdingDeletes: IStockRebalanceHoldingDelete[];
+  holdingCreates: IStockRebalanceHoldingCreate[];
+}
+
+export interface IStockRebalanceSaveRes {
+  cashAmount: number;
+  updated: number;
+  deleted: number;
+  created: number;
+}
+
 export interface IStockMetricOverrideUpdateReq {
   symbol: StockQuote['symbol'];
   normalizedDividend?: number | null;

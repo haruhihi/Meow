@@ -1,48 +1,42 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, Empty, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
-import { AddCircleOutline, PayCircleOutline } from 'antd-mobile-icons';
+import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
 import type { StockAccount } from '@prisma/client';
 import { post } from '@libs/fetch';
 import {
-  IStockAccountCreateReq,
-  IStockAccountCreateRes,
-  IStockAccountDeleteReq,
-  IStockAccountUpdateReq,
-  IStockAccountUpdateRes,
   IStockCashUpdateReq,
   IStockCashUpdateRes,
   IStockDividendListReq,
   IStockDividendListRes,
   IStockDividendMarkingUpdateReq,
   IStockDividendMarkingUpdateRes,
-  IStockHoldingCreateReq,
-  IStockHoldingCreateRes,
   IStockHoldingDeleteReq,
   IStockHoldingUpdateReq,
   IStockHoldingUpdateRes,
   IStockPortfolioSymbolSummary,
+  IStockRebalanceSaveReq,
+  IStockRebalanceSaveRes,
   IStockSnapshotCreateReq,
   IStockSnapshotCreateRes,
   StockDividendEventWithMarking,
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
+import { calculateExpectedDividend, calculatePortfolioDividendYield, formatStockQuantity, percentOf } from '@utils/stock-calculations';
+import {
+  applyRebalanceQuantityDelta,
+  buildRebalanceDiff,
+  buildRebalanceDraft,
+  createRebalanceHolding,
+  hasRebalanceChanges,
+  REBALANCE_QUANTITY_STEP,
+  StockRebalanceDiff,
+  StockRebalanceDraft,
+} from '@utils/stock-rebalance';
 import { useStockPortfolio, useStockSnapshotDetail, useStockSnapshots } from '@utils/stock';
+import { RebalancePanel } from './rebalance-panel';
 import styles from './stocks.module.scss';
-
-type AccountFormValues = {
-  name: string;
-};
-
-type HoldingFormValues = {
-  accountId: string[];
-  symbol: string;
-  name: string;
-  quantity: string;
-  currentPrice: string;
-};
 
 type SymbolFormValues = {
   name: string;
@@ -54,12 +48,17 @@ type CashFormValues = {
   amount: string;
 };
 
-const formatQuantity = (value: number) => Number(value.toFixed(4)).toString();
+type RebalanceAddHoldingFormValues = {
+  accountId: string[];
+  symbol: string;
+  name: string;
+  quantity: string;
+  currentPrice: string;
+};
+
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
 const formatOptionalNumber = (value?: number | null) => (value == null ? '—' : value.toFixed(1));
 const formatOptionalPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
-const marketValueOf = (holding: { quantity: number; currentPrice: number }) => holding.quantity * holding.currentPrice;
-const percentOf = (value: number, total: number) => (total > 0 ? value / total : 0);
 const formatQuoteTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -85,18 +84,11 @@ const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(e
 
 export default function StocksPage() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const [accountModalVisible, setAccountModalVisible] = useState(false);
   const [cashModalVisible, setCashModalVisible] = useState(false);
-  const [holdingModalVisible, setHoldingModalVisible] = useState(false);
   const [symbolModalVisible, setSymbolModalVisible] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<StockAccount | null>(null);
-  const [editingHolding, setEditingHolding] = useState<StockHoldingWithAccount | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<IStockPortfolioSymbolSummary | null>(null);
   const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
   const [dividendLoading, setDividendLoading] = useState(false);
-  const [defaultAccountId, setDefaultAccountId] = useState<number | null>(null);
-  const [showAccountAllocation, setShowAccountAllocation] = useState(false);
-  const [showAccountDetail, setShowAccountDetail] = useState(false);
   const [includeCashInPosition, setIncludeCashInPosition] = useState(true);
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
   const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
@@ -104,25 +96,28 @@ export default function StocksPage() {
   const [snapshotConflict, setSnapshotConflict] = useState<IStockSnapshotCreateRes | null>(null);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<number | null>(null);
   const [snapshotPickerVisible, setSnapshotPickerVisible] = useState(false);
-  const { data, loading, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
+  const [isRebalanceMode, setIsRebalanceMode] = useState(false);
+  const [rebalanceDraft, setRebalanceDraft] = useState<StockRebalanceDraft | null>(null);
+  const [rebalanceDiff, setRebalanceDiff] = useState<StockRebalanceDiff | null>(null);
+  const [rebalanceAddVisible, setRebalanceAddVisible] = useState(false);
+  const [isRebalanceSaving, setIsRebalanceSaving] = useState(false);
+  const { data, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
   const { snapshots, reQuery: reQuerySnapshots } = useStockSnapshots(refreshKey);
-  const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
+  const { snapshot: selectedSnapshot, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
   const isSnapshotView = selectedSnapshotId != null;
   const activeData = isSnapshotView ? selectedSnapshot?.portfolio ?? null : data;
-  const isActiveLoading = isSnapshotView ? snapshotLoading : loading;
-  const accounts = activeData?.accounts ?? [];
-  const holdings = activeData?.holdings ?? [];
-  const symbolSummaries = activeData?.symbolSummaries ?? [];
-  const totalMarketValue = activeData?.totalMarketValue ?? 0;
-  const totalAssetValue = activeData?.totalAssetValue ?? totalMarketValue;
-  const cashAmount = activeData?.cashAmount ?? 0;
+  const displayData = isRebalanceMode && rebalanceDraft ? rebalanceDraft : activeData;
+  const accounts = displayData?.accounts ?? [];
+  const holdings = displayData?.holdings ?? [];
+  const symbolSummaries = displayData?.symbolSummaries ?? [];
+  const totalMarketValue = displayData?.totalMarketValue ?? 0;
+  const totalAssetValue = displayData?.totalAssetValue ?? totalMarketValue;
+  const cashAmount = displayData?.cashAmount ?? 0;
   const positionTotalValue = includeCashInPosition ? totalAssetValue : totalMarketValue;
-  const expectedDividend = symbolSummaries.reduce(
-    (sum, summary) => sum + summary.marketValue * (summary.normalizedDividendYield ?? 0),
-    0
-  );
-  const portfolioDividendYield = totalMarketValue > 0 ? expectedDividend / totalMarketValue : 0;
+  const expectedDividend = calculateExpectedDividend(symbolSummaries);
+  const portfolioDividendYield = calculatePortfolioDividendYield(totalMarketValue, expectedDividend);
+  const isRebalanceCashInvalid = isRebalanceMode && cashAmount < 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
   const snapshotOptions = useMemo(() => [
     { label: '当前持仓', value: 'current' },
@@ -137,17 +132,9 @@ export default function StocksPage() {
     : selectedSnapshot
       ? formatDate(selectedSnapshot.snapshotAt)
       : '快照加载中';
-  const accountSummaries = useMemo(
-    () =>
-      (activeData?.accountSummaries ?? []).map((summary) => ({
-        ...summary,
-        percent: percentOf(summary.marketValue, positionTotalValue),
-      })),
-    [activeData?.accountSummaries, positionTotalValue]
-  );
   const sectorSummaries = useMemo(
     () =>
-      (activeData?.sectorSummaries ?? []).map((sector) => ({
+      (displayData?.sectorSummaries ?? []).map((sector) => ({
         ...sector,
         percent: percentOf(sector.marketValue, positionTotalValue),
         symbols: sector.symbols.map((summary) => ({
@@ -155,15 +142,7 @@ export default function StocksPage() {
           percent: percentOf(summary.marketValue, positionTotalValue),
         })),
       })),
-    [activeData?.sectorSummaries, positionTotalValue]
-  );
-  const holdingsByAccount = useMemo(
-    () =>
-      accounts.map((account) => ({
-        account,
-        holdings: holdings.filter((holding) => holding.accountId === account.id),
-      })),
-    [accounts, holdings]
+    [displayData?.sectorSummaries, positionTotalValue]
   );
   const selectedSymbolHoldings = useMemo(
     () => holdings.filter((holding) => holding.symbol === selectedSymbol?.symbol),
@@ -172,13 +151,13 @@ export default function StocksPage() {
 
   useEffect(() => {
     if (!isSnapshotView) return;
-    setAccountModalVisible(false);
     setCashModalVisible(false);
-    setHoldingModalVisible(false);
     setSymbolModalVisible(false);
-    setEditingAccount(null);
-    setEditingHolding(null);
     setSelectedSymbol(null);
+    setIsRebalanceMode(false);
+    setRebalanceDraft(null);
+    setRebalanceDiff(null);
+    setRebalanceAddVisible(false);
   }, [isSnapshotView]);
 
   const refresh = () => setRefreshKey((key) => key + 1);
@@ -193,6 +172,119 @@ export default function StocksPage() {
 
   const changeSnapshot = (value: string) => {
     setSelectedSnapshotId(value === 'current' ? null : Number(value));
+  };
+
+  const startRebalance = () => {
+    if (!data || isSnapshotView) return;
+    setRebalanceDraft(buildRebalanceDraft(data));
+    setRebalanceDiff(null);
+    setIsRebalanceMode(true);
+  };
+
+  const cancelRebalance = async () => {
+    if (data && rebalanceDraft) {
+      const diff = buildRebalanceDiff(data, rebalanceDraft);
+      if (hasRebalanceChanges(diff)) {
+        const ok = await Dialog.confirm({ title: '放弃调仓', content: '当前调仓草稿还没有保存，确认放弃吗？' });
+        if (!ok) return;
+      }
+    }
+    setIsRebalanceMode(false);
+    setRebalanceDraft(null);
+    setRebalanceDiff(null);
+    setRebalanceAddVisible(false);
+  };
+
+  const resetRebalance = () => {
+    if (!data) return;
+    setRebalanceDraft(buildRebalanceDraft(data));
+    setRebalanceDiff(null);
+  };
+
+  const changeRebalanceQuantity = (holdingId: number, quantityDelta: number) => {
+    setRebalanceDraft((draft) => draft ? applyRebalanceQuantityDelta(draft, holdingId, quantityDelta) : draft);
+  };
+
+  const addExistingRebalanceHolding = (accountId: number, summary: IStockPortfolioSymbolSummary) => {
+    setRebalanceDraft((draft) => draft
+      ? createRebalanceHolding(draft, {
+          accountId,
+          symbol: summary.symbol,
+          name: summary.name,
+          currentPrice: summary.currentPrice,
+          quantity: REBALANCE_QUANTITY_STEP,
+        })
+      : draft
+    );
+  };
+
+  const addNewRebalanceHolding = async (values: RebalanceAddHoldingFormValues) => {
+    const accountId = Number(values.accountId?.[0]);
+    if (!accountId) {
+      Toast.show({ content: '请选择账户' });
+      return;
+    }
+    setRebalanceDraft((draft) => draft
+      ? createRebalanceHolding(draft, {
+          accountId,
+          symbol: values.symbol,
+          name: values.name,
+          quantity: Number(values.quantity),
+          currentPrice: Number(values.currentPrice),
+        })
+      : draft
+    );
+    setRebalanceAddVisible(false);
+  };
+
+  const openRebalanceDiff = () => {
+    if (!data || !rebalanceDraft) return;
+    const diff = buildRebalanceDiff(data, rebalanceDraft);
+    if (!hasRebalanceChanges(diff)) {
+      Toast.show({ content: '没有需要保存的调仓' });
+      return;
+    }
+    if (rebalanceDraft.cashAmount < 0) {
+      Toast.show({ content: '现金不能为负数' });
+      return;
+    }
+    setRebalanceDiff(diff);
+  };
+
+  const saveRebalance = async () => {
+    if (!rebalanceDraft || isRebalanceSaving) return;
+    setIsRebalanceSaving(true);
+    try {
+      const payload: IStockRebalanceSaveReq = {
+        cashAmount: rebalanceDraft.cashAmount,
+        holdingUpdates: rebalanceDraft.holdings
+          .filter((holding) => !holding.isDraft && holding.quantity > 0 && holding.quantity !== holding.originalQuantity)
+          .map((holding) => ({ id: holding.id, quantity: holding.quantity })),
+        holdingDeletes: rebalanceDraft.holdings
+          .filter((holding) => !holding.isDraft && holding.originalQuantity > 0 && holding.quantity <= 0)
+          .map((holding) => ({ id: holding.id })),
+        holdingCreates: rebalanceDraft.holdings
+          .filter((holding) => holding.isDraft && holding.quantity > 0)
+          .map((holding) => ({
+            accountId: holding.accountId,
+            symbol: holding.symbol,
+            name: holding.name,
+            quantity: holding.quantity,
+            currentPrice: holding.currentPrice,
+          })),
+      };
+      const res = await post<IStockRebalanceSaveReq, IStockRebalanceSaveRes>('/api/stock/rebalance/save', payload);
+      await reQuery();
+      Toast.show({ content: `调仓已保存：更新 ${res.updated}，新增 ${res.created}，删除 ${res.deleted}` });
+      setIsRebalanceMode(false);
+      setRebalanceDraft(null);
+      setRebalanceDiff(null);
+      setRebalanceAddVisible(false);
+    } catch (error) {
+      Toast.show({ content: `调仓保存失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setIsRebalanceSaving(false);
+    }
   };
 
   const saveCash = async (values: CashFormValues) => {
@@ -251,22 +343,6 @@ export default function StocksPage() {
     }
   };
 
-  const openCreateAccount = () => {
-    setEditingAccount(null);
-    setAccountModalVisible(true);
-  };
-
-  const openEditAccount = (account: StockAccount) => {
-    setEditingAccount(account);
-    setAccountModalVisible(true);
-  };
-
-  const openCreateHolding = (accountId?: number) => {
-    setEditingHolding(null);
-    setDefaultAccountId(accountId ?? accounts[0]?.id ?? null);
-    setHoldingModalVisible(true);
-  };
-
   const openSymbolModal = async (summary: IStockPortfolioSymbolSummary) => {
     setSelectedSymbol(summary);
     setDividendEvents([]);
@@ -281,71 +357,6 @@ export default function StocksPage() {
       Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
     } finally {
       setDividendLoading(false);
-    }
-  };
-
-  const saveAccount = async (values: AccountFormValues) => {
-    try {
-      if (editingAccount) {
-        await post<IStockAccountUpdateReq, IStockAccountUpdateRes>('/api/stock/account/update', {
-          id: editingAccount.id,
-          name: values.name,
-        });
-        Toast.show({ content: '账户已保存' });
-      } else {
-        await post<IStockAccountCreateReq, IStockAccountCreateRes>('/api/stock/account/create', {
-          name: values.name,
-        });
-        Toast.show({ content: '账户已创建' });
-      }
-      setAccountModalVisible(false);
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
-  const deleteAccount = async (account: StockAccount) => {
-    const ok = await Dialog.confirm({ title: '删除账户', content: `确认删除「${account.name}」吗？账户下有持仓时会被阻止。` });
-    if (!ok) return;
-    try {
-      await post<IStockAccountDeleteReq, { id: number }>('/api/stock/account/delete', { id: account.id });
-      Toast.show({ content: '账户已删除' });
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
-  const saveHolding = async (values: HoldingFormValues) => {
-    const payload = {
-      accountId: Number(values.accountId?.[0]),
-      symbol: values.symbol,
-      name: values.name,
-      quantity: Number(values.quantity),
-      currentPrice: Number(values.currentPrice),
-    };
-
-    if (!payload.accountId) {
-      Toast.show({ content: '请选择账户' });
-      return;
-    }
-
-    try {
-      if (editingHolding) {
-        await post<IStockHoldingUpdateReq, IStockHoldingUpdateRes>('/api/stock/holding/update', {
-          id: editingHolding.id,
-          ...payload,
-        });
-        Toast.show({ content: '持仓已保存' });
-      } else {
-        await post<IStockHoldingCreateReq, IStockHoldingCreateRes>('/api/stock/holding/create', payload);
-        Toast.show({ content: '持仓已创建' });
-      }
-      setHoldingModalVisible(false);
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
     }
   };
 
@@ -411,14 +422,28 @@ export default function StocksPage() {
               {selectedSnapshotLabel}
             </button>
             {!isSnapshotView && (
-              <>
-                <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
-                  {isSnapshotSaving ? '保存中...' : '存快照'}
-                </button>
-                <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
-                  {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
-                </button>
-              </>
+              isRebalanceMode ? (
+                <>
+                  <button type="button" className={styles.quoteButton} disabled={isRebalanceCashInvalid || isRebalanceSaving} onClick={openRebalanceDiff}>
+                    保存调仓
+                  </button>
+                  <button type="button" className={styles.quoteButton} disabled={isRebalanceSaving} onClick={cancelRebalance}>
+                    取消
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className={styles.quoteButton} disabled={!data} onClick={startRebalance}>
+                    编辑
+                  </button>
+                  <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
+                    {isSnapshotSaving ? '保存中...' : '存快照'}
+                  </button>
+                  <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
+                    {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
+                  </button>
+                </>
+              )
             )}
             <label className={styles.positionToggle}>
               <span>计现金</span>
@@ -430,9 +455,16 @@ export default function StocksPage() {
           <div className={styles.summaryValue}>{formatMoney(totalAssetValue)}</div>
           <div className={styles.assetInlineStats}>
             <span>股票 {formatMoney(totalMarketValue)}</span>
-            <button type="button" disabled={isSnapshotView} onClick={() => setCashModalVisible(true)}>现金 {formatMoney(cashAmount)}</button>
+            <button type="button" disabled={isSnapshotView || isRebalanceMode} onClick={() => setCashModalVisible(true)}>
+              现金{isRebalanceMode ? '预估' : ''} {formatMoney(cashAmount)}
+            </button>
           </div>
         </div>
+        {isRebalanceMode && (
+          <div className={isRebalanceCashInvalid ? styles.rebalanceWarning : styles.rebalanceHint}>
+            {isRebalanceCashInvalid ? '现金为负，不能保存调仓' : '编辑模式未保存，保存前会先展示差异'}
+          </div>
+        )}
         {isSnapshotView && selectedSnapshot ? (
           <div className={styles.quoteTime}>快照 {formatDate(selectedSnapshot.snapshotAt)} · {selectedSnapshot.source === 'manual' ? '手动' : selectedSnapshot.source}</div>
         ) : (
@@ -440,12 +472,27 @@ export default function StocksPage() {
         )}
         <div className={styles.summaryGrid}>
           <SummaryStat label="持仓" value={`${symbolSummaries.length}`} />
-          <SummaryStat label="预期分红" value={formatMoney(expectedDividend)} />
-          <SummaryStat label="综合股息率" value={formatPercent(portfolioDividendYield)} />
+          <SummaryStat label={isRebalanceMode ? '预期分红预估' : '预期分红'} value={formatMoney(expectedDividend)} />
+          <SummaryStat label={isRebalanceMode ? '股息率预估' : '综合股息率'} value={formatPercent(portfolioDividendYield)} />
         </div>
       </section>
 
-      {activeData && sectorSummaries.length > 0 && (
+      {isRebalanceMode && rebalanceDraft && (
+        <RebalancePanel
+          accounts={rebalanceDraft.accounts}
+          symbolSummaries={rebalanceDraft.symbolSummaries}
+          symbolOrder={rebalanceDraft.symbolOrder}
+          holdings={rebalanceDraft.holdings}
+          onQuantityDelta={changeRebalanceQuantity}
+          onAddExisting={addExistingRebalanceHolding}
+          onAddNew={() => setRebalanceAddVisible(true)}
+          onReset={resetRebalance}
+          onSave={openRebalanceDiff}
+          saveDisabled={isRebalanceCashInvalid || isRebalanceSaving}
+        />
+      )}
+
+      {displayData && sectorSummaries.length > 0 && (
         <section className={styles.section}>
           <div className={styles.sectionTitle}>股票占比</div>
           {sectorSummaries.map((sector) => (
@@ -462,7 +509,7 @@ export default function StocksPage() {
               </div>
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => (
-                  <List.Item key={summary.symbol} onClick={isSnapshotView ? undefined : () => openSymbolModal(summary)} clickable={!isSnapshotView} arrow={false}>
+                  <List.Item key={summary.symbol} onClick={isSnapshotView || isRebalanceMode ? undefined : () => openSymbolModal(summary)} clickable={!isSnapshotView && !isRebalanceMode} arrow={false}>
                     <div className={styles.symbolRow}>
                       <div className={styles.symbolMain}>
                         <span>{summary.symbol}</span>
@@ -471,7 +518,7 @@ export default function StocksPage() {
                       <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
                     </div>
                     <div className={styles.itemMeta}>
-                      {formatQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
+                      {formatStockQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
                     </div>
                     <StockMetricLines summary={summary} />
                     <div className={styles.barTrack}>
@@ -485,119 +532,13 @@ export default function StocksPage() {
         </section>
       )}
 
-      <section className={styles.section}>
-        <button type="button" className={styles.foldHeader} onClick={() => setShowAccountAllocation((value) => !value)}>
-          <span>账户仓位</span>
-          <strong>{showAccountAllocation ? '收起' : '展开'}</strong>
-        </button>
-        {showAccountAllocation && (
-          <>
-            {!isSnapshotView && (
-              <div className={styles.foldActions}>
-                <Button size="small" color="primary" onClick={openCreateAccount}>
-                  <span className={styles.buttonText}><AddCircleOutline /> 新增账户</span>
-                </Button>
-                <Button size="small" color="primary" fill="outline" disabled={accounts.length === 0} onClick={() => openCreateHolding()}>
-                  <span className={styles.buttonText}><AddCircleOutline /> 新增持仓</span>
-                </Button>
-              </div>
-            )}
-            {accounts.length > 0 ? (
-            <div className={styles.accountScroller}>
-              {accountSummaries.map((summary) => (
-                <div key={summary.accountId} className={styles.accountCard}>
-                  <div className={styles.cardTopline}>
-                    <span>{summary.name}</span>
-                    <strong>{formatPercent(summary.percent)}</strong>
-                  </div>
-                  <div className={styles.cardValue}>{formatMoney(summary.marketValue)}</div>
-                  <div className={styles.barTrack}>
-                    <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
-                  </div>
-                  {!isSnapshotView && (
-                    <div className={styles.cardActions}>
-                      <Button size="mini" onClick={() => openEditAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                        重命名
-                      </Button>
-                      <Button size="mini" fill="outline" color="danger" onClick={() => deleteAccount(accounts.find((account) => account.id === summary.accountId)!)}>
-                        删除
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            ) : (
-              <Empty style={{ padding: '32px 0' }} description={isActiveLoading ? '加载中' : '还没有股票账户'} />
-            )}
-          </>
-        )}
-      </section>
-
-      <section className={styles.section}>
-        <button type="button" className={styles.foldHeader} onClick={() => setShowAccountDetail((value) => !value)}>
-          <span>账户明细</span>
-          <strong>{showAccountDetail ? '收起' : '展开'}</strong>
-        </button>
-        {showAccountDetail && (
-          accounts.length === 0 ? (
-            <Empty style={{ padding: '64px 0' }} description={isActiveLoading ? '加载中' : '先新增一个股票账户'} />
-          ) : (
-            holdingsByAccount.map(({ account, holdings: accountHoldings }) => (
-              <div key={account.id} className={styles.group}>
-                <div className={styles.groupHeader}>
-                  <div>
-                    <div className={styles.groupTitle}>{account.name}</div>
-                    <div className={styles.groupMeta}>{accountHoldings.length} 个持仓</div>
-                  </div>
-                  {!isSnapshotView && <Button size="mini" onClick={() => openCreateHolding(account.id)}>新增</Button>}
-                </div>
-
-                {accountHoldings.length > 0 ? (
-                  <List className={styles.list}>
-                    {accountHoldings.map((holding) => (
-                      <List.Item key={holding.id} prefix={<div className={styles.stockIcon}><PayCircleOutline /></div>}>
-                        <div className={styles.itemTitle}>{holding.symbol} · {holding.name}</div>
-                        <div className={styles.itemMeta}>
-                          {formatQuantity(holding.quantity)} 股 × {formatMoney(holding.currentPrice)} = {formatMoney(marketValueOf(holding))}
-                        </div>
-                      </List.Item>
-                    ))}
-                  </List>
-                ) : (
-                  <div className={styles.emptyGroup}>这个账户还没有持仓</div>
-                )}
-              </div>
-            ))
-          )
-        )}
-      </section>
       </PullToRefresh>
-
-      <AccountModal
-        key={editingAccount?.id ?? 'create-account'}
-        visible={accountModalVisible}
-        account={editingAccount}
-        onClose={() => setAccountModalVisible(false)}
-        onSave={saveAccount}
-      />
 
       <CashModal
         visible={cashModalVisible}
         amount={cashAmount}
         onClose={() => setCashModalVisible(false)}
         onSave={saveCash}
-      />
-
-      <HoldingModal
-        key={editingHolding?.id ?? `create-holding-${defaultAccountId ?? accounts.length}`}
-        visible={holdingModalVisible}
-        holding={editingHolding}
-        accounts={accounts}
-        defaultAccountId={defaultAccountId}
-        accountOptions={accountOptions}
-        onClose={() => setHoldingModalVisible(false)}
-        onSave={saveHolding}
       />
 
       <SymbolModal
@@ -611,6 +552,52 @@ export default function StocksPage() {
         onSave={saveSymbol}
         onDeleteHolding={deleteHolding}
         onToggleDividendEvent={toggleDividendEvent}
+      />
+
+      <RebalanceAddHoldingModal
+        key={`rebalance-add-${rebalanceAddVisible ? 'open' : 'closed'}`}
+        visible={rebalanceAddVisible}
+        accounts={accounts}
+        accountOptions={accountOptions}
+        onClose={() => setRebalanceAddVisible(false)}
+        onSave={addNewRebalanceHolding}
+      />
+
+      <Modal
+        visible={Boolean(rebalanceDiff)}
+        title="确认调仓差异"
+        closeOnMaskClick
+        showCloseButton
+        onClose={() => setRebalanceDiff(null)}
+        content={
+          rebalanceDiff && (
+            <div className={styles.rebalanceDiffModal}>
+              <div className={styles.rebalanceCashDiff}>
+                <span>现金</span>
+                <strong>{formatMoney(rebalanceDiff.cashFrom)} → {formatMoney(rebalanceDiff.cashTo)}</strong>
+                <em>{rebalanceDiff.cashDelta >= 0 ? '+' : ''}{formatMoney(rebalanceDiff.cashDelta)}</em>
+              </div>
+              <div className={styles.rebalanceDiffList}>
+                {rebalanceDiff.items.map((item) => (
+                  <div key={item.key} className={styles.rebalanceDiffItem}>
+                    <div>
+                      <strong>{item.accountName} · {item.symbol} {item.name}</strong>
+                      <span>
+                        {formatStockQuantity(item.fromQuantity)} → {formatStockQuantity(item.toQuantity)} 股
+                        {item.type === 'create' ? ' · 新增' : item.type === 'delete' ? ' · 清仓' : ''}
+                      </span>
+                    </div>
+                    <em>{item.cashImpact >= 0 ? '+' : ''}{formatMoney(item.cashImpact)}</em>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.rebalanceDiffActions}>
+                <Button block fill="outline" disabled={isRebalanceSaving} onClick={() => setRebalanceDiff(null)}>返回修改</Button>
+                <Button block color="primary" loading={isRebalanceSaving} onClick={saveRebalance}>确认保存</Button>
+              </div>
+            </div>
+          )
+        }
       />
 
       <Modal
@@ -726,58 +713,22 @@ const CashModal = ({
   />
 );
 
-const AccountModal = ({
+const RebalanceAddHoldingModal = ({
   visible,
-  account,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  account: StockAccount | null;
-  onClose: () => void;
-  onSave: (values: AccountFormValues) => Promise<void>;
-}) => (
-  <Modal
-    visible={visible}
-    title={account ? '重命名账户' : '新增账户'}
-    closeOnMaskClick
-    showCloseButton
-    onClose={onClose}
-    content={
-      <Form
-        layout="horizontal"
-        initialValues={{ name: account?.name ?? '' }}
-        footer={<Button block type="submit" color="primary">保存</Button>}
-        onFinish={onSave}
-      >
-        <Form.Item name="name" label="账户" rules={[{ required: true, message: '请输入账户名' }]}>
-          <Input placeholder="例如 华泰、富途、招商" />
-        </Form.Item>
-      </Form>
-    }
-  />
-);
-
-const HoldingModal = ({
-  visible,
-  holding,
   accounts,
-  defaultAccountId,
   accountOptions,
   onClose,
   onSave,
 }: {
   visible: boolean;
-  holding: StockHoldingWithAccount | null;
   accounts: StockAccount[];
-  defaultAccountId: number | null;
   accountOptions: { label: string; value: string }[];
   onClose: () => void;
-  onSave: (values: HoldingFormValues) => Promise<void>;
+  onSave: (values: RebalanceAddHoldingFormValues) => Promise<void>;
 }) => (
   <Modal
     visible={visible}
-    title={holding ? '编辑持仓' : '新增持仓'}
+    title="新增调仓股票"
     closeOnMaskClick
     showCloseButton
     onClose={onClose}
@@ -785,37 +736,28 @@ const HoldingModal = ({
       <Form
         layout="horizontal"
         initialValues={{
-          accountId: holding
-            ? [String(holding.accountId)]
-            : defaultAccountId
-              ? [String(defaultAccountId)]
-              : accounts[0]
-                ? [String(accounts[0].id)]
-                : undefined,
-          symbol: holding?.symbol ?? '',
-          name: holding?.name ?? '',
-          quantity: holding ? String(holding.quantity) : '',
-          currentPrice: holding ? String(holding.currentPrice) : '',
+          accountId: accounts[0] ? [String(accounts[0].id)] : undefined,
+          quantity: String(REBALANCE_QUANTITY_STEP),
         }}
-        footer={<Button block type="submit" color="primary">保存</Button>}
+        footer={<Button block type="submit" color="primary">加入草稿</Button>}
         onFinish={onSave}
       >
         <Form.Item name="accountId" label="账户" rules={[{ required: true, message: '请选择账户' }]}> 
           <Selector columns={2} options={accountOptions} />
         </Form.Item>
         <Form.Item name="symbol" label="代码" rules={[{ required: true, message: '请输入股票代码' }]}> 
-          <Input placeholder="例如 AAPL、00700、贵州茅台" />
+          <Input placeholder="例如 600519" />
         </Form.Item>
         <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入股票名称' }]}> 
-          <Input placeholder="例如 苹果、腾讯控股" />
+          <Input placeholder="例如 贵州茅台" />
         </Form.Item>
         <Form.Item name="quantity" label="股数" rules={[{ required: true, message: '请输入股数' }]}> 
           <Input placeholder="例如 100" type="number" />
         </Form.Item>
-        <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
+        <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入现价' }]}> 
           <Input placeholder="人民币价格" type="number" />
         </Form.Item>
-        <div className={styles.modalHint}>保存现价后，同一股票代码在其他账户中的现价会同步更新。</div>
+        <div className={styles.modalHint}>全新股票会先按 0 分红贡献预览，保存刷新后再使用服务端已有指标。</div>
       </Form>
     }
   />

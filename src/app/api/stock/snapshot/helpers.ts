@@ -1,7 +1,8 @@
 import { prisma } from '@libs/prisma';
 import { Prisma, StockSnapshot } from '@prisma/client';
 import { IStockSearchRes, IStockSnapshotSummary, StockSnapshotDetail, StockSnapshotListItem } from '@dtos/meow';
-import { buildStockPortfolio, roundStockValue } from '../helpers';
+import { calculateExpectedDividend, calculatePortfolioDividendYield } from '@utils/stock-calculations';
+import { buildStockPortfolio } from '../helpers';
 
 export const STOCK_SNAPSHOT_SCHEMA_VERSION = 1;
 
@@ -15,13 +16,8 @@ const toInputJson = (value: unknown) => JSON.parse(JSON.stringify(value)) as Pri
 const readNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
 export const buildStockSnapshotSummary = (portfolio: Awaited<ReturnType<typeof buildStockPortfolio>>): IStockSnapshotSummary => {
-  const expectedDividend = roundStockValue(
-    portfolio.symbolSummaries.reduce(
-      (sum, summary) => sum + summary.marketValue * (summary.normalizedDividendYield ?? 0),
-      0
-    )
-  );
-  const portfolioDividendYield = portfolio.totalMarketValue > 0 ? expectedDividend / portfolio.totalMarketValue : 0;
+  const expectedDividend = calculateExpectedDividend(portfolio.symbolSummaries);
+  const portfolioDividendYield = calculatePortfolioDividendYield(portfolio.totalMarketValue, expectedDividend);
 
   return {
     totalMarketValue: portfolio.totalMarketValue,
@@ -120,13 +116,13 @@ const summaryFromPayload = (payload: Prisma.JsonValue): IStockSnapshotSummary =>
     ? value.portfolio as Record<string, unknown>
     : {};
   const symbolSummaries = Array.isArray(portfolio.symbolSummaries) ? portfolio.symbolSummaries : [];
-  const expectedDividend = readNumber(summary.expectedDividend) || roundStockValue(
-    symbolSummaries.reduce((sum, item) => {
-      if (!item || typeof item !== 'object') return sum;
-      const record = item as Record<string, unknown>;
-      return sum + readNumber(record.marketValue) * readNumber(record.normalizedDividendYield);
-    }, 0)
-  );
+  const expectedDividend = readNumber(summary.expectedDividend) || calculateExpectedDividend(symbolSummaries.map((item) => {
+    const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    return {
+      marketValue: readNumber(record.marketValue),
+      normalizedDividendYield: readNumber(record.normalizedDividendYield),
+    };
+  }));
   const totalMarketValue = readNumber(summary.totalMarketValue) || readNumber(portfolio.totalMarketValue);
 
   return {
@@ -134,7 +130,7 @@ const summaryFromPayload = (payload: Prisma.JsonValue): IStockSnapshotSummary =>
     totalAssetValue: readNumber(summary.totalAssetValue) || readNumber(portfolio.totalAssetValue),
     cashAmount: readNumber(summary.cashAmount) || readNumber(portfolio.cashAmount),
     expectedDividend,
-    portfolioDividendYield: readNumber(summary.portfolioDividendYield) || (totalMarketValue > 0 ? expectedDividend / totalMarketValue : 0),
+    portfolioDividendYield: readNumber(summary.portfolioDividendYield) || calculatePortfolioDividendYield(totalMarketValue, expectedDividend),
     holdingCount: readNumber(summary.holdingCount) || (Array.isArray(portfolio.holdings) ? portfolio.holdings.length : 0),
     symbolCount: readNumber(summary.symbolCount) || symbolSummaries.length,
   };

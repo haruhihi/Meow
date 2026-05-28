@@ -1,4 +1,5 @@
 import { prisma } from '@libs/prisma';
+import { marketValueOf, percentOf, roundStockValue } from '@utils/stock-calculations';
 import type {
   IStockPortfolioAccountSummary,
   IStockPortfolioSectorSummary,
@@ -6,6 +7,8 @@ import type {
   StockHoldingWithAccount,
 } from '@dtos/meow';
 import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote } from '@prisma/client';
+
+export { marketValueOf, roundStockValue };
 
 const SECTOR_ORDER = ['消费', '白酒', '红利', '中药', '医药', '其他'];
 
@@ -144,13 +147,6 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     symbolSummaries,
   };
 };
-
-export const roundStockValue = (value: number) => Math.round(value * 100) / 100;
-
-export const marketValueOf = (holding: { quantity: number; currentPrice: number }) =>
-  roundStockValue(holding.quantity * holding.currentPrice);
-
-const percentOf = (value: number, total: number) => (total > 0 ? value / total : 0);
 
 const attachQuote = (
   holding: StockHolding & { account: StockAccount },
