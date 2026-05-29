@@ -1,0 +1,156 @@
+.page {
+  min-height: 100%;
+  padding-bottom: 96px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(20, 184, 166, 0.14), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #f6fff9 100%);
+  color: var(--meow-text);
+}
+
+.navbar {
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.header {
+  padding: 18px 16px 10px;
+
+  h1,
+  p {
+    margin: 0;
+  }
+
+  h1 {
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  p {
+    margin-top: 4px;
+    color: var(--meow-text-muted);
+    font-size: 13px;
+  }
+}
+
+.tabs {
+  --active-line-color: var(--meow-primary);
+  --active-title-color: var(--meow-primary);
+}
+
+.tableWrap {
+  margin: 10px 12px 0;
+  overflow-x: auto;
+  border: 1px solid var(--meow-border);
+  border-radius: 12px;
+  background: var(--meow-border);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
+}
+
+.statementTable {
+  display: grid;
+  grid-template-columns: 150px repeat(var(--period-count), 104px);
+  min-width: max-content;
+  gap: 1px;
+}
+
+.rowGroup {
+  display: contents;
+}
+
+.headerCell,
+.labelCell,
+.valueCell {
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.headerCell {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 9px 8px;
+  color: var(--meow-text);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.labelCell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  padding: 8px;
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    color: var(--meow-text);
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  span {
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.valueCell {
+  padding: 8px;
+  text-align: right;
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    color: var(--meow-text);
+    font-size: 12px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    margin-top: 3px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+  }
+}
+
+.errorPanel {
+  margin: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
+
+  strong,
+  p {
+    display: block;
+    margin: 0;
+  }
+
+  strong {
+    color: #b91c1c;
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  p {
+    margin: 8px 0 10px;
+    color: var(--meow-text-sub);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}

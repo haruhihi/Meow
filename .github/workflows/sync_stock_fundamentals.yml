@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '10 19 * * *'
   workflow_dispatch:
+    inputs:
+      symbols:
+        description: 'Optional stock symbols, separated by spaces. Empty means all held symbols.'
+        required: false
+        default: ''
+      statement_count:
+        description: 'Raw statement rows to fetch from Xueqiu type=all.'
+        required: false
+        default: '40'
 
 jobs:
   sync:
@@ -40,4 +49,11 @@ jobs:
       - name: Sync fundamentals
         env:
           DATABASE: ${{ secrets.DATABASE }}
-        run: node scripts/sync-stock-fundamentals.mjs --sleep 1500
+          SYMBOLS: ${{ github.event.inputs.symbols }}
+          STATEMENT_COUNT: ${{ github.event.inputs.statement_count }}
+        run: |
+          args=(--sleep 1500 --statement-count "${STATEMENT_COUNT:-40}")
+          if [ -n "$SYMBOLS" ]; then
+            args+=(--symbols $SYMBOLS)
+          fi
+          node scripts/sync-stock-fundamentals.mjs "${args[@]}"

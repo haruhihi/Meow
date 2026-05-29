@@ -2,7 +2,7 @@
 
 import { RefObject, useState } from 'react';
 import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Modal, NavBar, TextArea, Toast } from 'antd-mobile';
-import { AddCircleOutline, DeleteOutline, EditSOutline } from 'antd-mobile-icons';
+import { AddCircleOutline, DeleteOutline, EditSOutline, FileOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { post } from '@libs/fetch';
 import {
@@ -14,7 +14,7 @@ import {
   IStockRemarkUpdateRes,
   StockRemarkListItem,
 } from '@dtos/meow';
-import { useStockRemarks } from '@utils/stock';
+import { useStockAiPrompt, useStockAiReports, useStockRemarks } from '@utils/stock';
 import styles from './remarks.module.scss';
 
 type RemarkFormValues = {
@@ -35,13 +35,37 @@ const parseRemarkDate = (value?: string | null) => {
 };
 
 const formatRemarkDate = (value: string) => value.replace(/-/g, '/');
+const formatPromptTime = (value?: string | null) => {
+  if (!value) return '未知时间';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未知时间';
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+const formatReportDate = (value?: string | Date | null) => {
+  if (!value) return '未知日期';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '未知日期';
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+};
 
 export default function StockRemarksPage({ params }: { params: { symbol: string } }) {
   const router = useRouter();
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
   const { remarks, symbolName, loading, reQuery } = useStockRemarks(symbol);
+  const { data: promptData, loading: promptLoading, error: promptError, reQuery: reQueryPrompt } = useStockAiPrompt(symbol);
+  const { reports, loading: reportsLoading } = useStockAiReports(0, symbol);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<EditingRemark>(null);
+
+  const copyPrompt = async () => {
+    if (!promptData?.prompt) return;
+    try {
+      await navigator.clipboard.writeText(promptData.prompt);
+      Toast.show({ content: 'Prompt 已复制' });
+    } catch (err) {
+      Toast.show({ content: `复制失败: ${(err as Error).message}` });
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -99,7 +123,7 @@ export default function StockRemarksPage({ params }: { params: { symbol: string 
   return (
     <main className={styles.page}>
       <NavBar onBack={() => router.back()} className={styles.navbar}>
-        股票评语
+        股票洞察
       </NavBar>
 
       <header className={styles.header}>
@@ -114,6 +138,78 @@ export default function StockRemarksPage({ params }: { params: { symbol: string 
           </span>
         </Button>
       </header>
+
+      <section className={styles.aiPanel}>
+        <div className={styles.aiPanelHeader}>
+          <div>
+            <strong>AI 财报解读 Prompt</strong>
+            <p>{promptData ? `生成于 ${formatPromptTime(promptData.generatedAt)} · ${promptData.frameworkCards.length} 张方法卡片 · ${promptData.frameworkArticles.length} 篇文章引用` : '基于财务数据、分红标记和方法卡片生成'}</p>
+          </div>
+          <Button size="mini" color="primary" disabled={!promptData?.prompt} onClick={copyPrompt}>
+            <FileOutline /> 复制
+          </Button>
+        </div>
+        {promptError ? (
+          <div className={styles.aiError}>
+            <span>{promptError}</span>
+            <Button size="mini" onClick={() => { void reQueryPrompt().catch(() => undefined); }}>重试</Button>
+          </div>
+        ) : promptData ? (
+          <>
+            <div className={styles.metricGrid}>
+              {promptData.metrics.map((item) => (
+                <div key={item.label} className={styles.metricCard}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+            {promptData.frameworkCards.length > 0 && (
+              <div className={styles.articleStrip}>
+                {promptData.frameworkCards.map((card) => (
+                  <span key={card.articleId}>{card.title}</span>
+                ))}
+              </div>
+            )}
+            <details className={styles.promptPreview}>
+              <summary>查看 Prompt</summary>
+              <pre>{promptData.prompt}</pre>
+            </details>
+          </>
+        ) : (
+          <div className={styles.aiLoading}>{promptLoading ? 'Prompt 生成中' : '暂无 Prompt'}</div>
+        )}
+      </section>
+
+      <section className={styles.sectionHeader}>
+        <h2>AI 研报</h2>
+      </section>
+
+      {reports.length > 0 ? (
+        <section className={styles.reportList}>
+          {reports.map((report) => (
+            <button
+              key={report.id}
+              type="button"
+              className={styles.reportCard}
+              onClick={() => router.push(`/meow/ai-reports/${report.id}`)}
+            >
+              <div className={styles.reportTopline}>
+                <span>{formatReportDate(report.reportDate)}</span>
+                <em>{report.symbol}</em>
+              </div>
+              <strong>{report.title}</strong>
+              <p>{report.summary}</p>
+            </button>
+          ))}
+        </section>
+      ) : (
+        <Empty style={{ padding: '28px 0' }} description={reportsLoading ? '研报加载中' : '暂无研报'} />
+      )}
+
+      <section className={styles.sectionHeader}>
+        <h2>投资评语</h2>
+      </section>
 
       {remarks.length > 0 ? (
         <section className={styles.remarkList}>

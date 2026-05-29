@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 const SOURCE = 'xueqiu';
 const APP_PAGE = 'https://xueqiu.com/snowman/S/{symbol}/detail#/ZYCWZB';
 const FUNDAMENTAL_COUNT = 8;
+const DEFAULT_STATEMENT_COUNT = 40;
 
 setAppDatabaseUrl();
 
@@ -19,6 +20,7 @@ const parseArgs = () => {
   let limit = 0;
   let dryRun = false;
   let sleep = 1500;
+  let statementCount = DEFAULT_STATEMENT_COUNT;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -33,12 +35,15 @@ const parseArgs = () => {
     } else if (arg === '--sleep') {
       sleep = Number(args[index + 1] ?? sleep);
       index += 1;
+    } else if (arg === '--statement-count') {
+      statementCount = Number(args[index + 1] ?? statementCount);
+      index += 1;
     } else if (arg === '--dry-run') {
       dryRun = true;
     }
   }
 
-  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep };
+  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep, statementCount: Math.min(Math.max(statementCount, FUNDAMENTAL_COUNT), 80) };
 };
 
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -86,12 +91,12 @@ const fetchXueqiuJson = async (url, xueqiuSymbol, cookieHeader) => {
   return payload;
 };
 
-const financeUrl = (statement, xueqiuSymbol, type = 'Q4') => {
+const financeUrl = (statement, xueqiuSymbol, type = 'Q4', count = FUNDAMENTAL_COUNT) => {
   const url = new URL(`https://stock.xueqiu.com/v5/stock/finance/cn/${statement}.json`);
   url.searchParams.set('symbol', xueqiuSymbol);
   url.searchParams.set('type', type);
   url.searchParams.set('is_detail', 'true');
-  url.searchParams.set('count', String(FUNDAMENTAL_COUNT));
+  url.searchParams.set('count', String(count));
   url.searchParams.set('timestamp', '');
   return url.toString();
 };
@@ -100,6 +105,8 @@ const valueOf = (field) => {
   if (Array.isArray(field)) return typeof field[0] === 'number' ? field[0] : null;
   return typeof field === 'number' ? field : null;
 };
+
+const normalizeJsonValue = (value) => JSON.parse(JSON.stringify(value));
 
 const dateFromMillis = (value) => {
   if (!value) return null;
@@ -154,10 +161,11 @@ const trailingTwelveMonths = (items, fieldNames) => {
   return latestValue + previousAnnualValue - previousSamePeriodValue;
 };
 
-const fetchFundamentals = async (symbol) => {
+const fetchFundamentals = async (symbol, options) => {
   const xueqiuSymbol = toXueqiuSymbol(symbol);
   const { cookieHeader } = await createXueqiuSession(xueqiuSymbol);
   if (!cookieHeader) throw new Error('missing xueqiu anonymous cookie');
+  const statementCount = options.statementCount;
 
   const incomePayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
   await sleepMs(300);
@@ -165,9 +173,11 @@ const fetchFundamentals = async (symbol) => {
   await sleepMs(300);
   const cashFlowPayload = await fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
   await sleepMs(300);
-  const incomeAllPayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader);
+  const incomeAllPayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'all', statementCount), xueqiuSymbol, cookieHeader);
   await sleepMs(300);
-  const cashFlowAllPayload = await fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'all'), xueqiuSymbol, cookieHeader);
+  const balanceAllPayload = await fetchXueqiuJson(financeUrl('balance', xueqiuSymbol, 'all', statementCount), xueqiuSymbol, cookieHeader);
+  await sleepMs(300);
+  const cashFlowAllPayload = await fetchXueqiuJson(financeUrl('cash_flow', xueqiuSymbol, 'all', statementCount), xueqiuSymbol, cookieHeader);
 
   const incomeByDate = mapByReportDate(incomePayload.data?.list ?? []);
   const balanceByDate = mapByReportDate(balancePayload.data?.list ?? []);
@@ -183,7 +193,7 @@ const fetchFundamentals = async (symbol) => {
     capitalExpenditureTtm: trailingTwelveMonths(cashFlowAll, ['cash_paid_for_assets']),
   };
 
-  return dates.map((date) => {
+  const fundamentals = dates.map((date) => {
     const income = incomeByDate.get(date).item;
     const balance = balanceByDate.get(date).item;
     const cashFlow = cashFlowByDate.get(date)?.item;
@@ -206,7 +216,34 @@ const fetchFundamentals = async (symbol) => {
       capitalExpenditureTtm: ttm.capitalExpenditureTtm,
     };
   });
+
+  return {
+    fundamentals,
+    statements: [
+      ...buildStatementItems(symbol, 'income', incomePayload.data?.list ?? []),
+      ...buildStatementItems(symbol, 'balance', balancePayload.data?.list ?? []),
+      ...buildStatementItems(symbol, 'cash_flow', cashFlowPayload.data?.list ?? []),
+      ...buildStatementItems(symbol, 'income', incomeAllPayload.data?.list ?? []),
+      ...buildStatementItems(symbol, 'balance', balanceAllPayload.data?.list ?? []),
+      ...buildStatementItems(symbol, 'cash_flow', cashFlowAllPayload.data?.list ?? []),
+    ],
+  };
 };
+
+const buildStatementItems = (symbol, statement, items) =>
+  (items ?? [])
+    .map((item) => {
+      const reportDate = dateFromMillis(item.report_date);
+      if (!reportDate) return null;
+      return {
+        symbol,
+        statement,
+        reportDate,
+        reportName: item.report_name ?? null,
+        fields: normalizeJsonValue(item),
+      };
+    })
+    .filter(Boolean);
 
 const upsertFundamental = async (item) => {
   await prisma.stockFundamental.upsert({
@@ -251,6 +288,32 @@ const upsertFundamental = async (item) => {
   });
 };
 
+const upsertFinancialStatement = async (item) => {
+  await prisma.stockFinancialStatement.upsert({
+    where: {
+      symbol_statement_reportDate: {
+        symbol: item.symbol,
+        statement: item.statement,
+        reportDate: item.reportDate,
+      },
+    },
+    create: {
+      symbol: item.symbol,
+      statement: item.statement,
+      reportDate: item.reportDate,
+      reportName: item.reportName,
+      fields: item.fields,
+      source: SOURCE,
+    },
+    update: {
+      reportName: item.reportName,
+      fields: item.fields,
+      source: SOURCE,
+      fetchedAt: new Date(),
+    },
+  });
+};
+
 const main = async () => {
   const args = parseArgs();
   let symbols = await fetchSymbols(args.symbols);
@@ -258,19 +321,25 @@ const main = async () => {
   console.log(`syncing ${symbols.length} symbols: ${symbols.join(', ')}`);
 
   let ok = 0;
+  let statementsWritten = 0;
   const failed = [];
   for (const symbol of symbols) {
     try {
-      const items = await fetchFundamentals(symbol);
-      if (items.length === 0) {
+      const { fundamentals, statements } = await fetchFundamentals(symbol, { statementCount: args.statementCount });
+      if (fundamentals.length === 0) {
         failed.push(symbol);
         console.error(`[${symbol}] no fundamentals returned`);
         continue;
       }
-      for (const item of items) {
+      for (const item of fundamentals) {
         console.log(`[${symbol}] report=${item.reportDate.toISOString().slice(0, 10)} totalShares=${item.totalShares} deductedNetProfit=${item.deductedNetProfit} deductedNetProfitTtm=${item.deductedNetProfitTtm} netAsset=${item.netAsset} operatingCashFlow=${item.operatingCashFlow} operatingCashFlowTtm=${item.operatingCashFlowTtm}`);
         if (!args.dryRun) await upsertFundamental(item);
       }
+      for (const statement of statements) {
+        if (!args.dryRun) await upsertFinancialStatement(statement);
+        statementsWritten += 1;
+      }
+      console.log(`[${symbol}] financialStatements=${statements.length}`);
       ok += 1;
     } catch (error) {
       failed.push(symbol);
@@ -279,7 +348,7 @@ const main = async () => {
     if (args.sleep > 0) await sleepMs(args.sleep);
   }
 
-  console.log(`done ok=${ok} failed=${failed.length} failedSymbols=${failed.join(',')}`);
+  console.log(`done ok=${ok} financialStatements=${statementsWritten} failed=${failed.length} failedSymbols=${failed.join(',')}`);
   return ok > 0 || failed.length === 0 ? 0 : 1;
 };
 

@@ -3,6 +3,10 @@ import { post } from '@libs/fetch';
 import {
   IStockAiReportListReq,
   IStockAiReportListRes,
+  IStockAiPromptReq,
+  IStockAiPromptRes,
+  IStockFinancialStatementListReq,
+  IStockFinancialStatementListRes,
   IStockQuoteRefreshReq,
   IStockQuoteRefreshRes,
   IStockRemarkListReq,
@@ -71,6 +75,44 @@ export const useStockAiReports = (refreshKey = 0, symbol?: string) => {
   };
 };
 
+export const useStockAiPrompt = (symbol: string, refreshKey = 0) => {
+  const [data, setData] = useState<IStockAiPromptRes | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPrompt = async () => {
+    if (!symbol) {
+      setData(null);
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await post<IStockAiPromptReq, IStockAiPromptRes>('/api/stock/ai-report/prompt', { symbol });
+      setData(res);
+      return res;
+    } catch (err) {
+      const message = (err as any)?.result ?? String(err);
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchPrompt().catch(() => undefined);
+  }, [refreshKey, symbol]);
+
+  return {
+    data,
+    loading,
+    error,
+    reQuery: fetchPrompt,
+  };
+};
+
 export const useStockRemarks = (symbol: string, refreshKey = 0) => {
   const [remarks, setRemarks] = useState<IStockRemarkListRes['remarks']>([]);
   const [symbolName, setSymbolName] = useState(symbol);
@@ -103,6 +145,44 @@ export const useStockRemarks = (symbol: string, refreshKey = 0) => {
     symbolName,
     loading,
     reQuery: fetchRemarks,
+  };
+};
+
+export const useStockFinancialStatements = (symbol: string, refreshKey = 0, limit = 5) => {
+  const [data, setData] = useState<IStockFinancialStatementListRes | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStatements = async () => {
+    if (!symbol) {
+      setData(null);
+      return null;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await post<IStockFinancialStatementListReq, IStockFinancialStatementListRes>('/api/stock/financial-statement/list', { symbol, limit });
+      setData(res);
+      return res;
+    } catch (err) {
+      const message = (err as any)?.result ?? String(err);
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchStatements().catch(() => undefined);
+  }, [refreshKey, symbol, limit]);
+
+  return {
+    data,
+    loading,
+    error,
+    reQuery: fetchStatements,
   };
 };
 

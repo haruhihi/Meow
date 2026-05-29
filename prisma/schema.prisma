@@ -30,6 +30,7 @@ model User {
   StockQuote   StockQuote[]   @relation
   StockCash    StockCash?     @relation
   StockAiReport StockAiReport[] @relation
+  StockFrameworkArticle StockFrameworkArticle[] @relation
   StockSnapshot StockSnapshot[] @relation
   LifeAnalysisProfile UserLifeAnalysisProfile? @relation
   LifeAnalysisReports UserLifeAnalysisReport[] @relation
@@ -87,6 +88,25 @@ model StockAiReport {
   @@unique([userId, slug])
   @@index([userId, reportDate])
   @@index([symbol])
+}
+
+model StockFrameworkArticle {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  symbol    String   @db.VarChar(32)
+  articleId String   @db.VarChar(40)
+  title     String?  @db.VarChar(200)
+  reason    String?  @db.VarChar(500)
+  tags      Json?
+  weight    Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol, articleId])
+  @@index([userId, symbol])
+  @@index([articleId])
 }
 
 model StockSnapshot {
@@ -176,6 +196,23 @@ model StockFundamental {
   @@unique([symbol, reportDate])
   @@index([symbol])
   @@index([reportDate])
+}
+
+model StockFinancialStatement {
+  id         Int      @id @default(autoincrement())
+  symbol     String   @db.VarChar(32)
+  statement  String   @db.VarChar(32)
+  reportDate DateTime
+  reportName String?  @db.VarChar(80)
+  fields     Json
+  source     String   @db.VarChar(80)
+  fetchedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([symbol, statement, reportDate])
+  @@index([symbol, statement, reportDate])
+  @@index([statement])
 }
 
 model StockMetricOverride {
