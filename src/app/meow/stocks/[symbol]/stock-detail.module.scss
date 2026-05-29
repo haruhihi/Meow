@@ -21,20 +21,9 @@
   gap: 12px;
   padding: 18px 16px 10px;
 
-  span,
   h1,
   p {
     margin: 0;
-  }
-
-  span {
-    display: inline-flex;
-    padding: 2px 7px;
-    border-radius: 8px;
-    background: #ccfbf1;
-    color: #0f766e;
-    font-size: 12px;
-    font-weight: 900;
   }
 
   h1 {
@@ -54,6 +43,17 @@
   button {
     flex-shrink: 0;
   }
+}
+
+.symbolCode {
+  display: inline-flex;
+  margin: 0;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: #ccfbf1;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .metricGrid {
@@ -158,6 +158,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.buttonText {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .reportSwiper {

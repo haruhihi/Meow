@@ -4,6 +4,7 @@
 - This dev container does not have `rg` installed. Use VS Code search tools or shell `grep` for text/diff searches instead of `rg`.
 - When starting a development server, always stop the server and free the port before finishing the turn unless the user explicitly asks to keep it running.
 - For mobile-facing pages, prefer components from the existing UI library over native/desktop-style controls, and design interactions for convenient touch use and browsing.
+- For icon + text buttons on mobile, always wrap the contents in a dedicated inline-flex `white-space: nowrap` element/class and make the button `flex-shrink: 0` when placed beside titles or toolbar text. Avoid broad selectors like `.header span` that can style nested button labels.
 - Prefer reusing existing code, components, calculation utilities, validation helpers, and formatting functions before adding new ones. Avoid duplicated business logic or separate UI paths that can drift into inconsistent calculations, inputs, or persistence behavior.
 
 ## Stock financial analysis workflow

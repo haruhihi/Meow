@@ -253,7 +253,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
 
       <header className={styles.header}>
         <div>
-          <span>{summary.symbol}</span>
+          <span className={styles.symbolCode}>{summary.symbol}</span>
           <h1>{summary.name}</h1>
           <p>{formatMoney(summary.currentPrice)} · {formatStockQuantity(summary.quantity)} 股 · {formatMoney(summary.marketValue)}</p>
         </div>
@@ -292,7 +292,9 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
       <section className={styles.sectionBlock}>
         <div className={styles.sectionTitleRow}>
           <div className={styles.sectionTitle}>投资评语</div>
-          <Button size="mini" color="primary" onClick={openCreateRemark}><AddCircleOutline /> 新建</Button>
+          <Button size="mini" color="primary" onClick={openCreateRemark}>
+            <span className={styles.buttonText}><AddCircleOutline /> 新建</span>
+          </Button>
         </div>
         {remarks.length > 0 ? (
           <div className={styles.remarkList}>
