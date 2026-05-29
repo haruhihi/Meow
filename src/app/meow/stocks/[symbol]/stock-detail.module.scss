@@ -58,14 +58,15 @@
 
 .metricGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   padding: 8px 12px 0;
 
   div {
     min-width: 0;
-    padding: 10px;
-    border-radius: 12px;
+    min-height: 70px;
+    padding: 8px 7px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 8px 24px rgba(15, 118, 110, 0.07);
   }
@@ -78,7 +79,7 @@
 
   span {
     color: var(--meow-text-muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
   }
 
@@ -86,7 +87,7 @@
     margin-top: 3px;
     overflow: hidden;
     color: #0f766e;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 900;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -95,7 +96,7 @@
   em {
     margin-top: 2px;
     color: var(--meow-text-muted);
-    font-size: 10px;
+    font-size: 9px;
     font-style: normal;
   }
 }
@@ -342,8 +343,17 @@
 }
 
 @media (max-width: 360px) {
-  .metricGrid,
   .dividendGrid {
     grid-template-columns: 1fr;
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 520px) {
+  .metricGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

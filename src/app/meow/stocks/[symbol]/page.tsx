@@ -73,13 +73,11 @@ const DIVIDEND_PREVIEW_COUNT = 4;
 
 const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <section className={styles.metricGrid}>
-    <div><span>扣非 PE</span><strong>{formatOptionalNumber(summary.deductedPe)}</strong><em>静态</em></div>
-    <div><span>扣非 PE</span><strong>{formatOptionalNumber(summary.deductedPeTtm)}</strong><em>TTM</em></div>
+    <div><span>扣非 PE</span><strong>{formatOptionalNumber(summary.deductedPe)} / {formatOptionalNumber(summary.deductedPeTtm)}</strong><em>静 / TTM</em></div>
     <div><span>PB</span><strong>{formatOptionalNumber(summary.pb)}</strong><em>资产</em></div>
     <div><span>扣非 ROE</span><strong>{formatPercent(summary.deductedRoeTtm)}</strong><em>TTM</em></div>
     <div><span>股息率</span><strong>{formatPercent(summary.normalizedDividendYield)}</strong><em>常态</em></div>
-    <div><span>现金含金量</span><strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong><em>OCF/扣非</em></div>
-    <div><span>分红覆盖</span><strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong><em>FCF/分红</em></div>
+    <div><span>现金质量</span><strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)} / {formatOptionalNumber(summary.fcfDividendCoverage)}</strong><em>含金量 / 分红覆盖</em></div>
     <div><span>市值</span><strong>{formatMoney(summary.marketValue)}</strong><em>持仓口径</em></div>
   </section>
 );
@@ -263,7 +261,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
           <p>{formatMoney(summary.currentPrice)} · {formatStockQuantity(summary.quantity)} 股 · {formatMoney(summary.marketValue)}</p>
         </div>
         <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
-          <FileOutline /> 财报
+          <span className={styles.buttonText}><FileOutline /> 财报</span>
         </Button>
       </header>
 
