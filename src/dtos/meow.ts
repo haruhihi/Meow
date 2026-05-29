@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -518,6 +518,49 @@ export interface IStockMetricOverrideUpdateRes {
   symbol: StockQuote['symbol'];
   normalizedDividend: number | null;
   note: string | null;
+}
+
+export type StockRemarkListItem = Omit<StockRemark, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface IStockRemarkListReq {
+  symbol: StockQuote['symbol'];
+}
+
+export interface IStockRemarkListRes {
+  symbol: StockQuote['symbol'];
+  name: StockQuote['name'];
+  remarks: StockRemarkListItem[];
+}
+
+export interface IStockRemarkCreateReq {
+  symbol: StockQuote['symbol'];
+  remarkDate: StockRemark['remarkDate'];
+  content: StockRemark['content'];
+}
+
+export interface IStockRemarkCreateRes {
+  remark: StockRemarkListItem;
+}
+
+export interface IStockRemarkUpdateReq {
+  id: StockRemark['id'];
+  remarkDate?: StockRemark['remarkDate'];
+  content?: StockRemark['content'];
+}
+
+export interface IStockRemarkUpdateRes {
+  remark: StockRemarkListItem;
+}
+
+export interface IStockRemarkDeleteReq {
+  id: StockRemark['id'];
+}
+
+export interface IStockRemarkDeleteRes {
+  id: StockRemark['id'];
 }
 
 export type StockDividendEventWithMarking = StockDividendEvent & {

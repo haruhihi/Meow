@@ -1,7 +1,10 @@
 'use client';
 
+import type { MouseEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { EditSOutline } from 'antd-mobile-icons';
+import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
 import { post } from '@libs/fetch';
 import {
@@ -83,6 +86,7 @@ const formatDividendPlan = (event: StockDividendEventWithMarking) => {
 const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 export default function StocksPage() {
+  const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [symbolModalVisible, setSymbolModalVisible] = useState(false);
@@ -360,6 +364,11 @@ export default function StocksPage() {
     }
   };
 
+  const openRemarkPage = (event: MouseEvent<HTMLButtonElement>, summary: IStockPortfolioSymbolSummary) => {
+    event.stopPropagation();
+    router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}/remarks`);
+  };
+
   const deleteHolding = async (holding: StockHoldingWithAccount) => {
     const ok = await Dialog.confirm({ title: '删除持仓', content: `确认删除「${holding.symbol} ${holding.name}」吗？` });
     if (!ok) return;
@@ -512,8 +521,14 @@ export default function StocksPage() {
                   <List.Item key={summary.symbol} onClick={isSnapshotView || isRebalanceMode ? undefined : () => openSymbolModal(summary)} clickable={!isSnapshotView && !isRebalanceMode} arrow={false}>
                     <div className={styles.symbolRow}>
                       <div className={styles.symbolMain}>
-                        <span>{summary.symbol}</span>
+                        <span className={styles.symbolCode}>{summary.symbol}</span>
                         <strong>{summary.name}</strong>
+                        {!isSnapshotView && !isRebalanceMode && (
+                          <button type="button" className={styles.remarkEntry} onClick={(event) => openRemarkPage(event, summary)}>
+                            <EditSOutline />
+                            <span>评语</span>
+                          </button>
+                        )}
                       </div>
                       <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
                     </div>

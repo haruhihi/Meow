@@ -4,9 +4,10 @@ import type {
   IStockPortfolioAccountSummary,
   IStockPortfolioSectorSummary,
   IStockPortfolioSymbolSummary,
+  StockRemarkListItem,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
 
 export { marketValueOf, roundStockValue };
 
@@ -52,6 +53,26 @@ export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
 export const normalizeName = (name: string) => name.trim();
 
+export const normalizeRemarkDate = (value: unknown) => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('remarkDate must be YYYY-MM-DD');
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new Error('remarkDate is invalid');
+  }
+
+  return value;
+};
+
+export const normalizeRemarkContent = (value: unknown) => {
+  if (typeof value !== 'string') throw new Error('content is required');
+  const content = value.trim();
+  if (!content) throw new Error('content is required');
+  return content;
+};
+
 export const readNonNegativeNumber = (value: unknown, label: string) => {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue) || numberValue < 0) {
@@ -67,6 +88,34 @@ export const requireOwnedStockAccount = async (userId: number, accountId: number
   if (!account) throw new Error('account not found');
   return account;
 };
+
+export const requireOwnedStockSymbol = async (userId: number, symbol: string) => {
+  const quote = await prisma.stockQuote.findUnique({
+    where: { userId_symbol: { userId, symbol } },
+  });
+  if (quote) return quote;
+
+  const holding = await prisma.stockHolding.findFirst({
+    where: { userId, symbol },
+  });
+  if (!holding) throw new Error('stock not found');
+
+  return {
+    id: 0,
+    userId,
+    symbol,
+    name: symbol,
+    currentPrice: 0,
+    createdAt: holding.createdAt,
+    updatedAt: holding.updatedAt,
+  };
+};
+
+export const stockRemarkToListItem = (remark: StockRemark): StockRemarkListItem => ({
+  ...remark,
+  createdAt: remark.createdAt.toISOString(),
+  updatedAt: remark.updatedAt.toISOString(),
+});
 
 export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const trimmedKeyword = keyword?.trim();

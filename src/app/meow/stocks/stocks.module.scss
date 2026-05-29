@@ -513,6 +513,22 @@
   gap: 10px;
 }
 
+.remarkEntry {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(20, 184, 166, 0.24);
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .barTrack {
   margin-top: 9px;
   width: 100%;
@@ -564,16 +580,6 @@
   gap: 8px;
   min-width: 0;
 
-  span {
-    flex-shrink: 0;
-    padding: 2px 7px;
-    border-radius: 8px;
-    color: #0f766e;
-    background: #ccfbf1;
-    font-size: 12px;
-    font-weight: 800;
-  }
-
   strong {
     min-width: 0;
     overflow: hidden;
@@ -582,6 +588,16 @@
     color: var(--meow-text);
     font-size: 14px;
   }
+}
+
+.symbolCode {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 8px;
+  color: #0f766e;
+  background: #ccfbf1;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .symbolValue {

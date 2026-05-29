@@ -5,6 +5,8 @@ import {
   IStockAiReportListRes,
   IStockQuoteRefreshReq,
   IStockQuoteRefreshRes,
+  IStockRemarkListReq,
+  IStockRemarkListRes,
   IStockSearchReq,
   IStockSearchRes,
   IStockSnapshotDetailReq,
@@ -66,6 +68,41 @@ export const useStockAiReports = (refreshKey = 0, symbol?: string) => {
     reports,
     loading,
     reQuery: fetchReports,
+  };
+};
+
+export const useStockRemarks = (symbol: string, refreshKey = 0) => {
+  const [remarks, setRemarks] = useState<IStockRemarkListRes['remarks']>([]);
+  const [symbolName, setSymbolName] = useState(symbol);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRemarks = async () => {
+    if (!symbol) {
+      setRemarks([]);
+      setSymbolName('');
+      return null;
+    }
+
+    setLoading(true);
+    try {
+      const res = await post<IStockRemarkListReq, IStockRemarkListRes>('/api/stock/remark/list', { symbol });
+      setRemarks(res.remarks);
+      setSymbolName(res.name);
+      return res;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchRemarks();
+  }, [refreshKey, symbol]);
+
+  return {
+    remarks,
+    symbolName,
+    loading,
+    reQuery: fetchRemarks,
   };
 };
 
