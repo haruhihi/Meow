@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
 import { useStockAiReports } from '@utils/stock';
 import styles from './report.module.scss';
@@ -37,7 +38,7 @@ export default function AiReportDetailPage({ params }: { params: { id: string } 
           </header>
 
           <article className={styles.content}>
-            <ReactMarkdown>{report.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{report.content}</ReactMarkdown>
           </article>
 
           {report.sourceLinks.length > 0 && (

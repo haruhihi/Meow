@@ -147,6 +147,37 @@
     }
   }
 
+  table {
+    display: block;
+    width: 100%;
+    margin: 0 0 1.2em;
+    overflow-x: auto;
+    border-collapse: collapse;
+    color: var(--meow-text-sub);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  th,
+  td {
+    min-width: 88px;
+    border: 1px solid var(--meow-border);
+    padding: 7px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--meow-surface-alt);
+    color: var(--meow-text);
+    font-weight: 900;
+  }
+
+  a {
+    color: var(--meow-primary);
+    text-decoration: none;
+  }
+
   hr {
     border: 0;
     border-top: 1px solid var(--meow-border);
