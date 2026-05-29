@@ -7,6 +7,7 @@ import styles from './articles.module.scss';
 
 const UNKNOWN_KEY = 'unknown';
 const HISTORY_KEY = 'meow.articles.searchHistory';
+const SCROLL_KEY = 'meow.articles.scrollY';
 const HISTORY_MAX = 10;
 
 const formatDate = (value: string | null) => {
@@ -83,6 +84,13 @@ export default function ArticlesList({ initialArticles, yearCounts, total, pageS
   useEffect(() => {
     setHistory(loadHistory());
   }, []);
+
+  useEffect(() => {
+    const value = window.sessionStorage.getItem(SCROLL_KEY);
+    if (!value) return;
+    window.sessionStorage.removeItem(SCROLL_KEY);
+    requestAnimationFrame(() => window.scrollTo(0, Number(value) || 0));
+  }, [items.length]);
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -354,7 +362,12 @@ export default function ArticlesList({ initialArticles, yearCounts, total, pageS
         {items.map((article) => {
           const isEditing = editingId === article.id;
           return (
-            <a key={article.id} href={`/meow/articles/${article.id}`} className={styles.item}>
+            <a
+              key={article.id}
+              href={`/meow/articles/${article.id}`}
+              className={styles.item}
+              onClick={() => window.sessionStorage.setItem(SCROLL_KEY, String(window.scrollY))}
+            >
               <div className={styles.itemMeta}>
                 <span>{formatDate(article.publishDate)}</span>
                 <span>{article.author}</span>

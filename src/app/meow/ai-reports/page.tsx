@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import { useRouter } from 'next/navigation';
 import { useStockAiReports } from '@utils/stock';
 import styles from './reports.module.scss';
+
+const SCROLL_KEY = 'meow.aiReports.scrollY';
 
 const formatDate = (value?: string | Date | null) => {
   if (!value) return '未知日期';
@@ -15,6 +18,18 @@ const formatDate = (value?: string | Date | null) => {
 export default function AiReportsPage() {
   const router = useRouter();
   const { reports, loading } = useStockAiReports();
+
+  useEffect(() => {
+    const value = window.sessionStorage.getItem(SCROLL_KEY);
+    if (!value) return;
+    window.sessionStorage.removeItem(SCROLL_KEY);
+    requestAnimationFrame(() => window.scrollTo(0, Number(value) || 0));
+  }, [reports.length]);
+
+  const openReport = (id: number) => {
+    window.sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+    router.push(`/meow/ai-reports/${id}`);
+  };
 
   return (
     <main className={styles.page}>
@@ -34,7 +49,7 @@ export default function AiReportsPage() {
               key={report.id}
               type="button"
               className={styles.reportCard}
-              onClick={() => router.push(`/meow/ai-reports/${report.id}`)}
+              onClick={() => openReport(report.id)}
             >
               <div className={styles.reportTopline}>
                 <span>{report.symbol}</span>

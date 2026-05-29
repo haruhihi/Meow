@@ -1,0 +1,325 @@
+.page {
+  min-height: 100%;
+  padding-bottom: 96px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(20, 184, 166, 0.14), transparent 30%),
+    radial-gradient(circle at 92% 18%, rgba(251, 146, 60, 0.12), transparent 28%),
+    linear-gradient(180deg, #f7fbff 0%, #f6fff9 100%);
+  color: var(--meow-text);
+}
+
+.navbar {
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid rgba(20, 184, 166, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 16px 10px;
+
+  span,
+  h1,
+  p {
+    margin: 0;
+  }
+
+  span {
+    display: inline-flex;
+    padding: 2px 7px;
+    border-radius: 8px;
+    background: #ccfbf1;
+    color: #0f766e;
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  h1 {
+    margin-top: 7px;
+    font-size: 24px;
+    line-height: 1.25;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  p {
+    margin-top: 5px;
+    color: var(--meow-text-muted);
+    font-size: 13px;
+  }
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 12px 0;
+
+  div {
+    min-width: 0;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(15, 118, 110, 0.07);
+  }
+
+  span,
+  strong,
+  em {
+    display: block;
+  }
+
+  span {
+    color: var(--meow-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  strong {
+    margin-top: 3px;
+    overflow: hidden;
+    color: #0f766e;
+    font-size: 16px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  em {
+    margin-top: 2px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+    font-style: normal;
+  }
+}
+
+.promptBar,
+.sectionBlock {
+  margin: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
+}
+
+.promptBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+
+  button {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--meow-surface-alt);
+    padding: 9px;
+    color: var(--meow-text);
+    text-align: left;
+  }
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  span {
+    margin-top: 2px;
+    color: var(--meow-text-muted);
+    font-size: 11px;
+  }
+}
+
+.sectionBlock {
+  padding: 12px;
+}
+
+.sectionTitle,
+.sectionTitleRow {
+  color: var(--meow-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reportSwiper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  margin-top: 10px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+.reportCard,
+.remarkCard {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  background: var(--meow-surface-alt);
+  padding: 10px;
+  color: var(--meow-text);
+  text-align: left;
+  scroll-snap-align: start;
+
+  strong,
+  p,
+  span {
+    display: block;
+    margin: 0;
+  }
+
+  span {
+    color: var(--meow-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  strong {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 900;
+  }
+
+  p {
+    margin-top: 6px;
+    color: var(--meow-text-sub);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}
+
+.remarkList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.remarkCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inlineActions {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.holdingRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  :global(.adm-list-item) {
+    flex: 1;
+  }
+}
+
+.dividendGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dividendCard,
+.dividendCardActive {
+  min-width: 0;
+  border: 1px solid var(--meow-border);
+  border-radius: 12px;
+  background: var(--meow-surface-alt);
+  padding: 9px;
+  color: var(--meow-text);
+  text-align: left;
+
+  strong,
+  span,
+  em {
+    display: block;
+  }
+
+  strong {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--meow-text-sub);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  em {
+    margin-top: 5px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 800;
+  }
+}
+
+.dividendCardActive {
+  border-color: rgba(20, 184, 166, 0.38);
+  background: #ecfeff;
+}
+
+.emptyHint {
+  margin-top: 10px;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+}
+
+.promptModal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  pre {
+    max-height: 60vh;
+    margin: 0;
+    overflow: auto;
+    border-radius: 10px;
+    background: var(--meow-surface-alt);
+    padding: 10px;
+    color: var(--meow-text-sub);
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 360px) {
+  .metricGrid,
+  .dividendGrid {
+    grid-template-columns: 1fr;
+  }
+}

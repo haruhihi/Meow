@@ -1,29 +1,18 @@
 'use client';
 
-import type { MouseEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
-import { EditSOutline, FileOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
 import { post } from '@libs/fetch';
 import {
   IStockCashUpdateReq,
   IStockCashUpdateRes,
-  IStockDividendListReq,
-  IStockDividendListRes,
-  IStockDividendMarkingUpdateReq,
-  IStockDividendMarkingUpdateRes,
-  IStockHoldingDeleteReq,
-  IStockHoldingUpdateReq,
-  IStockHoldingUpdateRes,
   IStockPortfolioSymbolSummary,
   IStockRebalanceSaveReq,
   IStockRebalanceSaveRes,
   IStockSnapshotCreateReq,
   IStockSnapshotCreateRes,
-  StockDividendEventWithMarking,
-  StockHoldingWithAccount,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
 import { calculateExpectedDividend, calculatePortfolioDividendYield, formatStockQuantity, percentOf } from '@utils/stock-calculations';
@@ -40,12 +29,6 @@ import {
 import { useStockPortfolio, useStockSnapshotDetail, useStockSnapshots } from '@utils/stock';
 import { RebalancePanel } from './rebalance-panel';
 import styles from './stocks.module.scss';
-
-type SymbolFormValues = {
-  name: string;
-  currentPrice: string;
-  quantities: Record<string, string>;
-};
 
 type CashFormValues = {
   amount: string;
@@ -73,26 +56,11 @@ const formatDate = (value?: string | Date | null) => {
   if (Number.isNaN(date.getTime())) return '未知日期';
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
-const formatDividendPart = (value: number | null | undefined, prefix: string, suffix = '') =>
-  value && value > 0 ? `${prefix}${Number(value.toFixed(4))}${suffix}` : '';
-const formatDividendPlan = (event: StockDividendEventWithMarking) => {
-  const parts = [
-    formatDividendPart(event.cashPerTen, '10派', '元'),
-    formatDividendPart(event.bonusSharesPerTen, '10送', '股'),
-    formatDividendPart(event.transferSharesPerTen, '10转', '股'),
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
-};
-const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 export default function StocksPage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [cashModalVisible, setCashModalVisible] = useState(false);
-  const [symbolModalVisible, setSymbolModalVisible] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState<IStockPortfolioSymbolSummary | null>(null);
-  const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
-  const [dividendLoading, setDividendLoading] = useState(false);
   const [includeCashInPosition, setIncludeCashInPosition] = useState(true);
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
   const [isQuoteRefreshing, setIsQuoteRefreshing] = useState(false);
@@ -113,7 +81,6 @@ export default function StocksPage() {
   const activeData = isSnapshotView ? selectedSnapshot?.portfolio ?? null : data;
   const displayData = isRebalanceMode && rebalanceDraft ? rebalanceDraft : activeData;
   const accounts = displayData?.accounts ?? [];
-  const holdings = displayData?.holdings ?? [];
   const symbolSummaries = displayData?.symbolSummaries ?? [];
   const totalMarketValue = displayData?.totalMarketValue ?? 0;
   const totalAssetValue = displayData?.totalAssetValue ?? totalMarketValue;
@@ -148,16 +115,9 @@ export default function StocksPage() {
       })),
     [displayData?.sectorSummaries, positionTotalValue]
   );
-  const selectedSymbolHoldings = useMemo(
-    () => holdings.filter((holding) => holding.symbol === selectedSymbol?.symbol),
-    [holdings, selectedSymbol?.symbol]
-  );
-
   useEffect(() => {
     if (!isSnapshotView) return;
     setCashModalVisible(false);
-    setSymbolModalVisible(false);
-    setSelectedSymbol(null);
     setIsRebalanceMode(false);
     setRebalanceDraft(null);
     setRebalanceDiff(null);
@@ -347,83 +307,8 @@ export default function StocksPage() {
     }
   };
 
-  const openSymbolModal = async (summary: IStockPortfolioSymbolSummary) => {
-    setSelectedSymbol(summary);
-    setDividendEvents([]);
-    setSymbolModalVisible(true);
-    setDividendLoading(true);
-    try {
-      const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', {
-        symbol: summary.symbol,
-      });
-      setDividendEvents(res.events);
-    } catch (error) {
-      Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
-    } finally {
-      setDividendLoading(false);
-    }
-  };
-
-  const openInsightPage = (event: MouseEvent<HTMLButtonElement>, summary: IStockPortfolioSymbolSummary) => {
-    event.stopPropagation();
-    router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}/remarks`);
-  };
-
-  const openFinancialsPage = (event: MouseEvent<HTMLButtonElement>, summary: IStockPortfolioSymbolSummary) => {
-    event.stopPropagation();
-    router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}/financials`);
-  };
-
-  const deleteHolding = async (holding: StockHoldingWithAccount) => {
-    const ok = await Dialog.confirm({ title: '删除持仓', content: `确认删除「${holding.symbol} ${holding.name}」吗？` });
-    if (!ok) return;
-    try {
-      await post<IStockHoldingDeleteReq, { id: number }>('/api/stock/holding/delete', { id: holding.id });
-      Toast.show({ content: '持仓已删除' });
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
-  const saveSymbol = async (values: SymbolFormValues) => {
-    if (!selectedSymbol) return;
-    try {
-      const updates = selectedSymbolHoldings.map((holding) =>
-        post<IStockHoldingUpdateReq, IStockHoldingUpdateRes>('/api/stock/holding/update', {
-          id: holding.id,
-          name: values.name,
-          currentPrice: Number(values.currentPrice),
-          quantity: Number(values.quantities[String(holding.id)]),
-        })
-      );
-      await Promise.all(updates);
-      Toast.show({ content: '股票持仓已保存' });
-      setSymbolModalVisible(false);
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
-  const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
-    try {
-      await post<IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes>('/api/stock/dividend/marking/update', {
-        eventId: event.id,
-        countTowardNormalizedDividend: checked,
-        note: event.marking?.note ?? null,
-      });
-      setDividendEvents((events) =>
-        events.map((item) =>
-          item.id === event.id
-            ? { ...item, marking: { countTowardNormalizedDividend: checked, note: item.marking?.note ?? null } }
-            : item
-        )
-      );
-      refresh();
-    } catch (error) {
-      Toast.show({ content: `标记失败: ${(error as any)?.result ?? error}` });
-    }
+  const openSymbolPage = (summary: IStockPortfolioSymbolSummary) => {
+    router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}`);
   };
 
   return (
@@ -523,23 +408,11 @@ export default function StocksPage() {
               </div>
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => (
-                  <List.Item key={summary.symbol} onClick={isSnapshotView || isRebalanceMode ? undefined : () => openSymbolModal(summary)} clickable={!isSnapshotView && !isRebalanceMode} arrow={false}>
+                  <List.Item key={summary.symbol} onClick={isSnapshotView || isRebalanceMode ? undefined : () => openSymbolPage(summary)} clickable={!isSnapshotView && !isRebalanceMode} arrow={false}>
                     <div className={styles.symbolRow}>
                       <div className={styles.symbolMain}>
                         <span className={styles.symbolCode}>{summary.symbol}</span>
                         <strong>{summary.name}</strong>
-                        {!isSnapshotView && !isRebalanceMode && (
-                          <>
-                            <button type="button" className={styles.stockCardAction} onClick={(event) => openFinancialsPage(event, summary)}>
-                              <FileOutline />
-                              <span>财报</span>
-                            </button>
-                            <button type="button" className={styles.stockCardAction} onClick={(event) => openInsightPage(event, summary)}>
-                              <EditSOutline />
-                              <span>洞察</span>
-                            </button>
-                          </>
-                        )}
                       </div>
                       <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
                     </div>
@@ -565,19 +438,6 @@ export default function StocksPage() {
         amount={cashAmount}
         onClose={() => setCashModalVisible(false)}
         onSave={saveCash}
-      />
-
-      <SymbolModal
-        key={selectedSymbol?.symbol ?? 'symbol'}
-        visible={symbolModalVisible}
-        summary={selectedSymbol}
-        holdings={selectedSymbolHoldings}
-        dividendEvents={dividendEvents}
-        dividendLoading={dividendLoading}
-        onClose={() => setSymbolModalVisible(false)}
-        onSave={saveSymbol}
-        onDeleteHolding={deleteHolding}
-        onToggleDividendEvent={toggleDividendEvent}
       />
 
       <RebalanceAddHoldingModal
@@ -789,101 +649,3 @@ const RebalanceAddHoldingModal = ({
   />
 );
 
-const SymbolModal = ({
-  visible,
-  summary,
-  holdings,
-  dividendEvents,
-  dividendLoading,
-  onClose,
-  onSave,
-  onDeleteHolding,
-  onToggleDividendEvent,
-}: {
-  visible: boolean;
-  summary: IStockPortfolioSymbolSummary | null;
-  holdings: StockHoldingWithAccount[];
-  dividendEvents: StockDividendEventWithMarking[];
-  dividendLoading: boolean;
-  onClose: () => void;
-  onSave: (values: SymbolFormValues) => Promise<void>;
-  onDeleteHolding: (holding: StockHoldingWithAccount) => Promise<void>;
-  onToggleDividendEvent: (event: StockDividendEventWithMarking, checked: boolean) => Promise<void>;
-}) => (
-  <Modal
-    visible={visible}
-    title={summary ? `${summary.symbol} ${summary.name}` : '股票持仓'}
-    closeOnMaskClick
-    showCloseButton
-    onClose={onClose}
-    content={
-      summary && (
-        <Form
-          layout="horizontal"
-          initialValues={{
-            name: summary.name,
-            currentPrice: holdings[0] ? String(holdings[0].currentPrice) : '',
-            quantities: Object.fromEntries(holdings.map((holding) => [String(holding.id), String(holding.quantity)])),
-          }}
-          footer={<Button block type="submit" color="primary">保存</Button>}
-          onFinish={onSave}
-        >
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入股票名称' }]}> 
-            <Input placeholder="股票名称" />
-          </Form.Item>
-          <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
-            <Input placeholder="人民币价格" type="number" />
-          </Form.Item>
-          <StockMetricLines summary={summary} />
-          <div className={styles.modalSectionTitle}>分红事件</div>
-          {dividendLoading ? (
-            <div className={styles.emptyGroup}>分红加载中</div>
-          ) : dividendEvents.length > 0 ? (
-            <div className={styles.dividendList}>
-              {dividendEvents.map((event) => {
-                const checked = Boolean(event.marking?.countTowardNormalizedDividend);
-                return (
-                  <button
-                    key={event.id}
-                    type="button"
-                    className={checked ? styles.dividendItemActive : styles.dividendItem}
-                    onClick={() => onToggleDividendEvent(event, !checked)}
-                  >
-                    <span className={styles.dividendMain}>
-                      <strong>
-                        {event.reportPeriod ?? '未知报告期'}
-                        <span className={isDividendPlan(event) ? styles.dividendTagPlan : styles.dividendTagDone}>
-                          {isDividendPlan(event) ? '预案' : '实施'}
-                        </span>
-                      </strong>
-                      <em>{formatDividendPlan(event)}</em>
-                      <em>除权除息 {formatDate(event.exDividendDate)}</em>
-                    </span>
-                    <span className={styles.dividendMark}>{checked ? '已计入' : '计入'}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className={styles.emptyGroup}>暂无分红事件</div>
-          )}
-          <div className={styles.modalSectionTitle}>各账户股数</div>
-          {holdings.map((holding) => (
-            <div key={holding.id} className={styles.accountQuantityRow}>
-              <Form.Item
-                name={['quantities', String(holding.id)]}
-                label={holding.account.name}
-                rules={[{ required: true, message: '请输入股数' }]}
-              >
-                <Input placeholder="股数" type="number" />
-              </Form.Item>
-              <Button size="mini" color="danger" fill="outline" onClick={() => onDeleteHolding(holding)}>
-                删除
-              </Button>
-            </div>
-          ))}
-        </Form>
-      )
-    }
-  />
-);
