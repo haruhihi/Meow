@@ -3,6 +3,20 @@ import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 import { IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes } from '@dtos/meow';
 
+const duplicateDividendWhere = (event: {
+  symbol: string;
+  reportPeriod: string | null;
+  cashPerTen: number | null;
+  bonusSharesPerTen: number | null;
+  transferSharesPerTen: number | null;
+}) => ({
+  symbol: event.symbol,
+  reportPeriod: event.reportPeriod,
+  cashPerTen: event.cashPerTen,
+  bonusSharesPerTen: event.bonusSharesPerTen,
+  transferSharesPerTen: event.transferSharesPerTen,
+});
+
 export async function POST(req: Request) {
   try {
     const uid = await getUID();
@@ -16,24 +30,32 @@ export async function POST(req: Request) {
     });
     if (!event) throw new Error('dividend event not found');
 
-    const marking = await prisma.stockDividendMarking.upsert({
-      where: { userId_eventId: { userId: uid, eventId: body.eventId } },
-      create: {
-        userId: uid,
-        eventId: body.eventId,
-        countTowardNormalizedDividend: body.countTowardNormalizedDividend,
-        note: body.note?.trim() || null,
-      },
-      update: {
-        countTowardNormalizedDividend: body.countTowardNormalizedDividend,
-        note: body.note?.trim() || null,
-      },
+    const duplicateEvents = await prisma.stockDividendEvent.findMany({
+      where: duplicateDividendWhere(event),
+      select: { id: true },
     });
+    const eventIds = duplicateEvents.map((item) => item.id);
+
+    await Promise.all(eventIds.map((eventId) =>
+      prisma.stockDividendMarking.upsert({
+        where: { userId_eventId: { userId: uid, eventId } },
+        create: {
+          userId: uid,
+          eventId,
+          countTowardNormalizedDividend: body.countTowardNormalizedDividend,
+          note: body.note?.trim() || null,
+        },
+        update: {
+          countTowardNormalizedDividend: body.countTowardNormalizedDividend,
+          note: body.note?.trim() || null,
+        },
+      })
+    ));
 
     return success<IStockDividendMarkingUpdateRes>({
-      eventId: marking.eventId,
-      countTowardNormalizedDividend: marking.countTowardNormalizedDividend,
-      note: marking.note,
+      eventId: body.eventId,
+      countTowardNormalizedDividend: body.countTowardNormalizedDividend,
+      note: body.note?.trim() || null,
     });
   } catch (error) {
     return fail(error);

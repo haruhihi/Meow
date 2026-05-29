@@ -117,6 +117,14 @@ export const stockRemarkToListItem = (remark: StockRemark): StockRemarkListItem 
   updatedAt: remark.updatedAt.toISOString(),
 });
 
+export const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' | 'reportPeriod' | 'cashPerTen' | 'bonusSharesPerTen' | 'transferSharesPerTen'>) => [
+  event.symbol,
+  event.reportPeriod ?? '',
+  event.cashPerTen ?? 0,
+  event.bonusSharesPerTen ?? 0,
+  event.transferSharesPerTen ?? 0,
+].join('|');
+
 export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const trimmedKeyword = keyword?.trim();
   const accounts = await prisma.stockAccount.findMany({
@@ -343,7 +351,8 @@ const buildComputedMetrics = (
 
 const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: number | null) => {
   if (events.length === 0) return null;
-  const total = events.reduce((sum, event) => {
+  const uniqueEvents = [...new Map(events.map((event) => [dividendEventDedupeKey(event), event])).values()];
+  const total = uniqueEvents.reduce((sum, event) => {
     const cashPerTen = event.cashPerTen;
     const baseShares = event.dividendBaseShares ?? totalShares;
     if (!cashPerTen || cashPerTen <= 0 || !baseShares || baseShares <= 0) return sum;

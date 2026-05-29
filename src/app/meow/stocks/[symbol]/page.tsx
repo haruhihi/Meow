@@ -69,6 +69,7 @@ const formatDividendPlan = (event: StockDividendEventWithMarking) => {
   return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
 };
 const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
+const DIVIDEND_PREVIEW_COUNT = 4;
 
 const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <section className={styles.metricGrid}>
@@ -95,6 +96,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
   const [promptVisible, setPromptVisible] = useState(false);
   const [remarkVisible, setRemarkVisible] = useState(false);
   const [editingRemark, setEditingRemark] = useState<EditingRemark>(null);
+  const [showAllDividends, setShowAllDividends] = useState(false);
 
   const summary = data?.symbolSummaries.find((item) => item.symbol === symbol) ?? null;
   const holdings = useMemo(
@@ -104,6 +106,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
 
   useEffect(() => {
     let cancelled = false;
+    setShowAllDividends(false);
     const loadDividends = async () => {
       setDividendLoading(true);
       try {
@@ -120,6 +123,8 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
       cancelled = true;
     };
   }, [symbol]);
+
+  const visibleDividendEvents = showAllDividends ? dividendEvents : dividendEvents.slice(0, DIVIDEND_PREVIEW_COUNT);
 
   const saveHolding = async (values: HoldingFormValues) => {
     if (!summary) return;
@@ -350,18 +355,25 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
         {dividendLoading ? (
           <div className={styles.emptyHint}>分红加载中</div>
         ) : dividendEvents.length > 0 ? (
-          <div className={styles.dividendGrid}>
-            {dividendEvents.map((event) => {
-              const checked = Boolean(event.marking?.countTowardNormalizedDividend);
-              return (
-                <button key={event.id} type="button" className={checked ? styles.dividendCardActive : styles.dividendCard} onClick={() => toggleDividendEvent(event, !checked)}>
-                  <strong>{event.reportPeriod ?? '未知报告期'}</strong>
-                  <span>{formatDividendPlan(event)}</span>
-                  <em>{isDividendPlan(event) ? '预案' : '实施'} · {checked ? '已计入' : '未计入'}</em>
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <div className={styles.dividendGrid}>
+              {visibleDividendEvents.map((event) => {
+                const checked = Boolean(event.marking?.countTowardNormalizedDividend);
+                return (
+                  <button key={event.id} type="button" className={checked ? styles.dividendCardActive : styles.dividendCard} onClick={() => toggleDividendEvent(event, !checked)}>
+                    <strong>{event.reportPeriod ?? '未知报告期'}</strong>
+                    <span>{formatDividendPlan(event)}</span>
+                    <em>{isDividendPlan(event) ? '预案' : '实施'} · {checked ? '已计入' : '未计入'}</em>
+                  </button>
+                );
+              })}
+            </div>
+            {dividendEvents.length > DIVIDEND_PREVIEW_COUNT && (
+              <button type="button" className={styles.showMoreButton} onClick={() => setShowAllDividends((value) => !value)}>
+                {showAllDividends ? '收起' : `展示更多（${dividendEvents.length - DIVIDEND_PREVIEW_COUNT}）`}
+              </button>
+            )}
+          </>
         ) : (
           <div className={styles.emptyHint}>暂无分红事件</div>
         )}
