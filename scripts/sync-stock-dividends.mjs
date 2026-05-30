@@ -3,10 +3,12 @@
 import crypto from 'node:crypto';
 import { setAppDatabaseUrl } from './database-url.mjs';
 import { PrismaClient } from '@prisma/client';
+import { readFileSync } from 'node:fs';
 
 const SOURCE = 'xueqiu';
 const APP_PAGE = 'https://xueqiu.com/snowman/S/{symbol}/detail#/FHPS';
 const BONUS_URL = 'https://stock.xueqiu.com/v5/stock/f10/cn/bonus.json';
+const STOCK_UNIVERSE_PATH = new URL('../src/config/stock-universe.json', import.meta.url);
 
 setAppDatabaseUrl();
 
@@ -44,6 +46,14 @@ const parseArgs = () => {
 
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const loadStockUniverseSymbols = () => {
+  const text = readFileSync(STOCK_UNIVERSE_PATH, 'utf8');
+  const items = JSON.parse(text);
+  return Array.isArray(items)
+    ? items.map((item) => String(item?.symbol ?? '').trim().toUpperCase()).filter(Boolean)
+    : [];
+};
+
 const fetchSymbols = async (explicitSymbols) => {
   if (explicitSymbols.length > 0) return [...new Set(explicitSymbols)].sort();
   const rows = await prisma.stockHolding.findMany({
@@ -51,7 +61,7 @@ const fetchSymbols = async (explicitSymbols) => {
     select: { symbol: true },
     orderBy: { symbol: 'asc' },
   });
-  return rows.map((row) => row.symbol);
+  return [...new Set([...rows.map((row) => row.symbol), ...loadStockUniverseSymbols()])].sort();
 };
 
 const createXueqiuSession = async (xueqiuSymbol) => {

@@ -2,11 +2,13 @@
 
 import { setAppDatabaseUrl } from './database-url.mjs';
 import { PrismaClient } from '@prisma/client';
+import { readFileSync } from 'node:fs';
 
 setAppDatabaseUrl();
 
 const prisma = new PrismaClient();
 const SNAPSHOT_SCHEMA_VERSION = 1;
+const STOCK_UNIVERSE_PATH = new URL('../src/config/stock-universe.json', import.meta.url);
 
 const parseArgs = () => {
   const args = process.argv.slice(2);
@@ -41,41 +43,16 @@ const percentOf = (value, total) => (total > 0 ? value / total : 0);
 const formatSnapshotMonth = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 const toJson = (value) => JSON.parse(JSON.stringify(value));
 
-const sectorBySymbol = {
-  '600519': '白酒',
-  '000858': '白酒',
-  '002304': '白酒',
-  '000568': '白酒',
-  '600809': '白酒',
-  '600600': '消费',
-  '600887': '消费',
-  '603288': '消费',
-  '002507': '消费',
-  '600298': '消费',
-  '603345': '消费',
-  '000651': '红利',
-  '000333': '消费',
-  '601888': '消费',
-  '000423': '中药',
-  '000538': '中药',
-  '000999': '中药',
-  '600085': '中药',
-  '600329': '中药',
-  '600750': '中药',
-  '600436': '中药',
-  '600332': '中药',
-  '000963': '医药',
-  '600161': '医药',
-  '601006': '红利',
-  '601728': '红利',
-  '600941': '红利',
-  '601288': '红利',
-  '600036': '红利',
-  '600900': '红利',
-  '600377': '红利',
-  '601088': '红利',
-  '601318': '红利',
+const loadStockUniverse = () => {
+  const text = readFileSync(STOCK_UNIVERSE_PATH, 'utf8');
+  const items = JSON.parse(text);
+  return Array.isArray(items)
+    ? new Map(items.map((item) => [String(item?.symbol ?? '').trim().toUpperCase(), item]))
+    : new Map();
 };
+
+const stockUniverseBySymbol = loadStockUniverse();
+const getStockSector = (symbol) => stockUniverseBySymbol.get(symbol.trim().toUpperCase())?.sector ?? '其他';
 
 const sumMarkedDividendEvents = (events, totalShares) => {
   if (events.length === 0) return null;
@@ -153,7 +130,7 @@ const buildStockPortfolio = async (userId) => {
     const current = symbolMap.get(holding.symbol) ?? {
       symbol: holding.symbol,
       name: holding.name,
-      sector: sectorBySymbol[holding.symbol] ?? '其他',
+      sector: getStockSector(holding.symbol),
       currentPrice: holding.currentPrice,
       quantity: 0,
       marketValue: 0,

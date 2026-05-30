@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       await prisma.$transaction(
         quotes.map((quote) => {
           const universeItem = getStockUniverseItem(quote.symbol);
-          const name = quote.name ?? universeItem?.name ?? quote.symbol;
+          const name = universeItem?.name ?? quote.symbol;
           return prisma.stockQuote.upsert({
             where: { userId_symbol: { userId: uid, symbol: quote.symbol } },
             create: {

@@ -16,6 +16,8 @@ import {
 import type { StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricOverride, StockQuote } from '@prisma/client';
 
 const ALL_SECTOR = '全部关注';
+const EXCLUDING_DIVIDEND_SECTOR = '除红利';
+const DIVIDEND_SECTOR = '红利';
 
 type MetricDefinition = {
   key: IStockMagicFormulaMetric['key'];
@@ -203,6 +205,12 @@ const buildUniverseSymbols = (holdings: Pick<StockHolding, 'symbol'>[]) => {
   return [...map.values()].sort((left, right) => left.sector.localeCompare(right.sector) || left.symbol.localeCompare(right.symbol));
 };
 
+const matchSelectedSector = (item: { sector: string }, selectedSector: string) => {
+  if (selectedSector === ALL_SECTOR) return true;
+  if (selectedSector === EXCLUDING_DIVIDEND_SECTOR) return item.sector !== DIVIDEND_SECTOR;
+  return item.sector === selectedSector;
+};
+
 export async function POST(req: Request) {
   try {
     const uid = await getUID();
@@ -266,7 +274,7 @@ export async function POST(req: Request) {
     }, 0));
 
     const scoreInputs = universeItems
-      .filter((item) => selectedSector === ALL_SECTOR || item.sector === selectedSector)
+      .filter((item) => matchSelectedSector(item, selectedSector))
       .map((item): ScoreInput => {
         const quote = quoteBySymbol.get(item.symbol);
         const quantity = holdingsBySymbol.get(item.symbol) ?? 0;
@@ -290,7 +298,7 @@ export async function POST(req: Request) {
 
     return success<IStockMagicFormulaSearchRes>({
       selectedSector,
-      sectors: [ALL_SECTOR, ...getStockUniverseSectors()],
+      sectors: [ALL_SECTOR, EXCLUDING_DIVIDEND_SECTOR, ...getStockUniverseSectors()],
       items: scoreInputs.map(toMagicFormulaItem),
       updatedAt: new Date().toISOString(),
     });

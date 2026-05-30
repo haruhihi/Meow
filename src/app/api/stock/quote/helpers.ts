@@ -80,7 +80,7 @@ const parseEastmoneyResponse = (text: string): IStockQuoteRefreshItem[] => {
     : trimmed.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
   const payload = JSON.parse(jsonText) as {
     data?: {
-      diff?: Array<{ f12?: string; f14?: string; f2?: number | string }>;
+      diff?: Array<{ f12?: string; f2?: number | string }>;
     } | null;
   };
 
@@ -92,7 +92,6 @@ const parseEastmoneyResponse = (text: string): IStockQuoteRefreshItem[] => {
       if (!symbol || !Number.isFinite(currentPrice) || currentPrice <= 0) return null;
       return {
         symbol,
-        name: String(item.f14 ?? symbol).trim() || symbol,
         currentPrice,
         source: 'eastmoney' as const,
       };
@@ -122,12 +121,10 @@ const parseSinaResponse = (text: string): IStockQuoteRefreshItem[] => {
   while ((match = regex.exec(text)) !== null) {
     const symbol = match[2];
     const fields = match[3].split(',');
-    const name = fields[0]?.replace(/\s+/g, '').trim();
     const currentPrice = Number(fields[3]);
     if (!symbol || !Number.isFinite(currentPrice) || currentPrice <= 0) continue;
     quotes.push({
       symbol,
-      name: name || symbol,
       currentPrice,
       source: 'sina',
     });

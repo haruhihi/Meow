@@ -110,7 +110,7 @@ export default function MagicFormulaPage() {
     void loadData('全部关注');
   }, []);
 
-  const sectorOptions = (data?.sectors ?? ['全部关注', '消费', '白酒', '中药', '医药', '红利']).map((item) => ({
+  const sectorOptions = (data?.sectors ?? ['全部关注', '除红利', '消费', '白酒', '中药', '医药', '红利']).map((item) => ({
     label: item,
     value: item,
   }));
