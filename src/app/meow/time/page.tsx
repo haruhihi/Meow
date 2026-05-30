@@ -399,7 +399,7 @@ export default function TimePage() {
       </PullToRefresh>
 
       <TimeEntryFloatingButton
-        initialPositionBottom="100px"
+        initialPositionBottom="calc(100px + max(env(safe-area-inset-bottom), 0px))"
         activityTypes={activityTypes}
         onClick={openCreate}
         onQuickCreateSuccess={refreshAll}

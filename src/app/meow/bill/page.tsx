@@ -321,7 +321,7 @@ const App = observer(function App() {
 
       <FloatingBubble
         style={{
-          '--initial-position-bottom': '100px',
+          '--initial-position-bottom': 'calc(100px + max(env(safe-area-inset-bottom), 0px))',
           '--initial-position-right': '24px',
           '--edge-distance': '44px',
           '--background': 'var(--meow-accent-gradient)',
@@ -332,7 +332,7 @@ const App = observer(function App() {
       </FloatingBubble>
 
       <TimeEntryFloatingButton
-        initialPositionBottom="168px"
+        initialPositionBottom="calc(168px + max(env(safe-area-inset-bottom), 0px))"
         activityTypes={activityTypes}
         onClick={openTimeCreate}
         onQuickCreateSuccess={activityRes.reQuery}

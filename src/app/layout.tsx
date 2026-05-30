@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     title: 'Meow',
     statusBarStyle: 'default',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
@@ -59,7 +62,13 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
                 // 这段 JavaScript 会在页面加载之前执行
-                if (!/^\/meow\/stocks(?:\/(?!snapshots$)[^/]+)?$/.test(window.location.pathname)) {
+                const isMeowDocumentScrollRoute =
+                  /^\/meow\/(?:bill|time|me)$/.test(window.location.pathname) ||
+                  /^\/meow\/stocks(?:\/(?!snapshots$)[^/]+)?$/.test(window.location.pathname) ||
+                  /^\/meow\/articles(?:\/[^/]+)?$/.test(window.location.pathname) ||
+                  /^\/meow\/ai-reports(?:\/[^/]+)?$/.test(window.location.pathname);
+
+                if (!isMeowDocumentScrollRoute) {
                   console.log('Setting body height: ' + document.documentElement.clientHeight + 'px')
                   document.body.style.height = document.documentElement.clientHeight + 'px';
                   // 你可以添加其他初始化脚本

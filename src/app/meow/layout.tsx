@@ -53,6 +53,9 @@ const Bottom: FC = () => {
 const App: React.FC<{ children: React.ReactNode }> = (props) => {
   const pathname = usePathname();
   const isDocumentScrollRoute =
+    pathname === '/meow/bill' ||
+    pathname === '/meow/time' ||
+    pathname === '/meow/me' ||
     pathname === '/meow/stocks' ||
     /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname) ||
     pathname === '/meow/articles' ||

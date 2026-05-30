@@ -3,8 +3,8 @@
     radial-gradient(circle at 14% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
     radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.18), transparent 30%),
     linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
-  min-height: 100%;
-  padding-bottom: 24px;
+  min-height: 100dvh;
+  padding-bottom: 0;
 }
 
 .sectionHeader {
@@ -262,5 +262,5 @@
 }
 
 .endSpacer {
-  height: 80px;
+  height: calc(92px + max(env(safe-area-inset-bottom), 0px));
 }
