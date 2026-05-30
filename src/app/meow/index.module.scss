@@ -30,11 +30,7 @@
     flex: 0;
     border-top: solid 1px var(--adm-color-border);
     background: var(--meow-surface);
-    .tabBarWrap {
-      :global(.adm-safe-area) {
-        padding-bottom: env(safe-area-inset-bottom) !important;
-      }
-    }
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
 
   .documentScrollApp .bottom {
