@@ -1,139 +1,68 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { post } from '@libs/fetch';
+import { useMeowStores } from '@stores/meow-store-context';
 import {
-  ITransactionSearchRes,
-  ITransactionSearchReq,
-  ITransactionAnalyzeReq,
-  ITransactionAnalyzeRes,
   ICouponSearchReq,
   ICouponSearchRes,
+  ITransactionCreateReq,
+  ITransactionDeleteReq,
 } from '@dtos/meow';
 import dayjs from 'dayjs';
 
-const DEFAULT_PAGE = 0;
-const DEFAULT_PAGE_SIZE = 15;
-
 export const useTransactions = () => {
-  const [page, setPage] = useState<number>(DEFAULT_PAGE);
-  const [transactions, setTransactions] = useState<ITransactionSearchRes['transactions']>();
-  const [hasMore, setHasMore] = useState<boolean>(true);
-
-  const fetchTransactions = async (page: number) => {
-    const res = await post<ITransactionSearchReq, ITransactionSearchRes>('/api/transaction/search', {
-      page,
-      pageSize: DEFAULT_PAGE_SIZE,
-    });
-    setTransactions((current) => {
-      if (!current || page === DEFAULT_PAGE) return res.transactions;
-      return [...current, ...res.transactions];
-    });
-
-    if (res.transactions.length < DEFAULT_PAGE_SIZE) {
-      setHasMore(false);
-    }
-
-    if (res.transactions.length > 0) {
-      setPage(page);
-    }
-  };
+  const { transactionStore } = useMeowStores();
 
   useEffect(() => {
-    fetchTransactions(DEFAULT_PAGE);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void transactionStore.loadTransactions({ force: false });
+  }, [transactionStore]);
 
   return {
-    transactions,
-    loadMore: async () => {
-      return fetchTransactions(page + 1);
-    },
-    hasMore,
-    reQuery: async () => {
-      setPage(DEFAULT_PAGE);
-      setHasMore(true);
-      await fetchTransactions(DEFAULT_PAGE);
-    },
+    transactions: transactionStore.transactions,
+    loading: transactionStore.transactionsStatus.loading,
+    refreshing: transactionStore.transactionsStatus.refreshing,
+    loadMore: transactionStore.loadMoreTransactions,
+    hasMore: transactionStore.transactionHasMore,
+    reQuery: transactionStore.refreshTransactions,
+    createTransaction: (params: ITransactionCreateReq) => transactionStore.createTransaction(params),
+    deleteTransactions: (params: ITransactionDeleteReq) => transactionStore.deleteTransactions(params),
+    mutating: transactionStore.transactionMutating,
   };
 };
 
 // Fetch analyze data (full month dump). Bumps on refreshKey change.
 export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0, includeCouponDiscount = false) => {
-  const [data, setData] = useState<ITransactionAnalyzeRes | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { transactionStore } = useMeowStores();
   const year = month.year();
   const m = month.month() + 1;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    post<ITransactionAnalyzeReq, ITransactionAnalyzeRes>('/api/transaction/analyze', {
+    void transactionStore.loadMonthAnalyze({
       year,
       month: m,
-      granularity: 'month',
       includeCouponDiscount,
-    })
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setData({
-            transactions: [],
-            total: 0,
-            grossTotal: 0,
-            netTotal: 0,
-            couponDiscountTotal: 0,
-            couponUsages: [],
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [year, m, refreshKey, includeCouponDiscount]);
+    }, { force: refreshKey > 0 });
+  }, [year, m, refreshKey, includeCouponDiscount, transactionStore]);
 
-  return { data, loading };
+  const status = transactionStore.getMonthAnalyzeStatus(year, m, includeCouponDiscount);
+
+  return {
+    data: transactionStore.getMonthAnalyze(year, m, includeCouponDiscount),
+    loading: status.loading,
+    refreshing: status.refreshing,
+    reQuery: () => transactionStore.loadMonthAnalyze({ year, month: m, includeCouponDiscount }, { force: true }),
+  };
 };
 
 export const usePaymentCoupons = (month: dayjs.Dayjs, refreshKey: number = 0) => {
-  const [coupons, setCoupons] = useState<ICouponSearchRes['coupons']>([]);
+  const { couponStore } = useMeowStores();
   const year = month.year();
   const m = month.month() + 1;
 
   useEffect(() => {
-    let cancelled = false;
-    post<ICouponSearchReq, ICouponSearchRes>('/api/coupon/search', {
-      year,
-      month: m,
-      includeAdjacent: true,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        const currentKey = year * 12 + m;
-        setCoupons(
-          res.coupons
-            .slice()
-            .sort((left, right) => {
-              const rank = (diff: number) => (diff === 0 ? 0 : diff === -1 ? 1 : diff === 1 ? 2 : 3 + Math.abs(diff));
-              const leftRank = rank(left.validYear * 12 + left.validMonth - currentKey);
-              const rightRank = rank(right.validYear * 12 + right.validMonth - currentKey);
-              if (leftRank !== rightRank) return leftRank - rightRank;
-              return left.name.localeCompare(right.name, 'zh-CN');
-            })
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setCoupons([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [year, m, refreshKey]);
+    void couponStore.loadPaymentCoupons(year, m, { force: refreshKey > 0 });
+  }, [year, m, refreshKey, couponStore]);
 
-  return coupons;
+  return couponStore.getPaymentCoupons(year, m);
 };
 
 export const searchCoupons = (params: ICouponSearchReq) =>

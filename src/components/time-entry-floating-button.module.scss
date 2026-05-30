@@ -1,0 +1,20 @@
+.bubble {
+  color: #fff;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--meow-accent-strong) 24%, transparent);
+}
+
+.iconWrap {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  line-height: 1;
+}
+
+.icon {
+  width: 28px;
+  height: 28px;
+  display: block;
+}

@@ -6,6 +6,12 @@ export const PALETTE = {
   // Brand
   primary: '#5B7CFA',
   primaryDim: '#3B5BE0',
+  accent: '#14B8A6',
+  accentStrong: '#0F766E',
+  accentSoft: '#CCFBF1',
+  info: '#38BDF8',
+  warm: '#F97316',
+  creative: '#9C27B0',
   success: '#25B67A',
   warning: '#F5A524',
   danger: '#F04438',
@@ -24,8 +30,8 @@ export const PALETTE = {
 
 // Ordered palette used for ECharts and analytic fallbacks.
 export const CHART_COLORS = [
-  '#5B7CFA', '#F5A524', '#25B67A', '#F04438', '#9B6DFF',
-  '#14B8A6', '#FF7A59', '#64748B', '#D946EF', '#0EA5E9',
+  PALETTE.primary, PALETTE.warning, PALETTE.success, PALETTE.danger, '#9B6DFF',
+  PALETTE.accent, '#FF7A59', '#64748B', '#D946EF', '#0EA5E9',
   '#EC4899', '#84CC16', '#F59E0B', '#6366F1', '#10B981',
 ];
 

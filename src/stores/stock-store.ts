@@ -1,6 +1,15 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { post } from '@libs/fetch';
 import {
+  ResourceStatus,
+  createStatus,
+  dedupeRequest,
+  getMapStatus,
+  markStatusError,
+  markStatusSuccess,
+  setStatus,
+} from '@stores/store-resource';
+import {
   IStockAiPromptReq,
   IStockAiPromptRes,
   IStockAiReportListReq,
@@ -40,21 +49,6 @@ import {
   StockSnapshotDetail,
 } from '@dtos/meow';
 
-type ResourceStatus = {
-  loading: boolean;
-  refreshing: boolean;
-  error: string | null;
-  updatedAt: number | null;
-};
-
-const createStatus = (): ResourceStatus => ({
-  loading: false,
-  refreshing: false,
-  error: null,
-  updatedAt: null,
-});
-
-const getErrorMessage = (error: unknown) => (error as any)?.result ?? (error instanceof Error ? error.message : String(error));
 const reportKey = (symbol?: string) => symbol?.toUpperCase() ?? '__all__';
 const financialStatementsKey = (symbol: string, limit: number) => `${symbol.toUpperCase()}:${limit}`;
 
@@ -97,7 +91,7 @@ export class StockStore {
 
   getSnapshotDetailStatus(snapshotId: number | null) {
     if (snapshotId == null) return createStatus();
-    return this.getMapStatus(this.snapshotDetailStatuses, snapshotId);
+    return getMapStatus(this.snapshotDetailStatuses, snapshotId);
   }
 
   getReports(symbol?: string) {
@@ -105,7 +99,7 @@ export class StockStore {
   }
 
   getReportStatus(symbol?: string) {
-    return this.getMapStatus(this.reportStatuses, reportKey(symbol));
+    return getMapStatus(this.reportStatuses, reportKey(symbol));
   }
 
   getPrompt(symbol: string) {
@@ -113,7 +107,7 @@ export class StockStore {
   }
 
   getPromptStatus(symbol: string) {
-    return this.getMapStatus(this.promptStatuses, symbol.toUpperCase());
+    return getMapStatus(this.promptStatuses, symbol.toUpperCase());
   }
 
   getRemarks(symbol: string) {
@@ -125,7 +119,7 @@ export class StockStore {
   }
 
   getRemarkStatus(symbol: string) {
-    return this.getMapStatus(this.remarkStatuses, symbol.toUpperCase());
+    return getMapStatus(this.remarkStatuses, symbol.toUpperCase());
   }
 
   getDividends(symbol: string) {
@@ -133,7 +127,7 @@ export class StockStore {
   }
 
   getDividendStatus(symbol: string) {
-    return this.getMapStatus(this.dividendStatuses, symbol.toUpperCase());
+    return getMapStatus(this.dividendStatuses, symbol.toUpperCase());
   }
 
   getFinancialStatements(symbol: string, limit: number) {
@@ -141,7 +135,7 @@ export class StockStore {
   }
 
   getFinancialStatementStatus(symbol: string, limit: number) {
-    return this.getMapStatus(this.financialStatementStatuses, financialStatementsKey(symbol, limit));
+    return getMapStatus(this.financialStatementStatuses, financialStatementsKey(symbol, limit));
   }
 
   loadPortfolio(params: IStockSearchReq = {}, options: { force?: boolean } = {}) {
@@ -157,7 +151,7 @@ export class StockStore {
   }
 
   refreshQuotes(params: IStockQuoteRefreshReq = {}) {
-    return this.dedupe(`quote-refresh:${JSON.stringify(params)}`, async () => {
+    return dedupeRequest(this.inflight, `quote-refresh:${JSON.stringify(params)}`, async () => {
       runInAction(() => {
         this.quoteRefreshing = true;
       });
@@ -340,52 +334,52 @@ export class StockStore {
   }
 
   private fetchPortfolio(key: string, params: IStockSearchReq, background: boolean) {
-    this.setStatus(this.portfolioStatus, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    setStatus(this.portfolioStatus, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockSearchReq, IStockSearchRes>('/api/stock/search', params);
         runInAction(() => {
           this.portfolio = res;
-          this.markStatusSuccess(this.portfolioStatus);
+          markStatusSuccess(this.portfolioStatus);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(this.portfolioStatus, error));
+        runInAction(() => markStatusError(this.portfolioStatus, error));
         throw error;
       }
     });
   }
 
   private fetchSnapshots(key: string, limit: number, background: boolean) {
-    this.setStatus(this.snapshotsStatus, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    setStatus(this.snapshotsStatus, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockSnapshotListReq, IStockSnapshotListRes>('/api/stock/snapshot/list', { limit });
         runInAction(() => {
           this.snapshots = res.snapshots;
-          this.markStatusSuccess(this.snapshotsStatus);
+          markStatusSuccess(this.snapshotsStatus);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(this.snapshotsStatus, error));
+        runInAction(() => markStatusError(this.snapshotsStatus, error));
         throw error;
       }
     });
   }
 
   private fetchSnapshotDetail(key: string, snapshotId: number, background: boolean) {
-    const status = this.getMapStatus(this.snapshotDetailStatuses, snapshotId);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.snapshotDetailStatuses, snapshotId);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockSnapshotDetailReq, IStockSnapshotDetailRes>('/api/stock/snapshot/detail', { id: snapshotId });
         runInAction(() => {
           this.snapshotDetailsById.set(snapshotId, res.snapshot);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res.snapshot;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
@@ -393,72 +387,72 @@ export class StockStore {
 
   private fetchReports(key: string, symbol: string | undefined, background: boolean) {
     const normalizedKey = reportKey(symbol);
-    const status = this.getMapStatus(this.reportStatuses, normalizedKey);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.reportStatuses, normalizedKey);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockAiReportListReq, IStockAiReportListRes>('/api/stock/ai-report/list', { symbol });
         runInAction(() => {
           this.reportsByKey.set(normalizedKey, res.reports);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
   }
 
   private fetchPrompt(key: string, symbol: string, background: boolean) {
-    const status = this.getMapStatus(this.promptStatuses, symbol);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.promptStatuses, symbol);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockAiPromptReq, IStockAiPromptRes>('/api/stock/ai-report/prompt', { symbol });
         runInAction(() => {
           this.promptsBySymbol.set(symbol, res);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
   }
 
   private fetchRemarks(key: string, symbol: string, background: boolean) {
-    const status = this.getMapStatus(this.remarkStatuses, symbol);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.remarkStatuses, symbol);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockRemarkListReq, IStockRemarkListRes>('/api/stock/remark/list', { symbol });
         runInAction(() => {
           this.remarksBySymbol.set(symbol, res);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
   }
 
   private fetchDividends(key: string, symbol: string, background: boolean) {
-    const status = this.getMapStatus(this.dividendStatuses, symbol);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.dividendStatuses, symbol);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', { symbol });
         runInAction(() => {
           this.dividendsBySymbol.set(symbol, res.events);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
@@ -466,57 +460,20 @@ export class StockStore {
 
   private fetchFinancialStatements(key: string, symbol: string, limit: number, background: boolean) {
     const dataKey = financialStatementsKey(symbol, limit);
-    const status = this.getMapStatus(this.financialStatementStatuses, dataKey);
-    this.setStatus(status, background ? 'refreshing' : 'loading', true);
-    return this.dedupe(key, async () => {
+    const status = getMapStatus(this.financialStatementStatuses, dataKey);
+    setStatus(status, background ? 'refreshing' : 'loading', true);
+    return dedupeRequest(this.inflight, key, async () => {
       try {
         const res = await post<IStockFinancialStatementListReq, IStockFinancialStatementListRes>('/api/stock/financial-statement/list', { symbol, limit });
         runInAction(() => {
           this.financialStatementsByKey.set(dataKey, res);
-          this.markStatusSuccess(status);
+          markStatusSuccess(status);
         });
         return res;
       } catch (error) {
-        runInAction(() => this.markStatusError(status, error));
+        runInAction(() => markStatusError(status, error));
         throw error;
       }
     });
-  }
-
-  private dedupe<T>(key: string, fetcher: () => Promise<T>) {
-    const existing = this.inflight.get(key) as Promise<T> | undefined;
-    if (existing) return existing;
-    const promise = fetcher().finally(() => {
-      runInAction(() => this.inflight.delete(key));
-    });
-    this.inflight.set(key, promise);
-    return promise;
-  }
-
-  private getMapStatus<TKey>(map: Map<TKey, ResourceStatus>, key: TKey) {
-    let status = map.get(key);
-    if (!status) {
-      status = createStatus();
-      map.set(key, status);
-    }
-    return status;
-  }
-
-  private setStatus(status: ResourceStatus, key: 'loading' | 'refreshing', value: boolean) {
-    status[key] = value;
-    status.error = null;
-  }
-
-  private markStatusSuccess(status: ResourceStatus) {
-    status.loading = false;
-    status.refreshing = false;
-    status.error = null;
-    status.updatedAt = Date.now();
-  }
-
-  private markStatusError(status: ResourceStatus, error: unknown) {
-    status.loading = false;
-    status.refreshing = false;
-    status.error = getErrorMessage(error);
   }
 }

@@ -9,6 +9,12 @@
   /* Meow design tokens. Keep in sync with src/styles/theme.ts */
   --meow-primary: #5B7CFA;
   --meow-primary-dim: #3B5BE0;
+  --meow-accent: #14B8A6;
+  --meow-accent-strong: #0F766E;
+  --meow-accent-soft: #CCFBF1;
+  --meow-info: #38BDF8;
+  --meow-warm: #F97316;
+  --meow-creative: #9C27B0;
   --meow-success: #25B67A;
   --meow-warning: #F5A524;
   --meow-danger: #F04438;
@@ -21,6 +27,12 @@
   --meow-text: #1F2330;
   --meow-text-sub: #5B6478;
   --meow-text-muted: #8A93A8;
+
+  --meow-primary-gradient: linear-gradient(135deg, var(--meow-primary) 0%, var(--meow-primary-dim) 100%);
+  --meow-creative-gradient: linear-gradient(135deg, var(--meow-creative) 0%, var(--meow-primary) 100%);
+  --meow-accent-gradient: linear-gradient(135deg, var(--meow-accent) 0%, var(--meow-primary) 52%, var(--meow-warm) 100%);
+  --meow-loading-gradient: conic-gradient(from 0deg, var(--meow-accent-strong), var(--meow-accent), color-mix(in srgb, var(--meow-accent) 16%, transparent));
+  --meow-progress-gradient: linear-gradient(90deg, var(--meow-accent) 0%, var(--meow-info) 48%, var(--meow-warm) 100%);
 
   /* antd-mobile primary override */
   --adm-color-primary: var(--meow-primary);

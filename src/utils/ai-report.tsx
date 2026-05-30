@@ -16,7 +16,7 @@ export interface LifeReportListItem {
 
 export const useLifeReports = (refreshKey = 0) => {
   const [reports, setReports] = useState<LifeReportListItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchReports = async () => {
     setLoading(true);

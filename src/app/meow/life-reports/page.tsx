@@ -16,6 +16,7 @@ const formatDate = (value?: string | Date | null) => {
 export default function LifeReportsPage() {
   const router = useRouter();
   const { reports, loading } = useLifeReports();
+  const initialLoading = loading && reports.length === 0;
 
   return (
     <main className={styles.page}>
@@ -28,7 +29,9 @@ export default function LifeReportsPage() {
         <p>睡眠、时间分配、运动恢复与节律优化</p>
       </header>
 
-      {reports.length > 0 ? (
+      {initialLoading ? (
+        <LoadingState label="报告加载中" />
+      ) : reports.length > 0 ? (
         <section className={styles.reportList}>
           {reports.map((report) => (
             <button
@@ -46,8 +49,6 @@ export default function LifeReportsPage() {
             </button>
           ))}
         </section>
-      ) : loading ? (
-        <LoadingState label="报告加载中" />
       ) : (
         <Empty style={{ padding: '72px 0' }} description="暂无作息报告" />
       )}

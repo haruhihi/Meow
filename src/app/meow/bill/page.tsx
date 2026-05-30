@@ -16,39 +16,38 @@ import {
   Selector,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { ClockCircleOutline, HandPayCircleOutline, PayCircleOutline, PieOutline } from 'antd-mobile-icons';
-import { RefObject, useEffect, useMemo, useState } from 'react';
+import { PayCircleOutline, PieOutline } from 'antd-mobile-icons';
+import { observer } from 'mobx-react-lite';
+import { RefObject, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import { useActivityTypes } from '@utils/time-entry';
+import { BillEntryIcon } from '@components/action-icons';
+import { LoadingState } from '@components/loading';
 import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
 import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
 import {
   useCategories,
   getCategoryOptions,
   flattenCategoryOptions,
-  getIconFromCategoryId,
-  getColorFromCategoryId,
-  primeCategoryResolvers,
+  getIconByCategoryName,
 } from '@utils/category';
 import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,
   ITimeEntryCreateReq,
   ITimeEntryCreateRes,
-  ITransactionCreateReq,
-  ITransactionCreateRes,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
-import { formatMoney } from '@styles/theme';
+import { formatMoney, getCategoryColorByName } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
 import styles from './bill.module.scss';
 
-export default function App() {
+const App = observer(function App() {
   const router = useRouter();
   const [form] = Form.useForm();
   const [timeForm] = Form.useForm();
@@ -64,7 +63,7 @@ export default function App() {
   const [transactionSubmitting, setTransactionSubmitting] = useState(false);
 
   const categoryRes = useCategories();
-  const { transactions, reQuery, loadMore, hasMore } = useTransactions();
+  const { transactions, reQuery, loadMore, hasMore, createTransaction, deleteTransactions } = useTransactions();
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
@@ -72,10 +71,7 @@ export default function App() {
   const activityTypes = activityRes.activityTypes ?? [];
   const categories = categoryRes?.categories ?? [];
   const recentTransactions = transactions ?? [];
-
-  useEffect(() => {
-    if (categories.length > 0) primeCategoryResolvers(categories);
-  }, [categories]);
+  const initialLoading = !categoryRes || transactions === undefined || monthData === null;
 
   // Resolver: category id -> top-level category name. Built from the current
   // categories payload (or a no-op while loading). Must live BEFORE any early
@@ -259,58 +255,65 @@ export default function App() {
           onIncludeCouponDiscountChange={setIncludeCouponDiscount}
         />
 
-        {monthData && monthData.transactions.length > 0 && (
+        {initialLoading ? (
+          <LoadingState className={styles.pageLoading} label="账单加载中" />
+        ) : (
           <>
-            <TopCategories
-              month={month}
-              transactions={monthData.transactions}
-              categories={categories}
-              selected={selectedTop}
-              onSelect={setSelectedTop}
-            />
+            {monthData && monthData.transactions.length > 0 && (
+              <>
+                <TopCategories
+                  month={month}
+                  transactions={monthData.transactions}
+                  categories={categories}
+                  selected={selectedTop}
+                  onSelect={setSelectedTop}
+                />
 
-            <div className={styles.sectionHeader}>
-              <span>本月趋势</span>
-              <button type="button" className={styles.linkBtn} onClick={() => setShowTrend((v) => !v)}>
-                {showTrend ? '收起' : '展开'}
+                <div className={styles.sectionHeader}>
+                  <span>本月趋势</span>
+                  <button type="button" className={styles.linkBtn} onClick={() => setShowTrend((v) => !v)}>
+                    {showTrend ? '收起' : '展开'}
+                  </button>
+                </div>
+                {showTrend && (
+                  <div className={styles.trendCard}>
+                    <DailyTrendChart month={month} transactions={filteredMonthTxns} />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
+              <span>最近记录{selectedTop ? ` · ${selectedTop}` : ''}</span>
+              <button
+                type="button"
+                className={styles.linkBtn}
+                onClick={() => router.push('/meow/analyze')}
+              >
+                统计分析 <PieOutline />
               </button>
             </div>
-            {showTrend && (
-              <div className={styles.trendCard}>
-                <DailyTrendChart month={month} transactions={filteredMonthTxns} />
-              </div>
+
+            {filteredRecent.length > 0 ? (
+              <GroupedList
+                transactions={filteredRecent}
+                getTopName={topNameOf}
+                onDelete={async (id) => {
+                  await deleteTransactions({ ids: [id] });
+                  Toast.show({ content: '删除成功' });
+                  setRefreshKey((k) => k + 1);
+                }}
+                hasMore={hasMore && !selectedTop}
+                onLoadMore={loadMore}
+              />
+            ) : (
+              <Empty
+                style={{ padding: '64px 0' }}
+                imageStyle={{ width: 128 }}
+                description={selectedTop ? `${selectedTop} 暂无记录` : '暂无记录'}
+              />
             )}
           </>
-        )}
-
-        <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
-          <span>最近记录{selectedTop ? ` · ${selectedTop}` : ''}</span>
-          <button
-            type="button"
-            className={styles.linkBtn}
-            onClick={() => router.push('/meow/analyze')}
-          >
-            统计分析 <PieOutline />
-          </button>
-        </div>
-
-        {filteredRecent.length > 0 ? (
-          <GroupedList
-            transactions={filteredRecent}
-            onDelete={async (id) => {
-              await post('/api/transaction/delete', { ids: [id] });
-              Toast.show({ content: '删除成功', afterClose: () => reQuery() });
-              setRefreshKey((k) => k + 1);
-            }}
-            hasMore={hasMore && !selectedTop}
-            onLoadMore={loadMore}
-          />
-        ) : (
-          <Empty
-            style={{ padding: '64px 0' }}
-            imageStyle={{ width: 128 }}
-            description={selectedTop ? `${selectedTop} 暂无记录` : '暂无记录'}
-          />
         )}
 
         <div className={styles.endSpacer} />
@@ -321,22 +324,19 @@ export default function App() {
           '--initial-position-bottom': '100px',
           '--initial-position-right': '24px',
           '--edge-distance': '44px',
-          '--background': 'var(--meow-primary)',
+          '--background': 'var(--meow-accent-gradient)',
         }}
         onClick={onClick}
       >
-        <HandPayCircleOutline fontSize={32} />
+        <span className={styles.actionIconWrap}><BillEntryIcon className={styles.actionIcon} /></span>
       </FloatingBubble>
 
       <TimeEntryFloatingButton
         initialPositionBottom="168px"
-        background="#9C27B0"
         activityTypes={activityTypes}
         onClick={openTimeCreate}
         onQuickCreateSuccess={activityRes.reQuery}
-      >
-        <ClockCircleOutline fontSize={32} />
-      </TimeEntryFloatingButton>
+      />
 
       <Modal
         visible={visible}
@@ -417,7 +417,7 @@ export default function App() {
                   Toast.show({ content: '抵扣金额不能超过券余额' });
                   return;
                 }
-                await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', {
+                await createTransaction({
                   amount: amountValue,
                   categoryId: Number(category[category.length - 1]),
                   date: dayjs(time).unix() * 1000,
@@ -430,7 +430,6 @@ export default function App() {
                     content: '记录成功',
                     afterClose: () => {
                       setVisible(false);
-                      reQuery();
                       setRefreshKey((k) => k + 1);
                       resolve();
                     },
@@ -528,18 +527,21 @@ export default function App() {
       />
     </div>
   );
-}
+});
+
+export default App;
 
 type Txns = NonNullable<ReturnType<typeof useTransactions>['transactions']>;
 
 interface GroupedListProps {
   transactions: Txns;
+  getTopName: (id: number) => string | undefined;
   onDelete: (id: number) => Promise<void>;
   hasMore: boolean;
   onLoadMore: () => Promise<unknown>;
 }
 
-const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedListProps) => {
+const GroupedList = ({ transactions, getTopName, onDelete, hasMore, onLoadMore }: GroupedListProps) => {
   const groups = useMemo(() => {
     const m = new Map<string, Txns>();
     transactions.forEach((t) => {
@@ -568,9 +570,10 @@ const GroupedList = ({ transactions, onDelete, hasMore, onLoadMore }: GroupedLis
           </div>
           <List>
             {g.items.map((transaction) => {
-              const Icon = getIconFromCategoryId(transaction.category.id);
-              const color = getColorFromCategoryId(transaction.category.id);
               const { description, category } = transaction;
+              const topName = getTopName(category.id) ?? category.name;
+              const Icon = getIconByCategoryName(topName);
+              const color = getCategoryColorByName(topName);
               const netAmount = Math.max(0, transaction.amount - transaction.couponDiscount);
               const couponText = transaction.couponDiscount > 0
                 ? ` · ${transaction.coupon?.name ?? transaction.couponName ?? '券'}抵扣 ${formatMoney(transaction.couponDiscount)}`

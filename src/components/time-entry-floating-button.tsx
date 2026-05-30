@@ -5,12 +5,14 @@ import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { post } from '@libs/fetch';
+import { TimeEntryIcon } from '@components/action-icons';
 import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,
   ITimeEntryCreateReq,
   ITimeEntryCreateRes,
 } from '@dtos/meow';
+import styles from './time-entry-floating-button.module.scss';
 
 type ActivityTypeOption = {
   id: number;
@@ -19,9 +21,9 @@ type ActivityTypeOption = {
 
 type TimeEntryFloatingButtonProps = {
   initialPositionBottom: string;
-  background: string;
+  background?: string;
   activityTypes: ActivityTypeOption[];
-  children: ReactNode;
+  children?: ReactNode;
   onClick: () => void;
   onQuickCreateSuccess?: () => void | Promise<void>;
 };
@@ -99,17 +101,18 @@ export const TimeEntryFloatingButton = ({
 
   return (
     <FloatingBubble
+      className={styles.bubble}
       style={{
         '--initial-position-bottom': initialPositionBottom,
         '--initial-position-right': '24px',
         '--edge-distance': '44px',
-        '--background': background,
+        '--background': background ?? 'var(--meow-accent-strong)',
         opacity: creating ? 0.55 : 1,
         pointerEvents: creating ? 'none' : 'auto',
       }}
       onClick={handleClick}
     >
-      {children}
+      <span className={styles.iconWrap}>{children ?? <TimeEntryIcon className={styles.icon} />}</span>
     </FloatingBubble>
   );
 };

@@ -50,8 +50,8 @@
   margin: 0;
   padding: 2px 7px;
   border-radius: 8px;
-  background: #ccfbf1;
-  color: #0f766e;
+  background: var(--meow-accent-soft);
+  color: var(--meow-accent-strong);
   font-size: 12px;
   font-weight: 900;
 }
@@ -86,7 +86,7 @@
   strong {
     margin-top: 3px;
     overflow: hidden;
-    color: #0f766e;
+    color: var(--meow-accent-strong);
     font-size: 14px;
     font-weight: 900;
     text-overflow: ellipsis;

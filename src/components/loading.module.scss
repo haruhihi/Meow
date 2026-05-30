@@ -26,30 +26,20 @@
   width: var(--loading-size, 42px);
   height: var(--loading-size, 42px);
   border-radius: 50%;
-  background:
-    conic-gradient(from 0deg, #12b8a6, #5b7cfa, #f97316, #25b67a, #12b8a6);
-  box-shadow: 0 10px 24px rgba(91, 124, 250, 0.22);
+  border: 3px solid color-mix(in srgb, var(--meow-accent) 18%, transparent);
+  border-top-color: var(--meow-accent-strong);
+  background: transparent;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--meow-accent-strong) 14%, transparent);
   animation: loadingSpin 0.9s linear infinite;
 
   &::before {
-    position: absolute;
-    inset: 5px;
-    border-radius: inherit;
-    background: var(--meow-surface);
-    content: '';
+    display: none;
+    content: none;
   }
 
   &::after {
-    position: absolute;
-    top: 2px;
-    left: 50%;
-    width: 8px;
-    height: 8px;
-    border-radius: inherit;
-    background: #fff;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
-    content: '';
-    transform: translateX(-50%);
+    display: none;
+    content: none;
   }
 }
 
@@ -73,17 +63,8 @@
 .inline .orb {
   --loading-size: 16px;
   flex: 0 0 auto;
-  box-shadow: 0 4px 10px rgba(91, 124, 250, 0.2);
-
-  &::before {
-    inset: 3px;
-  }
-
-  &::after {
-    top: 1px;
-    width: 4px;
-    height: 4px;
-  }
+  border-width: 2px;
+  box-shadow: none;
 }
 
 .inline .label {

@@ -19,6 +19,7 @@ export default function LifeReportDetailPage({ params }: { params: { id: string 
   const router = useRouter();
   const { reports, loading } = useLifeReports();
   const report = useMemo(() => reports.find((item) => item.reportKey === params.id) ?? null, [params.id, reports]);
+  const initialLoading = loading && reports.length === 0;
 
   return (
     <main className={styles.page}>
@@ -26,7 +27,9 @@ export default function LifeReportDetailPage({ params }: { params: { id: string 
         作息报告
       </NavBar>
 
-      {report ? (
+      {initialLoading ? (
+        <LoadingState label="报告加载中" />
+      ) : report ? (
         <>
           <header className={styles.header}>
             <div className={styles.meta}>
@@ -41,8 +44,6 @@ export default function LifeReportDetailPage({ params }: { params: { id: string 
             <ReactMarkdown>{report.content}</ReactMarkdown>
           </article>
         </>
-      ) : loading ? (
-        <LoadingState label="报告加载中" />
       ) : (
         <Empty style={{ padding: '72px 0' }} description="报告不存在" />
       )}

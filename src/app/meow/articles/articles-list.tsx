@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { InlineLoading } from '@components/loading';
 import { post } from '@libs/fetch';
 import type { ArticleListItem, ArticleYearCount } from '@libs/article-db';
@@ -363,9 +364,10 @@ export default function ArticlesList({ initialArticles, yearCounts, total, pageS
         {items.map((article) => {
           const isEditing = editingId === article.id;
           return (
-            <a
+            <Link
               key={article.id}
               href={`/meow/articles/${article.id}`}
+              prefetch={false}
               className={styles.item}
               onClick={() => window.sessionStorage.setItem(SCROLL_KEY, String(window.scrollY))}
             >
@@ -404,7 +406,7 @@ export default function ArticlesList({ initialArticles, yearCounts, total, pageS
                   ))}
                 </div>
               )}
-            </a>
+            </Link>
           );
         })}
         {items.length === 0 && !loading && (

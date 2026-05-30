@@ -1,5 +1,8 @@
 .page {
-  background: var(--meow-bg);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.18), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
   min-height: 100%;
   padding-bottom: 24px;
 }
@@ -22,7 +25,7 @@
   all: unset;
   font-size: 12px;
   font-weight: 500;
-  color: var(--meow-primary);
+  color: var(--meow-accent-strong);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -35,6 +38,30 @@
   border-radius: 14px;
   background: var(--meow-surface);
   box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+}
+
+.pageLoading {
+  min-height: 180px;
+  margin: 8px 12px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--meow-surface) 88%, transparent);
+  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.05);
+}
+
+.actionIconWrap {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  line-height: 1;
+}
+
+.actionIcon {
+  width: 28px;
+  height: 28px;
+  display: block;
 }
 
 .group {
@@ -141,8 +168,8 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  color: var(--meow-primary);
-  background: color-mix(in srgb, var(--meow-primary) 12%, transparent);
+  color: var(--meow-accent-strong);
+  background: color-mix(in srgb, var(--meow-accent) 12%, transparent);
   flex-shrink: 0;
 }
 
@@ -155,9 +182,9 @@
 .couponOptionDate {
   font-size: 11px;
   font-weight: 600;
-  color: var(--meow-primary);
-  background: color-mix(in srgb, var(--meow-primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--meow-primary) 28%, transparent);
+  color: var(--meow-accent-strong);
+  background: color-mix(in srgb, var(--meow-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--meow-accent) 28%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
   flex-shrink: 0;
@@ -215,8 +242,8 @@
   }
 
   :global(.adm-selector-item-active) {
-    border-color: color-mix(in srgb, var(--meow-primary) 45%, var(--meow-border));
-    box-shadow: 0 6px 14px color-mix(in srgb, var(--meow-primary) 20%, transparent);
+    border-color: color-mix(in srgb, var(--meow-accent) 45%, var(--meow-border));
+    box-shadow: 0 6px 14px color-mix(in srgb, var(--meow-accent) 20%, transparent);
     transform: translateY(-1px);
   }
 }

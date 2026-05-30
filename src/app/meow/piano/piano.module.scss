@@ -15,7 +15,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 18px 16px;
-  background: linear-gradient(135deg, #9C27B0 0%, #5B7CFA 100%);
+  background: var(--meow-creative-gradient);
   color: #fff;
 
   h1 {
@@ -298,7 +298,7 @@
   margin-top: 12px;
   padding: 12px;
   border-radius: 12px;
-  background: rgba(91, 124, 250, 0.1);
+  background: color-mix(in srgb, var(--meow-primary) 10%, transparent);
 
   span,
   strong,

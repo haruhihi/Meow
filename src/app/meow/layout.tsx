@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
 import { ClockCircleOutline, HistogramOutline, PayCircleOutline, UserOutline } from 'antd-mobile-icons';
-import { StockStoreProvider } from '@stores/stock-store-context';
+import { MeowStoreProvider } from '@stores/meow-store-context';
 import styles from './index.module.scss';
 
 const Bottom: FC = () => {
@@ -52,10 +52,16 @@ const Bottom: FC = () => {
 
 const App: React.FC<{ children: React.ReactNode }> = (props) => {
   const pathname = usePathname();
-  const isStocksDocumentScrollRoute = pathname === '/meow/stocks' || /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname);
+  const isDocumentScrollRoute =
+    pathname === '/meow/stocks' ||
+    /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname) ||
+    pathname === '/meow/articles' ||
+    /^\/meow\/articles\/[^/]+$/.test(pathname) ||
+    pathname === '/meow/ai-reports' ||
+    /^\/meow\/ai-reports\/[^/]+$/.test(pathname);
 
   useEffect(() => {
-    if (!isStocksDocumentScrollRoute) return;
+    if (!isDocumentScrollRoute) return;
 
     const root = document.documentElement;
     const body = document.body;
@@ -70,15 +76,15 @@ const App: React.FC<{ children: React.ReactNode }> = (props) => {
       body.classList.remove('meow-document-scroll');
       body.style.height = previousBodyHeight;
     };
-  }, [isStocksDocumentScrollRoute]);
+  }, [isDocumentScrollRoute]);
 
   return (
-    <div className={`${styles.app} ${isStocksDocumentScrollRoute ? styles.documentScrollApp : ''}`}>
+    <div className={`${styles.app} ${isDocumentScrollRoute ? styles.documentScrollApp : ''}`}>
       {/* <div className={styles.top}>
         <NavBar>Meow</NavBar>
       </div> */}
       <div className={styles.body}>
-        <StockStoreProvider>{props.children}</StockStoreProvider>
+        <MeowStoreProvider>{props.children}</MeowStoreProvider>
       </div>
       <div className={styles.bottom}>
         <Bottom />

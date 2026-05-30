@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-html-link-for-pages */
 import { notFound } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { getArticleById } from '@libs/article-db';
 import styles from '../articles.module.scss';
@@ -19,9 +19,9 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
   return (
     <main className={styles.detailPage}>
       <header className={styles.detailHeader}>
-        <a href="/meow/articles" className={styles.backLink}>
+        <Link href="/meow/articles" prefetch={false} className={styles.backLink}>
           返回
-        </a>
+        </Link>
         <div className={styles.detailMeta}>
           <PublishDateEditor id={article.id} publishDate={article.publishDate} />
           <span>{article.author}</span>

@@ -62,7 +62,7 @@
 
 .activityButtonActive {
   border-color: color-mix(in srgb, var(--meow-primary) 50%, var(--meow-border));
-  background: color-mix(in srgb, var(--meow-primary) 9%, #ffffff);
+  background: color-mix(in srgb, var(--meow-primary) 9%, var(--meow-surface));
   color: var(--meow-primary);
 }
 
@@ -95,7 +95,7 @@
   button {
     border: 1px solid color-mix(in srgb, var(--meow-primary) 22%, var(--meow-border));
     border-radius: 999px;
-    background: color-mix(in srgb, var(--meow-primary) 8%, #ffffff);
+    background: color-mix(in srgb, var(--meow-primary) 8%, var(--meow-surface));
     color: var(--meow-primary);
     padding: 4px 9px;
     font-size: 12px;

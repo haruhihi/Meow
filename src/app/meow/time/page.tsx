@@ -11,7 +11,6 @@ import {
   Toast,
 } from 'antd-mobile';
 import {
-  AddCircleOutline,
   ClockCircleOutline,
   LeftOutline,
   RightOutline,
@@ -20,6 +19,7 @@ import dayjs from 'dayjs';
 import ReactECharts from 'echarts-for-react';
 import { useMemo, useState } from 'react';
 import { post } from '@libs/fetch';
+import { LoadingState } from '@components/loading';
 import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
 import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
 import {
@@ -124,6 +124,7 @@ export default function TimePage() {
   const { data: analyzeData } = useTimeRangeAnalyze(analyzeRange.start, analyzeRange.end, refreshKey);
 
   const activityTypes = activityRes.activityTypes ?? [];
+  const initialLoading = activityRes.activityTypes === undefined || timeEntries === undefined || analyzeData === null;
   const selectedActivity = selectedActivityId
     ? activityTypes.find((activityType) => activityType.id === selectedActivityId)
     : undefined;
@@ -322,70 +323,76 @@ export default function TimePage() {
           viewData={viewData}
         />
 
-        {analyzeData && viewData && viewData.activitySummaries.length > 0 && (
+        {initialLoading ? (
+          <LoadingState className={styles.pageLoading} label="时间加载中" />
+        ) : (
           <>
-            <ActivityBreakdown
-              summaries={viewData.activitySummaries}
-              totalMinutes={viewData.totalMinutes}
-              selectedActivityId={selectedActivityId}
-              onSelect={setSelectedActivityId}
-            />
-
-            <div className={styles.sectionHeader}>
-              <span>{viewData.chartTitle}{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
-              <span className={styles.sectionHint}>{viewData.chartHint}</span>
-            </div>
-            <div className={styles.chartCard}>
-              <DailyStackChart
-                points={viewData.chartPoints}
-                activities={viewData.activitySummaries}
-                selectedActivityId={selectedActivityId}
-              />
-            </div>
-
-            {viewMode === 'day' && viewData.rhythmSegments.length > 0 && (
+            {analyzeData && viewData && viewData.activitySummaries.length > 0 && (
               <>
-                <div className={styles.sectionHeader}>
-                  <span>24 小时节律{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
-                  <span className={styles.sectionHint}>{viewData.rangeLabel}</span>
-                </div>
-                <RhythmView
-                  dailySummaries={analyzeData.dailySummaries}
-                  rhythmSegments={viewData.rhythmSegments}
+                <ActivityBreakdown
+                  summaries={viewData.activitySummaries}
+                  totalMinutes={viewData.totalMinutes}
                   selectedActivityId={selectedActivityId}
-                  showAll={showAllRhythm}
+                  onSelect={setSelectedActivityId}
                 />
+
+                <div className={styles.sectionHeader}>
+                  <span>{viewData.chartTitle}{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
+                  <span className={styles.sectionHint}>{viewData.chartHint}</span>
+                </div>
+                <div className={styles.chartCard}>
+                  <DailyStackChart
+                    points={viewData.chartPoints}
+                    activities={viewData.activitySummaries}
+                    selectedActivityId={selectedActivityId}
+                  />
+                </div>
+
+                {viewMode === 'day' && viewData.rhythmSegments.length > 0 && (
+                  <>
+                    <div className={styles.sectionHeader}>
+                      <span>24 小时节律{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
+                      <span className={styles.sectionHint}>{viewData.rangeLabel}</span>
+                    </div>
+                    <RhythmView
+                      dailySummaries={analyzeData.dailySummaries}
+                      rhythmSegments={viewData.rhythmSegments}
+                      selectedActivityId={selectedActivityId}
+                      showAll={showAllRhythm}
+                    />
+                  </>
+                )}
               </>
             )}
+
+            <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
+              <span>最近记录{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
+              {selectedActivity && (
+                <button type="button" className={styles.linkBtn} onClick={() => setSelectedActivityId(null)}>
+                  全部
+                </button>
+              )}
+            </div>
+
+            {filteredRecent.length > 0 ? (
+              <GroupedList
+                entries={filteredRecent}
+                onEdit={openEdit}
+                onDelete={async (id) => {
+                  await post('/api/time-entry/delete', { ids: [id] });
+                  Toast.show({ content: '删除成功', afterClose: () => void refreshAll() });
+                }}
+                hasMore={hasMore && !selectedActivityId}
+                onLoadMore={loadMore}
+              />
+            ) : (
+              <Empty
+                style={{ padding: '64px 0' }}
+                imageStyle={{ width: 128 }}
+                description={selectedActivity ? `${selectedActivity.name} 暂无记录` : '暂无记录'}
+              />
+            )}
           </>
-        )}
-
-        <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
-          <span>最近记录{selectedActivity ? ` · ${selectedActivity.name}` : ''}</span>
-          {selectedActivity && (
-            <button type="button" className={styles.linkBtn} onClick={() => setSelectedActivityId(null)}>
-              全部
-            </button>
-          )}
-        </div>
-
-        {filteredRecent.length > 0 ? (
-          <GroupedList
-            entries={filteredRecent}
-            onEdit={openEdit}
-            onDelete={async (id) => {
-              await post('/api/time-entry/delete', { ids: [id] });
-              Toast.show({ content: '删除成功', afterClose: () => void refreshAll() });
-            }}
-            hasMore={hasMore && !selectedActivityId}
-            onLoadMore={loadMore}
-          />
-        ) : (
-          <Empty
-            style={{ padding: '64px 0' }}
-            imageStyle={{ width: 128 }}
-            description={selectedActivity ? `${selectedActivity.name} 暂无记录` : '暂无记录'}
-          />
         )}
 
         <div className={styles.endSpacer} />
@@ -393,13 +400,10 @@ export default function TimePage() {
 
       <TimeEntryFloatingButton
         initialPositionBottom="100px"
-        background="var(--meow-primary)"
         activityTypes={activityTypes}
         onClick={openCreate}
         onQuickCreateSuccess={refreshAll}
-      >
-        <AddCircleOutline fontSize={32} />
-      </TimeEntryFloatingButton>
+      />
 
       <TimeEntryModal
         visible={visible}

@@ -1,5 +1,8 @@
 .page {
-  background: var(--meow-bg);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.18), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
   min-height: 100%;
   padding-bottom: 24px;
 }
@@ -7,9 +10,12 @@
 .summaryCard {
   margin: 12px;
   padding: 14px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #f8f9fc);
-  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.06);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 34%),
+    var(--meow-accent-gradient);
+  box-shadow: 0 12px 28px rgba(20, 184, 166, 0.22);
+  color: #fff;
 }
 
 .summaryHeader {
@@ -25,18 +31,18 @@
   :global(.adm-selector-item) {
     min-width: 0;
     padding: 7px 8px;
-    border: 1px solid var(--meow-border);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 10px;
-    background: var(--meow-surface-alt);
-    color: var(--meow-text-sub);
+    background: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.78);
     font-size: 12px;
     font-weight: 700;
   }
 
   :global(.adm-selector-item-active) {
-    border-color: color-mix(in srgb, var(--meow-primary) 50%, var(--meow-border));
-    background: color-mix(in srgb, var(--meow-primary) 10%, #ffffff);
-    color: var(--meow-primary);
+    border-color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--meow-accent-strong);
   }
 }
 
@@ -45,8 +51,8 @@
   height: 32px;
   border: 0;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--meow-primary) 10%, transparent);
-  color: var(--meow-primary);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,20 +70,20 @@
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--meow-text);
+  color: #fff;
 }
 
 .monthTag {
   padding: 2px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--meow-primary) 12%, transparent);
-  color: var(--meow-primary);
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
   font-size: 11px;
   font-weight: 700;
 }
 
 .totalLabel {
-  color: var(--meow-text-muted);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 12px;
   margin-bottom: 6px;
 }
@@ -91,7 +97,7 @@
 }
 
 .totalValue {
-  color: var(--meow-text);
+  color: #fff;
   font-size: 30px;
   line-height: 1.1;
   font-weight: 800;
@@ -114,13 +120,13 @@
 
 .statItem {
   border-radius: 12px;
-  background: var(--meow-surface-alt);
+  background: rgba(255, 255, 255, 0.12);
   padding: 9px 8px;
   min-width: 0;
 }
 
 .statValue {
-  color: var(--meow-text);
+  color: #fff;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
@@ -131,7 +137,7 @@
 
 .statLabel {
   margin-top: 3px;
-  color: var(--meow-text-muted);
+  color: rgba(255, 255, 255, 0.74);
   font-size: 11px;
 }
 
@@ -157,7 +163,7 @@
 
 .linkBtn {
   all: unset;
-  color: var(--meow-primary);
+  color: var(--meow-accent-strong);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -210,8 +216,8 @@
 }
 
 .activityCardActive {
-  border-color: color-mix(in srgb, var(--meow-primary) 46%, var(--meow-border));
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--meow-primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--meow-accent) 46%, var(--meow-border));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--meow-accent) 18%, transparent);
 }
 
 .activityNameRow {
@@ -276,6 +282,14 @@
 
 .chartCard {
   padding: 4px 4px 0;
+}
+
+.pageLoading {
+  min-height: 180px;
+  margin: 8px 12px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--meow-surface) 88%, transparent);
+  box-shadow: 0 2px 10px rgba(31, 35, 48, 0.05);
 }
 
 .rhythmCard {

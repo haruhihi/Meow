@@ -58,7 +58,7 @@
   }
 
   strong {
-    color: #0f766e;
+    color: var(--meow-accent-strong);
     font-size: 20px;
     font-weight: 900;
     font-variant-numeric: tabular-nums;
@@ -108,8 +108,8 @@
     flex-shrink: 0;
     padding: 2px 7px;
     border-radius: 8px;
-    color: #0f766e;
-    background: #ccfbf1;
+    color: var(--meow-accent-strong);
+    background: var(--meow-accent-soft);
     font-size: 12px;
     font-weight: 800;
   }
