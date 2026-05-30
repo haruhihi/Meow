@@ -368,7 +368,9 @@ const buildComputedMetrics = (
     normalizedDividend,
     reportDate: fundamental?.reportDate.toISOString() ?? null,
     deductedNetProfitCagr5,
-    deductedPeg: deductedPe && deductedNetProfitCagr5 && deductedNetProfitCagr5 > 0 ? roundStockValue(deductedPe / (deductedNetProfitCagr5 * 100)) : null,
+    deductedPeg: deductedPe != null && deductedNetProfitCagr5 != null && deductedNetProfitCagr5 !== 0
+      ? roundStockValue(deductedPe / (deductedNetProfitCagr5 * 100))
+      : null,
     goodwill,
     goodwillToNetAsset: goodwill != null && netAsset && netAsset > 0 ? goodwill / netAsset : null,
     goodwillToTotalAssets: goodwill != null && totalAssets && totalAssets > 0 ? goodwill / totalAssets : null,
