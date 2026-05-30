@@ -1,0 +1,317 @@
+.page {
+  min-height: 100dvh;
+  padding-bottom: calc(96px + max(env(safe-area-inset-bottom), 0px));
+  background:
+    radial-gradient(circle at 12% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 8%, rgba(249, 115, 22, 0.16), transparent 30%),
+    linear-gradient(180deg, #f7fbff 0%, #fff8f0 48%, #f7fff9 100%);
+}
+
+.header {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 8px);
+  z-index: 20;
+  margin: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 34%),
+    var(--meow-accent-gradient);
+  box-shadow: 0 12px 28px rgba(20, 184, 166, 0.22);
+  color: #fff;
+}
+
+.headerTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  h1 {
+    margin: 0;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  p {
+    margin: 3px 0 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
+  }
+}
+
+.backButton {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.sectorSelector {
+  margin-top: 12px;
+
+  :global(.adm-selector-item) {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  :global(.adm-selector-item-active) {
+    border-color: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--meow-accent-strong);
+  }
+}
+
+.headerMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pegToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 900;
+
+  :global(.adm-switch) {
+    --checked-color: var(--meow-warm);
+  }
+}
+
+.loadingBlock {
+  min-height: 220px;
+  margin: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.09);
+}
+
+.matrixCard {
+  margin: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--meow-accent) 18%, white);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
+  overflow: hidden;
+}
+
+.matrixSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--meow-border-soft);
+  color: var(--meow-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+
+  strong {
+    flex-shrink: 0;
+    color: var(--meow-accent-strong);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.matrixScroller {
+  overflow: hidden;
+}
+
+.matrixTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--meow-text);
+
+  th,
+  td {
+    border-bottom: 1px solid var(--meow-border-soft);
+    border-left: 1px solid var(--meow-border-soft);
+    background: rgba(255, 255, 255, 0.88);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0;
+    background: color-mix(in srgb, var(--meow-accent-soft) 58%, white);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+.stockColumn {
+  width: 34%;
+  border-left: 0 !important;
+}
+
+th.stockColumn {
+  padding: 10px 9px;
+  background: color-mix(in srgb, var(--meow-accent) 14%, white);
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sortButton,
+.activeSortButton {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 7px;
+  border: 0;
+  background: transparent;
+  color: var(--meow-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.activeSortButton {
+  color: var(--meow-accent-strong);
+  background: color-mix(in srgb, var(--meow-accent-soft) 86%, white);
+}
+
+.sortButton span,
+.activeSortButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sortButton em,
+.activeSortButton em {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.stockCell {
+  min-height: 76px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.96);
+
+  strong,
+  span,
+  em,
+  small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--meow-text);
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  span {
+    margin-top: 2px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+  }
+
+  em {
+    margin-top: 3px;
+    color: var(--meow-accent-strong);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  small {
+    margin-top: 3px;
+    color: var(--meow-warning);
+    font-size: 9px;
+    font-weight: 800;
+  }
+}
+
+.metricCell {
+  min-height: 76px;
+  padding: 9px 7px;
+
+  strong,
+  span,
+  em {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--meow-accent-strong);
+    font-size: 14px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--meow-text);
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  em {
+    margin-top: 3px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 800;
+  }
+}
+
+.missingMetricCell {
+  opacity: 0.54;
+}
+
+.empty {
+  margin: 48px 12px;
+}
+
+.footerActions {
+  margin: 16px 12px 0;
+}

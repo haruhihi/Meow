@@ -421,6 +421,43 @@ export interface IStockSearchRes {
   symbolSummaries: IStockPortfolioSymbolSummary[];
 }
 
+export interface IStockMagicFormulaSearchReq {
+  sector?: string | null;
+}
+
+export interface IStockMagicFormulaMetric {
+  key: 'deductedPe' | 'deductedRoe' | 'deductedRoa' | 'dividendYield' | 'deductedPeg';
+  label: string;
+  direction: 'asc' | 'desc';
+  value: number | null;
+  display: string;
+}
+
+export interface IStockMagicFormulaItem {
+  symbol: string;
+  name: string;
+  sector: string;
+  isHeld: boolean;
+  currentPrice: number | null;
+  marketValue: number;
+  percent: number;
+  metrics: IStockMagicFormulaMetric[];
+  flags: string[];
+  reportName?: string | null;
+  reportDate?: string | null;
+  deductedNetProfitCagr5?: number | null;
+  goodwillToNetAsset?: number | null;
+  operatingCashFlowToDeductedNetProfit?: number | null;
+  fcfDividendCoverage?: number | null;
+}
+
+export interface IStockMagicFormulaSearchRes {
+  selectedSector: string;
+  sectors: string[];
+  items: IStockMagicFormulaItem[];
+  updatedAt: string;
+}
+
 export interface IStockSnapshotSummary {
   totalMarketValue: number;
   totalAssetValue: number;

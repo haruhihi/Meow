@@ -333,6 +333,9 @@ const StocksPage = observer(function StocksPage() {
                   <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
                     刷新数据
                   </button>
+                  <button type="button" className={styles.quoteButton} onClick={() => router.push('/meow/stocks/magic-formula')}>
+                    神奇公式
+                  </button>
                 </>
               )
             )}

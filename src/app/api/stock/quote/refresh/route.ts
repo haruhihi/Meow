@@ -2,6 +2,7 @@ import { prisma } from '@libs/prisma';
 import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 import { IStockQuoteRefreshReq, IStockQuoteRefreshRes } from '@dtos/meow';
+import { getStockUniverseItem, getStockUniverseSymbols } from '../../../../../config/stock-universe';
 import { fetchRealtimeQuotes } from '../helpers';
 
 export async function POST(req: Request) {
@@ -19,7 +20,9 @@ export async function POST(req: Request) {
       distinct: ['symbol'],
       select: { symbol: true },
     });
-    const symbols = holdings.map((holding) => holding.symbol);
+    const symbols = requestedSymbols?.length
+      ? [...new Set(requestedSymbols)].sort()
+      : [...new Set([...holdings.map((holding) => holding.symbol), ...getStockUniverseSymbols()])].sort();
 
     if (symbols.length === 0) {
       return success<IStockQuoteRefreshRes>({
@@ -32,25 +35,20 @@ export async function POST(req: Request) {
     }
 
     const { quotes, failedSymbols } = await fetchRealtimeQuotes(symbols);
-    const existingQuotes = await prisma.stockQuote.findMany({
-      where: { userId: uid, symbol: { in: quotes.map((quote) => quote.symbol) } },
-    });
-    const existingQuoteBySymbol = new Map(existingQuotes.map((quote) => [quote.symbol, quote]));
-
     if (quotes.length > 0) {
       await prisma.$transaction(
         quotes.map((quote) => {
-          const existingQuote = existingQuoteBySymbol.get(quote.symbol);
+          const universeItem = getStockUniverseItem(quote.symbol);
+          const name = quote.name ?? universeItem?.name ?? quote.symbol;
           return prisma.stockQuote.upsert({
             where: { userId_symbol: { userId: uid, symbol: quote.symbol } },
             create: {
               userId: uid,
               symbol: quote.symbol,
-              name: quote.name ?? quote.symbol,
+              name,
               currentPrice: quote.currentPrice,
             },
             update: {
-              name: quote.name ?? existingQuote?.name ?? quote.symbol,
               currentPrice: quote.currentPrice,
             },
           });

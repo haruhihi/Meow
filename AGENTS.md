@@ -13,6 +13,10 @@
 
 ## Stock financial analysis workflow
 
+- Core data boundary: only stock price is treated as live-changing quote data. Fundamentals, total shares/share capital, dividends, financial statements, and non-price valuation inputs must come from persisted DB rows synced from Xueqiu on schedule or by explicit manual sync.
+- Dividend yield must be based only on user-marked normal dividend events (`StockDividendMarking.countTowardNormalizedDividend`) or an explicit `StockMetricOverride.normalizedDividend`. Do not infer normalized dividend yield from unmarked/latest dividend events.
+- Use current price from the quote interface plus persisted Xueqiu total shares to derive market cap for valuation. Do not persist or refresh vendor market cap in `StockQuote` as a live quote field.
+- Before relying on a total-shares/share-capital field, verify the Xueqiu mapping/API. Do not assume Xueqiu financial-statement `balance.shares` equals market total shares for special cases such as 中国移动.
 - Do not sync Xueqiu financial statements before every report. GitHub Actions already refreshes the data on schedule; default to the persisted DB data to avoid unnecessary Xueqiu traffic and IP risk.
 - Only run a manual sync when the user explicitly asks to refresh, when required statements are missing/stale, or when investigating a suspected data issue. Use `node scripts/sync-stock-fundamentals.mjs --symbols <symbol> --statement-count 40 --sleep 1500` for a single stock, or a larger `--sleep` for batches.
 - `StockFundamental` stores the compact metrics used by the stock page. `StockFinancialStatement` stores raw Xueqiu `income`, `balance`, and `cash_flow` rows keyed by `symbol + statement + reportDate`; prefer this raw table for report generation and field verification.

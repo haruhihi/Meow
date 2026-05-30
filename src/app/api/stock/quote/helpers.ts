@@ -26,9 +26,10 @@ export const fetchRealtimeQuotes = async (symbols: string[]) => {
   const unsupportedSymbols = uniqueSymbols.filter((symbol) => !toMarketSymbol(symbol));
 
   const eastmoneyQuotes = await fetchEastmoneyQuotes(marketSymbols);
+  const eastmoneySymbols = new Set(eastmoneyQuotes.map((quote) => quote.symbol));
   const missingSymbols = marketSymbols
     .map((item) => item.symbol)
-    .filter((symbol) => !eastmoneyQuotes.some((quote) => quote.symbol === symbol));
+    .filter((symbol) => !eastmoneySymbols.has(symbol));
 
   const sinaQuotes = missingSymbols.length > 0
     ? await fetchSinaQuotes(marketSymbols.filter((item) => missingSymbols.includes(item.symbol)))
@@ -106,14 +107,13 @@ const fetchSinaQuotes = async (marketSymbols: MarketSymbol[]): Promise<IStockQuo
   try {
     const text = await fetchTextWithTimeout(url, {
       Referer: 'https://finance.sina.com.cn/',
-    });
+    }, 'gb18030');
     return parseSinaResponse(text);
   } catch (error) {
     console.log('Sina quote fallback failed', error);
     return [];
   }
 };
-
 const parseSinaResponse = (text: string): IStockQuoteRefreshItem[] => {
   const quotes: IStockQuoteRefreshItem[] = [];
   const regex = /var hq_str_(sh|sz)(\d{6})="([^"]*)";/g;
@@ -122,10 +122,12 @@ const parseSinaResponse = (text: string): IStockQuoteRefreshItem[] => {
   while ((match = regex.exec(text)) !== null) {
     const symbol = match[2];
     const fields = match[3].split(',');
+    const name = fields[0]?.replace(/\s+/g, '').trim();
     const currentPrice = Number(fields[3]);
     if (!symbol || !Number.isFinite(currentPrice) || currentPrice <= 0) continue;
     quotes.push({
       symbol,
+      name: name || symbol,
       currentPrice,
       source: 'sina',
     });
@@ -134,7 +136,7 @@ const parseSinaResponse = (text: string): IStockQuoteRefreshItem[] => {
   return quotes;
 };
 
-const fetchTextWithTimeout = async (url: string, headers: Record<string, string> = {}) => {
+const fetchTextWithTimeout = async (url: string, headers: Record<string, string> = {}, encoding: string = 'utf-8') => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -149,7 +151,7 @@ const fetchTextWithTimeout = async (url: string, headers: Record<string, string>
       cache: 'no-store',
     });
     if (!res.ok) throw new Error(`quote fetch failed: ${res.status}`);
-    return await res.text();
+    return new TextDecoder(encoding).decode(await res.arrayBuffer());
   } finally {
     clearTimeout(timer);
   }

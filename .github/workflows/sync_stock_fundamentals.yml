@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       symbols:
-        description: 'Optional stock symbols, separated by spaces. Empty means all held symbols.'
+        description: 'Optional stock symbols, separated by spaces. Empty means held symbols plus configured watchlist.'
         required: false
         default: ''
       statement_count:

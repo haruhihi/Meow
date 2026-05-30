@@ -2,11 +2,13 @@
 
 import { setAppDatabaseUrl } from './database-url.mjs';
 import { PrismaClient } from '@prisma/client';
+import { readFileSync } from 'node:fs';
 
 const SOURCE = 'xueqiu';
 const APP_PAGE = 'https://xueqiu.com/snowman/S/{symbol}/detail#/ZYCWZB';
 const FUNDAMENTAL_COUNT = 8;
 const DEFAULT_STATEMENT_COUNT = 40;
+const STOCK_UNIVERSE_PATH = new URL('../src/config/stock-universe.json', import.meta.url);
 
 setAppDatabaseUrl();
 
@@ -48,6 +50,14 @@ const parseArgs = () => {
 
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const loadStockUniverseSymbols = () => {
+  const text = readFileSync(STOCK_UNIVERSE_PATH, 'utf8');
+  const items = JSON.parse(text);
+  return Array.isArray(items)
+    ? items.map((item) => String(item?.symbol ?? '').trim().toUpperCase()).filter(Boolean)
+    : [];
+};
+
 const fetchSymbols = async (explicitSymbols) => {
   if (explicitSymbols.length > 0) {
     return [...new Set(explicitSymbols)].sort();
@@ -57,7 +67,7 @@ const fetchSymbols = async (explicitSymbols) => {
     select: { symbol: true },
     orderBy: { symbol: 'asc' },
   });
-  return rows.map((row) => row.symbol);
+  return [...new Set([...rows.map((row) => row.symbol), ...loadStockUniverseSymbols()])].sort();
 };
 
 const createXueqiuSession = async (xueqiuSymbol) => {
@@ -101,9 +111,24 @@ const financeUrl = (statement, xueqiuSymbol, type = 'Q4', count = FUNDAMENTAL_CO
   return url.toString();
 };
 
+const realtimeQuoteUrl = (xueqiuSymbol) => {
+  const url = new URL('https://stock.xueqiu.com/v5/stock/realtime/quotec.json');
+  url.searchParams.set('symbol', xueqiuSymbol);
+  return url.toString();
+};
+
 const valueOf = (field) => {
   if (Array.isArray(field)) return typeof field[0] === 'number' ? field[0] : null;
   return typeof field === 'number' ? field : null;
+};
+
+const readQuoteTotalShares = (payload) => {
+  const quote = Array.isArray(payload?.data) ? payload.data[0] : null;
+  const marketCapital = valueOf(quote?.market_capital);
+  const currentPrice = valueOf(quote?.current);
+  return marketCapital && marketCapital > 0 && currentPrice && currentPrice > 0
+    ? marketCapital / currentPrice
+    : undefined;
 };
 
 const normalizeJsonValue = (value) => JSON.parse(JSON.stringify(value));
@@ -167,6 +192,9 @@ const fetchFundamentals = async (symbol, options) => {
   if (!cookieHeader) throw new Error('missing xueqiu anonymous cookie');
   const statementCount = options.statementCount;
 
+  const realtimeQuotePayload = await fetchXueqiuJson(realtimeQuoteUrl(xueqiuSymbol), xueqiuSymbol, cookieHeader);
+  const totalShares = readQuoteTotalShares(realtimeQuotePayload);
+  await sleepMs(300);
   const incomePayload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
   await sleepMs(300);
   const balancePayload = await fetchXueqiuJson(financeUrl('balance', xueqiuSymbol, 'Q4'), xueqiuSymbol, cookieHeader);
@@ -201,7 +229,7 @@ const fetchFundamentals = async (symbol, options) => {
       symbol,
       reportDate: incomeByDate.get(date).reportDate,
       reportName: income.report_name ?? balance.report_name ?? null,
-      totalShares: valueOf(balance.shares),
+      totalShares,
       deductedNetProfit: valueOf(income.net_profit_after_nrgal_atsolc),
       deductedNetProfitTtm: ttm.deductedNetProfitTtm,
       netProfit: valueOf(income.net_profit_atsopc) ?? valueOf(income.net_profit),
