@@ -347,7 +347,7 @@ const buildComputedMetrics = (
   const deductedNetProfitCagr5 = latestAnnual?.deductedNetProfit && latestAnnual.deductedNetProfit > 0 && baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0
     ? (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / 5) - 1
     : null;
-  const goodwill = readStatementNumber(annualBalance?.fields, 'goodwill');
+  const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
   const deductedPe = companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
 
