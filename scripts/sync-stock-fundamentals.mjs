@@ -23,6 +23,8 @@ const parseArgs = () => {
   let dryRun = false;
   let sleep = 1500;
   let statementCount = DEFAULT_STATEMENT_COUNT;
+  let skipUnchanged = false;
+  let force = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -42,10 +44,14 @@ const parseArgs = () => {
       index += 1;
     } else if (arg === '--dry-run') {
       dryRun = true;
+    } else if (arg === '--skip-unchanged') {
+      skipUnchanged = true;
+    } else if (arg === '--force') {
+      force = true;
     }
   }
 
-  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep, statementCount: Math.min(Math.max(statementCount, FUNDAMENTAL_COUNT), 80) };
+  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep, statementCount: Math.min(Math.max(statementCount, FUNDAMENTAL_COUNT), 80), skipUnchanged, force };
 };
 
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -117,6 +123,8 @@ const realtimeQuoteUrl = (xueqiuSymbol) => {
   return url.toString();
 };
 
+const sameReportDate = (left, right) => left?.toISOString().slice(0, 10) === right?.toISOString().slice(0, 10);
+
 const valueOf = (field) => {
   if (Array.isArray(field)) return typeof field[0] === 'number' ? field[0] : null;
   return typeof field === 'number' ? field : null;
@@ -186,11 +194,40 @@ const trailingTwelveMonths = (items, fieldNames) => {
   return latestValue + previousAnnualValue - previousSamePeriodValue;
 };
 
+const fetchLatestRemoteReportDate = async (xueqiuSymbol, cookieHeader) => {
+  const payload = await fetchXueqiuJson(financeUrl('income', xueqiuSymbol, 'all', 1), xueqiuSymbol, cookieHeader);
+  return dateFromMillis(payload.data?.list?.[0]?.report_date);
+};
+
+const hasCachedLatestStatements = async (symbol, latestRemoteReportDate) => {
+  if (!latestRemoteReportDate) return false;
+  const statements = await Promise.all(['income', 'balance', 'cash_flow'].map((statement) => prisma.stockFinancialStatement.findFirst({
+    where: { symbol, statement },
+    orderBy: { reportDate: 'desc' },
+    select: { reportDate: true },
+  })));
+  return statements.every((statement) => sameReportDate(statement?.reportDate, latestRemoteReportDate));
+};
+
 const fetchFundamentals = async (symbol, options) => {
   const xueqiuSymbol = toXueqiuSymbol(symbol);
   const { cookieHeader } = await createXueqiuSession(xueqiuSymbol);
   if (!cookieHeader) throw new Error('missing xueqiu anonymous cookie');
   const statementCount = options.statementCount;
+
+  if (options.skipUnchanged && !options.force) {
+    const latestRemoteReportDate = await fetchLatestRemoteReportDate(xueqiuSymbol, cookieHeader);
+    const shouldSkip = await hasCachedLatestStatements(symbol, latestRemoteReportDate);
+    if (shouldSkip) {
+      return {
+        skipped: true,
+        latestReportDate: latestRemoteReportDate,
+        fundamentals: [],
+        statements: [],
+      };
+    }
+    await sleepMs(300);
+  }
 
   const realtimeQuotePayload = await fetchXueqiuJson(realtimeQuoteUrl(xueqiuSymbol), xueqiuSymbol, cookieHeader);
   const totalShares = readQuoteTotalShares(realtimeQuotePayload);
@@ -246,6 +283,8 @@ const fetchFundamentals = async (symbol, options) => {
   });
 
   return {
+    skipped: false,
+    latestReportDate: null,
     fundamentals,
     statements: [
       ...buildStatementItems(symbol, 'income', incomePayload.data?.list ?? []),
@@ -349,12 +388,18 @@ const main = async () => {
   console.log(`syncing ${symbols.length} symbols: ${symbols.join(', ')}`);
 
   let ok = 0;
+  let skipped = 0;
   let statementsWritten = 0;
   const failed = [];
   for (const symbol of symbols) {
     try {
-      const { fundamentals, statements } = await fetchFundamentals(symbol, { statementCount: args.statementCount });
-      if (fundamentals.length === 0) {
+      const { skipped: skippedSymbol, latestReportDate, fundamentals, statements } = await fetchFundamentals(symbol, args);
+      if (skippedSymbol) {
+        skipped += 1;
+        console.log(`[${symbol}] skipped unchanged latestReport=${latestReportDate.toISOString().slice(0, 10)}`);
+        continue;
+      }
+      if (fundamentals.length === 0 && statements.length === 0) {
         failed.push(symbol);
         console.error(`[${symbol}] no fundamentals returned`);
         continue;
@@ -376,8 +421,8 @@ const main = async () => {
     if (args.sleep > 0) await sleepMs(args.sleep);
   }
 
-  console.log(`done ok=${ok} financialStatements=${statementsWritten} failed=${failed.length} failedSymbols=${failed.join(',')}`);
-  return ok > 0 || failed.length === 0 ? 0 : 1;
+  console.log(`done ok=${ok} skipped=${skipped} financialStatements=${statementsWritten} failed=${failed.length} failedSymbols=${failed.join(',')}`);
+  return ok > 0 || skipped > 0 || failed.length === 0 ? 0 : 1;
 };
 
 main()

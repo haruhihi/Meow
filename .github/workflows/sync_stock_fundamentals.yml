@@ -13,6 +13,10 @@ on:
         description: 'Raw statement rows to fetch from Xueqiu type=all.'
         required: false
         default: '40'
+      force_refresh:
+        description: 'Force full Xueqiu fetch even when the latest report is already cached.'
+        required: false
+        default: 'false'
 
 jobs:
   sync:
@@ -51,8 +55,12 @@ jobs:
           DATABASE: ${{ secrets.DATABASE }}
           SYMBOLS: ${{ github.event.inputs.symbols }}
           STATEMENT_COUNT: ${{ github.event.inputs.statement_count }}
+          FORCE_REFRESH: ${{ github.event.inputs.force_refresh }}
         run: |
-          args=(--sleep 1500 --statement-count "${STATEMENT_COUNT:-40}")
+          args=(--sleep 1500 --statement-count "${STATEMENT_COUNT:-40}" --skip-unchanged)
+          if [ "$FORCE_REFRESH" = "true" ]; then
+            args+=(--force)
+          fi
           if [ -n "$SYMBOLS" ]; then
             args+=(--symbols $SYMBOLS)
           fi
