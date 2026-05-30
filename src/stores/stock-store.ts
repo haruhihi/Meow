@@ -144,10 +144,9 @@ export class StockStore {
     return this.getMapStatus(this.financialStatementStatuses, financialStatementsKey(symbol, limit));
   }
 
-  loadPortfolio(params: IStockSearchReq = {}, options: { force?: boolean; background?: boolean } = {}) {
+  loadPortfolio(params: IStockSearchReq = {}, options: { force?: boolean } = {}) {
     const key = `portfolio:${JSON.stringify(params)}`;
     if (this.portfolio && !options.force) {
-      if (options.background) void this.fetchPortfolio(key, params, true);
       return Promise.resolve(this.portfolio);
     }
     return this.fetchPortfolio(key, params, Boolean(this.portfolio));
@@ -224,21 +223,19 @@ export class StockStore {
     }
   }
 
-  loadSnapshots(limit = 120, options: { force?: boolean; background?: boolean } = {}) {
+  loadSnapshots(limit = 120, options: { force?: boolean } = {}) {
     const key = `snapshots:${limit}`;
     if (this.snapshots.length > 0 && !options.force) {
-      if (options.background) void this.fetchSnapshots(key, limit, true);
       return Promise.resolve({ snapshots: this.snapshots });
     }
     return this.fetchSnapshots(key, limit, this.snapshots.length > 0);
   }
 
-  loadSnapshotDetail(snapshotId: number | null, options: { force?: boolean; background?: boolean } = {}) {
+  loadSnapshotDetail(snapshotId: number | null, options: { force?: boolean } = {}) {
     if (!snapshotId) return Promise.resolve(null);
     const key = `snapshot-detail:${snapshotId}`;
     const existing = this.snapshotDetailsById.get(snapshotId) ?? null;
     if (existing && !options.force) {
-      if (options.background) void this.fetchSnapshotDetail(key, snapshotId, true);
       return Promise.resolve(existing);
     }
     return this.fetchSnapshotDetail(key, snapshotId, Boolean(existing));
@@ -259,42 +256,38 @@ export class StockStore {
     }
   }
 
-  loadReports(symbol?: string, options: { force?: boolean; background?: boolean } = {}) {
+  loadReports(symbol?: string, options: { force?: boolean } = {}) {
     const key = reportKey(symbol);
     const inflightKey = `reports:${key}`;
     const existing = this.reportsByKey.get(key);
     if (existing && !options.force) {
-      if (options.background) void this.fetchReports(inflightKey, symbol, true);
       return Promise.resolve({ reports: existing });
     }
     return this.fetchReports(inflightKey, symbol, Boolean(existing));
   }
 
-  loadPrompt(symbol: string, options: { force?: boolean; background?: boolean } = {}) {
+  loadPrompt(symbol: string, options: { force?: boolean } = {}) {
     const normalized = symbol.toUpperCase();
     const existing = this.promptsBySymbol.get(normalized) ?? null;
     if (existing && !options.force) {
-      if (options.background) void this.fetchPrompt(`prompt:${normalized}`, normalized, true);
       return Promise.resolve(existing);
     }
     return this.fetchPrompt(`prompt:${normalized}`, normalized, Boolean(existing));
   }
 
-  loadRemarks(symbol: string, options: { force?: boolean; background?: boolean } = {}) {
+  loadRemarks(symbol: string, options: { force?: boolean } = {}) {
     const normalized = symbol.toUpperCase();
     const existing = this.remarksBySymbol.get(normalized) ?? null;
     if (existing && !options.force) {
-      if (options.background) void this.fetchRemarks(`remarks:${normalized}`, normalized, true);
       return Promise.resolve(existing);
     }
     return this.fetchRemarks(`remarks:${normalized}`, normalized, Boolean(existing));
   }
 
-  loadDividends(symbol: string, options: { force?: boolean; background?: boolean } = {}) {
+  loadDividends(symbol: string, options: { force?: boolean } = {}) {
     const normalized = symbol.toUpperCase();
     const existing = this.dividendsBySymbol.get(normalized);
     if (existing && !options.force) {
-      if (options.background) void this.fetchDividends(`dividends:${normalized}`, normalized, true);
       return Promise.resolve({ events: existing });
     }
     return this.fetchDividends(`dividends:${normalized}`, normalized, Boolean(existing));
@@ -337,11 +330,10 @@ export class StockStore {
     return res;
   }
 
-  loadFinancialStatements(symbol: string, limit = 5, options: { force?: boolean; background?: boolean } = {}) {
+  loadFinancialStatements(symbol: string, limit = 5, options: { force?: boolean } = {}) {
     const key = financialStatementsKey(symbol, limit);
     const existing = this.financialStatementsByKey.get(key) ?? null;
     if (existing && !options.force) {
-      if (options.background) void this.fetchFinancialStatements(`financial-statements:${key}`, symbol, limit, true);
       return Promise.resolve(existing);
     }
     return this.fetchFinancialStatements(`financial-statements:${key}`, symbol, limit, Boolean(existing));
