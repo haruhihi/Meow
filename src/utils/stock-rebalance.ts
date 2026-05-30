@@ -8,8 +8,6 @@ import type {
 } from '@dtos/meow';
 import { marketValueOf, percentOf, roundStockValue } from './stock-calculations';
 
-const SECTOR_ORDER = ['消费', '白酒', '红利', '中药', '医药', '其他'];
-
 export const REBALANCE_QUANTITY_STEP = 100;
 
 export type StockRebalanceHolding = StockHoldingWithAccount & {
@@ -53,14 +51,6 @@ let nextDraftHoldingId = -1;
 
 const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
-const sortSectors = (left: IStockPortfolioSectorSummary, right: IStockPortfolioSectorSummary) => {
-  const leftIndex = SECTOR_ORDER.indexOf(left.sector);
-  const rightIndex = SECTOR_ORDER.indexOf(right.sector);
-  const resolvedLeftIndex = leftIndex === -1 ? SECTOR_ORDER.length : leftIndex;
-  const resolvedRightIndex = rightIndex === -1 ? SECTOR_ORDER.length : rightIndex;
-  return resolvedLeftIndex - resolvedRightIndex || left.sector.localeCompare(right.sector);
-};
-
 const emptyQuote = (holding: Pick<StockRebalanceCreateInput, 'symbol' | 'name' | 'currentPrice'>, userId = 0) => {
   const now = new Date();
   return {
@@ -100,6 +90,17 @@ const buildSymbolSummaries = (
 ): IStockPortfolioSymbolSummary[] => {
   const metadataBySymbol = new Map(previousSummaries.map((summary) => [summary.symbol, summary]));
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
+
+  previousSummaries.forEach((summary) => {
+    bySymbol.set(summary.symbol, {
+      ...summary,
+      quantity: 0,
+      marketValue: 0,
+      percent: 0,
+      holdingCount: 0,
+      accounts: [],
+    });
+  });
 
   holdings.filter((holding) => holding.quantity > 0).forEach((holding) => {
     const metadata = metadataBySymbol.get(holding.symbol);
@@ -169,7 +170,7 @@ const buildSectorSummaries = (
       percent: percentOf(summary.marketValue, totalAssetValue),
       symbols: summary.symbols.sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol)),
     }))
-    .sort(sortSectors);
+    .sort((left, right) => right.marketValue - left.marketValue || left.sector.localeCompare(right.sector));
 };
 
 export const recalculateRebalanceDraft = (

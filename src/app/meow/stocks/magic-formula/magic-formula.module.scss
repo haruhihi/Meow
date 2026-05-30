@@ -223,10 +223,14 @@ th.stockColumn {
   font-style: normal;
 }
 
-.stockCell {
+.stockCellButton {
+  width: 100%;
   min-height: 76px;
+  border: 0;
   padding: 9px;
   background: rgba(255, 255, 255, 0.96);
+  color: var(--meow-text);
+  text-align: left;
 
   strong,
   span,
@@ -314,4 +318,83 @@ th.stockColumn {
 
 .footerActions {
   margin: 16px 12px 0;
+}
+
+.dividendModal {
+  p {
+    margin: 0 0 10px;
+    color: var(--meow-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
+.dividendGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dividendCard,
+.dividendCardActive {
+  min-width: 0;
+  min-height: 84px;
+  border: 1px solid var(--meow-border);
+  border-radius: 12px;
+  background: var(--meow-surface-alt);
+  padding: 9px;
+  color: var(--meow-text);
+  text-align: left;
+
+  strong,
+  span,
+  em {
+    display: block;
+  }
+
+  strong {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--meow-text-sub);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  em {
+    margin-top: 5px;
+    color: var(--meow-text-muted);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 800;
+  }
+}
+
+.dividendCardActive {
+  border-color: color-mix(in srgb, var(--meow-accent) 42%, white);
+  background: var(--meow-accent-soft);
+}
+
+.showMoreButton {
+  width: 100%;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--meow-surface-alt);
+  padding: 9px;
+  color: var(--meow-primary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 360px) {
+  .dividendGrid {
+    grid-template-columns: 1fr;
+  }
 }

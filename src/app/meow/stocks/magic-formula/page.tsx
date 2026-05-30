@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Empty, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { Button, Empty, Modal, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
 import { LeftOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { LoadingState } from '@components/loading';
-import { IStockMagicFormulaItem, IStockMagicFormulaMetric, IStockMagicFormulaSearchReq, IStockMagicFormulaSearchRes } from '@dtos/meow';
+import {
+  IStockDividendListReq,
+  IStockDividendListRes,
+  IStockDividendMarkingUpdateReq,
+  IStockDividendMarkingUpdateRes,
+  IStockMagicFormulaItem,
+  IStockMagicFormulaMetric,
+  IStockMagicFormulaSearchReq,
+  IStockMagicFormulaSearchRes,
+  StockDividendEventWithMarking,
+} from '@dtos/meow';
 import { post } from '@libs/fetch';
 import styles from './magic-formula.module.scss';
 
@@ -18,6 +28,7 @@ type RankedItem = Omit<IStockMagicFormulaItem, 'metrics'> & {
   maxRankSum: number;
   metrics: RankedMetric[];
 };
+const DIVIDEND_PREVIEW_COUNT = 6;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '';
@@ -27,6 +38,20 @@ const formatDateTime = (value?: string | null) => {
 };
 
 const getMetric = (item: RankedItem, key: MetricKey) => item.metrics.find((metric) => metric.key === key) ?? null;
+
+const formatDividendPart = (value: number | null | undefined, prefix: string, suffix = '') =>
+  value && value > 0 ? `${prefix}${Number(value.toFixed(4))}${suffix}` : '';
+
+const formatDividendPlan = (event: StockDividendEventWithMarking) => {
+  const parts = [
+    formatDividendPart(event.cashPerTen, '10派', '元'),
+    formatDividendPart(event.bonusSharesPerTen, '10送', '股'),
+    formatDividendPart(event.transferSharesPerTen, '10转', '股'),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
+};
+
+const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 const buildRankMap = (items: IStockMagicFormulaItem[], metric: IStockMagicFormulaMetric) => {
   const ranked = items
@@ -57,7 +82,7 @@ const buildRankedItems = (items: IStockMagicFormulaItem[], selectedSector: strin
   return items
     .map((item) => {
       const metrics = activeMetrics.map((metric) => ({
-        ...metric,
+        ...(item.metrics.find((itemMetric) => itemMetric.key === metric.key) ?? metric),
         rank: rankMaps.get(metric.key)?.get(item.symbol) ?? null,
       }));
       const rankSum = metrics.reduce((sum, metric) => sum + (metric.rank ?? missingRank), 0);
@@ -88,6 +113,11 @@ export default function MagicFormulaPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [includePeg, setIncludePeg] = useState(false);
   const [sort, setSort] = useState<SortState>(null);
+  const [selectedItem, setSelectedItem] = useState<RankedItem | null>(null);
+  const [showAllDividends, setShowAllDividends] = useState(false);
+  const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
+  const [dividendLoading, setDividendLoading] = useState(false);
+  const selectedSymbol = selectedItem?.symbol ?? '';
 
   const loadData = async (nextSector = sector, background = false) => {
     if (background) setRefreshing(true);
@@ -110,6 +140,10 @@ export default function MagicFormulaPage() {
     void loadData('全部关注');
   }, []);
 
+  useEffect(() => {
+    setShowAllDividends(false);
+  }, [selectedSymbol]);
+
   const sectorOptions = (data?.sectors ?? ['全部关注', '除红利', '消费', '白酒', '中药', '医药', '红利']).map((item) => ({
     label: item,
     value: item,
@@ -118,6 +152,7 @@ export default function MagicFormulaPage() {
   const rankedItems = buildRankedItems(data?.items ?? [], sector, includePeg);
   const metricColumns = rankedItems[0]?.metrics ?? [];
   const sortedItems = sortItems(rankedItems, sort);
+  const visibleDividendEvents = showAllDividends ? dividendEvents : dividendEvents.slice(0, DIVIDEND_PREVIEW_COUNT);
 
   const toggleSort = (key: MetricKey) => {
     setSort((current) => current?.key === key
@@ -125,6 +160,48 @@ export default function MagicFormulaPage() {
         ? { key, direction: 'desc' }
         : null
       : { key, direction: 'asc' });
+  };
+
+  const loadDividendEvents = async (symbol: string) => {
+    setDividendLoading(true);
+    try {
+      const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', { symbol });
+      setDividendEvents(res.events);
+    } catch (error) {
+      setDividendEvents([]);
+      Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setDividendLoading(false);
+    }
+  };
+
+  const openDividendModal = (item: RankedItem) => {
+    setSelectedItem(item);
+    setShowAllDividends(false);
+    setDividendEvents([]);
+    void loadDividendEvents(item.symbol);
+  };
+
+  const closeDividendModal = () => {
+    setSelectedItem(null);
+    setShowAllDividends(false);
+    setDividendEvents([]);
+  };
+
+  const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
+    if (!selectedSymbol) return;
+    try {
+      await post<IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes>('/api/stock/dividend/marking/update', {
+        eventId: event.id,
+        countTowardNormalizedDividend: checked,
+        note: event.marking?.note ?? null,
+      });
+      await loadDividendEvents(selectedSymbol);
+      await loadData(sector, true);
+      Toast.show({ content: checked ? '已计入常态分红' : '已取消计入' });
+    } catch (error) {
+      Toast.show({ content: `标记失败: ${(error as any)?.result ?? error}` });
+    }
   };
 
   return (
@@ -196,12 +273,12 @@ export default function MagicFormulaPage() {
                   {sortedItems.map((item) => (
                     <tr key={item.symbol}>
                       <td className={styles.stockColumn}>
-                        <div className={styles.stockCell}>
+                        <button type="button" className={styles.stockCellButton} onClick={() => openDividendModal(item)}>
                           <strong>{item.name}</strong>
                           <span>{item.symbol} · {item.sector}</span>
                           <em>综合 #{item.overallRank} · 名次和 {item.rankSum}</em>
                           {item.flags.length > 0 && <small>{item.flags.join(' · ')}</small>}
-                        </div>
+                        </button>
                       </td>
                       {metricColumns.map((column) => {
                         const metric = getMetric(item, column.key);
@@ -228,6 +305,44 @@ export default function MagicFormulaPage() {
           <Button block fill="outline" loading={refreshing} onClick={() => loadData(sector, true)}>刷新评分</Button>
         </div>
       </PullToRefresh>
+
+      <Modal
+        visible={Boolean(selectedItem)}
+        title={selectedItem ? `${selectedItem.symbol} ${selectedItem.name}` : '分红事件'}
+        closeOnMaskClick
+        showCloseButton
+        onClose={closeDividendModal}
+        content={
+          <section className={styles.dividendModal}>
+            <p>点击分红方案切换是否计入常态分红，神奇公式会随标记刷新。</p>
+            {dividendLoading ? (
+              <LoadingState label="分红加载中" compact />
+            ) : dividendEvents.length > 0 ? (
+              <>
+                <div className={styles.dividendGrid}>
+                  {visibleDividendEvents.map((event) => {
+                    const checked = Boolean(event.marking?.countTowardNormalizedDividend);
+                    return (
+                      <button key={event.id} type="button" className={checked ? styles.dividendCardActive : styles.dividendCard} onClick={() => toggleDividendEvent(event, !checked)}>
+                        <strong>{event.reportPeriod ?? '未知报告期'}</strong>
+                        <span>{formatDividendPlan(event)}</span>
+                        <em>{isDividendPlan(event) ? '预案' : '实施'} · {checked ? '已计入' : '未计入'}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+                {dividendEvents.length > DIVIDEND_PREVIEW_COUNT && (
+                  <button type="button" className={styles.showMoreButton} onClick={() => setShowAllDividends((value) => !value)}>
+                    {showAllDividends ? '收起' : `展示更多（${dividendEvents.length - DIVIDEND_PREVIEW_COUNT}）`}
+                  </button>
+                )}
+              </>
+            ) : (
+              <Empty style={{ padding: '32px 0' }} description="暂无分红事件" />
+            )}
+          </section>
+        }
+      />
     </div>
   );
 }

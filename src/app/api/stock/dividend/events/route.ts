@@ -3,6 +3,7 @@ import { success, fail } from '@libs/fetch';
 import { getUID } from '@libs/session';
 import { IStockDividendListReq, IStockDividendListRes, StockDividendEventWithMarking } from '@dtos/meow';
 import { dividendEventDedupeKey, normalizeSymbol } from '../../helpers';
+import { getStockUniverseItem } from '../../../../../config/stock-universe';
 
 const isImplementedDividend = (event: { status: string | null; description: string | null; exDividendDate: Date | null }) =>
   Boolean(event.exDividendDate) || /实施/.test(event.status ?? event.description ?? '');
@@ -53,7 +54,11 @@ export async function POST(req: Request) {
       distinct: ['symbol'],
       select: { symbol: true },
     });
-    const symbols = heldSymbols.map((holding) => holding.symbol);
+    const symbols = requestedSymbol
+      ? heldSymbols.length > 0 || getStockUniverseItem(requestedSymbol)
+        ? [requestedSymbol]
+        : []
+      : heldSymbols.map((holding) => holding.symbol);
 
     if (symbols.length === 0) {
       return success<IStockDividendListRes>({ events: [] });

@@ -1,6 +1,6 @@
 import { prisma } from '@libs/prisma';
 import { marketValueOf, percentOf, roundStockValue } from '@utils/stock-calculations';
-import { getStockSector, STOCK_SECTOR_ORDER } from '../../../config/stock-universe';
+import { getStockSector, getStockUniverseItem, stockUniverse } from '../../../config/stock-universe';
 import type {
   IStockPortfolioAccountSummary,
   IStockPortfolioSectorSummary,
@@ -58,6 +58,20 @@ export const requireOwnedStockSymbol = async (userId: number, symbol: string) =>
   });
   if (quote) return quote;
 
+  const universeItem = getStockUniverseItem(symbol);
+  if (universeItem) {
+    const now = new Date();
+    return {
+      id: 0,
+      userId,
+      symbol,
+      name: universeItem.name,
+      currentPrice: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   const holding = await prisma.stockHolding.findFirst({
     where: { userId, symbol },
   });
@@ -106,7 +120,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cash = await prisma.stockCash.findUnique({
     where: { userId },
   });
-  const symbols = [...new Set(holdings.map((holding) => holding.symbol))];
+  const symbols = [...new Set([...holdings.map((holding) => holding.symbol), ...stockUniverse.map((item) => item.symbol)])];
   const fundamentals = await prisma.stockFundamental.findMany({
     where: { symbol: { in: symbols } },
     orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
@@ -152,8 +166,8 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     current.push(marking.event);
     markedDividendEventsBySymbol.set(marking.event.symbol, current);
   });
-  const holdingsWithQuotes = holdings
-    .map((holding) => attachQuote(holding, quoteBySymbol.get(holding.symbol)))
+  const holdingsWithQuotes = holdings.map((holding) => attachQuote(holding, quoteBySymbol.get(holding.symbol)));
+  const displayedHoldings = holdingsWithQuotes
     .filter((holding) => {
       if (!trimmedKeyword) return true;
       const keyword = trimmedKeyword.toLowerCase();
@@ -163,17 +177,29 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
         holding.account.name.toLowerCase().includes(keyword)
       );
     });
+  const displaySymbols = symbols.filter((symbol) => {
+    if (!trimmedKeyword) return true;
+    if (displayedHoldings.some((holding) => holding.symbol === symbol)) return true;
+    const keyword = trimmedKeyword.toLowerCase();
+    const universeItem = getStockUniverseItem(symbol);
+    const quote = quoteBySymbol.get(symbol);
+    return (
+      symbol.toLowerCase().includes(keyword) ||
+      (quote?.name ?? universeItem?.name ?? '').toLowerCase().includes(keyword) ||
+      getStockSector(symbol).toLowerCase().includes(keyword)
+    );
+  });
 
-  const totalMarketValue = roundStockValue(holdingsWithQuotes.reduce((sum, holding) => sum + marketValueOf(holding), 0));
+  const totalMarketValue = roundStockValue(displayedHoldings.reduce((sum, holding) => sum + marketValueOf(holding), 0));
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
-  const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue, latestFundamentalBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
+  const accountSummaries = buildAccountSummaries(accounts, displayedHoldings, totalAssetValue);
+  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
     accounts,
-    holdings: holdingsWithQuotes,
+    holdings: displayedHoldings,
     cashAmount,
     totalMarketValue,
     totalAssetValue,
@@ -225,6 +251,8 @@ const buildAccountSummaries = (
 
 const buildSymbolSummaries = (
   holdings: StockHoldingWithAccount[],
+  symbols: string[],
+  quoteBySymbol: Map<string, StockQuote>,
   totalMarketValue: number,
   fundamentalBySymbol: Map<string, StockFundamental>,
   annualFundamentalsBySymbol: Map<string, StockFundamental[]>,
@@ -233,6 +261,22 @@ const buildSymbolSummaries = (
   markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
 ): IStockPortfolioSymbolSummary[] => {
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
+
+  symbols.forEach((symbol) => {
+    const quote = quoteBySymbol.get(symbol);
+    const universeItem = getStockUniverseItem(symbol);
+    bySymbol.set(symbol, {
+      symbol,
+      name: quote?.name ?? universeItem?.name ?? symbol,
+      sector: getStockSector(symbol),
+      currentPrice: quote?.currentPrice ?? 0,
+      quantity: 0,
+      marketValue: 0,
+      percent: 0,
+      holdingCount: 0,
+      accounts: [],
+    });
+  });
 
   holdings.forEach((holding) => {
     const marketValue = marketValueOf(holding);
@@ -397,5 +441,5 @@ const buildSectorSummaries = (
       percent: percentOf(summary.marketValue, totalAssetValue),
       symbols: summary.symbols.sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol)),
     }))
-    .sort((left, right) => STOCK_SECTOR_ORDER.indexOf(left.sector) - STOCK_SECTOR_ORDER.indexOf(right.sector));
+    .sort((left, right) => right.marketValue - left.marketValue || left.sector.localeCompare(right.sector));
 };

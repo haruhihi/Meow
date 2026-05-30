@@ -8,7 +8,7 @@ export type StockUniverseItem = {
 
 export const stockUniverse = stockUniverseData as StockUniverseItem[];
 
-export const STOCK_SECTOR_ORDER = ['消费', '白酒', '红利', '中药', '医药', '其他'];
+export const STOCK_SECTOR_ORDER = ['消费', '家电', '白酒', '红利', '中药', '医药', '其他'];
 
 const stockUniverseBySymbol = new Map(stockUniverse.map((item) => [item.symbol, item]));
 
