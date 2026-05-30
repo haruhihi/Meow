@@ -2,9 +2,11 @@
 
 import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
+import { observer } from 'mobx-react-lite';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useStockAiReports } from '@utils/stock';
 import styles from './report.module.scss';
 
@@ -15,7 +17,7 @@ const formatDate = (value?: string | Date | null) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export default function AiReportDetailPage({ params }: { params: { id: string } }) {
+const AiReportDetailPage = observer(function AiReportDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { reports, loading } = useStockAiReports();
   const report = useMemo(() => reports.find((item) => String(item.id) === params.id) ?? null, [params.id, reports]);
@@ -54,9 +56,13 @@ export default function AiReportDetailPage({ params }: { params: { id: string } 
             </section>
           )}
         </>
+      ) : loading ? (
+        <LoadingState label="报告加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '研报不存在'} />
+        <Empty style={{ padding: '72px 0' }} description="研报不存在" />
       )}
     </main>
   );
-}
+});
+
+export default AiReportDetailPage;

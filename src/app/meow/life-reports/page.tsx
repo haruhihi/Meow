@@ -2,6 +2,7 @@
 
 import { Empty, NavBar } from 'antd-mobile';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useLifeReports } from '@utils/ai-report';
 import styles from '../ai-reports/reports.module.scss';
 
@@ -45,8 +46,10 @@ export default function LifeReportsPage() {
             </button>
           ))}
         </section>
+      ) : loading ? (
+        <LoadingState label="报告加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '暂无作息报告'} />
+        <Empty style={{ padding: '72px 0' }} description="暂无作息报告" />
       )}
     </main>
   );

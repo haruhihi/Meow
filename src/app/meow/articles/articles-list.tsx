@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { InlineLoading } from '@components/loading';
 import { post } from '@libs/fetch';
 import type { ArticleListItem, ArticleYearCount } from '@libs/article-db';
 import styles from './articles.module.scss';
@@ -414,7 +415,7 @@ export default function ArticlesList({ initialArticles, yearCounts, total, pageS
       <div className={styles.loadMore}>
         {hasMore ? (
           <button type="button" onClick={loadMore} disabled={loading}>
-            {loading ? '加载中...' : '加载更多'}
+            {loading ? <InlineLoading label="加载中" /> : '加载更多'}
           </button>
         ) : (
           items.length > 0 && (

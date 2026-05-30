@@ -1,244 +1,171 @@
-import { useEffect, useState } from 'react';
-import { post } from '@libs/fetch';
+import { useEffect } from 'react';
 import {
-  IStockAiReportListReq,
-  IStockAiReportListRes,
-  IStockAiPromptReq,
-  IStockAiPromptRes,
-  IStockFinancialStatementListReq,
-  IStockFinancialStatementListRes,
+  IStockCashUpdateReq,
+  IStockDividendMarkingUpdateReq,
+  IStockHoldingDeleteReq,
+  IStockHoldingUpdateReq,
   IStockQuoteRefreshReq,
-  IStockQuoteRefreshRes,
-  IStockRemarkListReq,
-  IStockRemarkListRes,
+  IStockRebalanceSaveReq,
+  IStockRemarkCreateReq,
+  IStockRemarkDeleteReq,
+  IStockRemarkUpdateReq,
   IStockSearchReq,
-  IStockSearchRes,
-  IStockSnapshotDetailReq,
-  IStockSnapshotDetailRes,
-  IStockSnapshotListReq,
-  IStockSnapshotListRes,
-  StockSnapshotDetail,
+  IStockSnapshotCreateReq,
 } from '@dtos/meow';
+import { useStockStore } from '@stores/stock-store-context';
 
 export const useStockPortfolio = (refreshKey = 0) => {
-  const [data, setData] = useState<IStockSearchRes | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchPortfolio = async (params: IStockSearchReq = {}) => {
-    setLoading(true);
-    try {
-      const res = await post<IStockSearchReq, IStockSearchRes>('/api/stock/search', params);
-      setData(res);
-      return res;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshQuotes = () => post<IStockQuoteRefreshReq, IStockQuoteRefreshRes>('/api/stock/quote/refresh', {});
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchPortfolio();
-  }, [refreshKey]);
+    void stockStore.loadPortfolio({}, { force: refreshKey > 0 });
+  }, [refreshKey, stockStore]);
+
+  const hasLoaded = stockStore.portfolioStatus.updatedAt != null || stockStore.portfolioStatus.error != null;
 
   return {
-    data,
-    loading,
-    reQuery: fetchPortfolio,
-    refreshQuotes,
+    data: stockStore.portfolio,
+    loading: stockStore.portfolioStatus.loading || (!hasLoaded && !stockStore.portfolio),
+    refreshing: stockStore.portfolioStatus.refreshing,
+    reQuery: (params: IStockSearchReq = {}) => stockStore.refreshPortfolio(params),
+    refreshQuotes: (params: IStockQuoteRefreshReq = {}) => stockStore.refreshQuotes(params),
+    updateCash: (params: IStockCashUpdateReq) => stockStore.updateCash(params),
+    saveRebalance: (params: IStockRebalanceSaveReq) => stockStore.saveRebalance(params),
+    updateHolding: (params: IStockHoldingUpdateReq) => stockStore.updateHolding(params),
+    deleteHolding: (params: IStockHoldingDeleteReq) => stockStore.deleteHolding(params),
+    updating: stockStore.portfolioUpdating,
+    quoteRefreshing: stockStore.quoteRefreshing,
   };
 };
 
 export const useStockAiReports = (refreshKey = 0, symbol?: string) => {
-  const [reports, setReports] = useState<IStockAiReportListRes['reports']>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchReports = async () => {
-    setLoading(true);
-    try {
-      const res = await post<IStockAiReportListReq, IStockAiReportListRes>('/api/stock/ai-report/list', { symbol });
-      setReports(res.reports);
-      return res;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchReports();
-  }, [refreshKey, symbol]);
+    void stockStore.loadReports(symbol, { force: refreshKey > 0 });
+  }, [refreshKey, stockStore, symbol]);
+
+  const status = stockStore.getReportStatus(symbol);
+  const reports = stockStore.getReports(symbol);
+  const hasLoaded = status.updatedAt != null || status.error != null;
 
   return {
     reports,
-    loading,
-    reQuery: fetchReports,
+    loading: status.loading || (!hasLoaded && reports.length === 0),
+    refreshing: status.refreshing,
+    reQuery: () => stockStore.loadReports(symbol, { force: true }),
   };
 };
 
 export const useStockAiPrompt = (symbol: string, refreshKey = 0) => {
-  const [data, setData] = useState<IStockAiPromptRes | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchPrompt = async () => {
-    if (!symbol) {
-      setData(null);
-      return null;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await post<IStockAiPromptReq, IStockAiPromptRes>('/api/stock/ai-report/prompt', { symbol });
-      setData(res);
-      return res;
-    } catch (err) {
-      const message = (err as any)?.result ?? String(err);
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchPrompt().catch(() => undefined);
-  }, [refreshKey, symbol]);
+    if (!symbol) return;
+    void stockStore.loadPrompt(symbol, { force: refreshKey > 0 }).catch(() => undefined);
+  }, [refreshKey, stockStore, symbol]);
+
+  const status = stockStore.getPromptStatus(symbol);
 
   return {
-    data,
-    loading,
-    error,
-    reQuery: fetchPrompt,
+    data: symbol ? stockStore.getPrompt(symbol) : null,
+    loading: status.loading,
+    refreshing: status.refreshing,
+    error: status.error,
+    reQuery: () => stockStore.loadPrompt(symbol, { force: true }),
   };
 };
 
 export const useStockRemarks = (symbol: string, refreshKey = 0) => {
-  const [remarks, setRemarks] = useState<IStockRemarkListRes['remarks']>([]);
-  const [symbolName, setSymbolName] = useState(symbol);
-  const [loading, setLoading] = useState(false);
-
-  const fetchRemarks = async () => {
-    if (!symbol) {
-      setRemarks([]);
-      setSymbolName('');
-      return null;
-    }
-
-    setLoading(true);
-    try {
-      const res = await post<IStockRemarkListReq, IStockRemarkListRes>('/api/stock/remark/list', { symbol });
-      setRemarks(res.remarks);
-      setSymbolName(res.name);
-      return res;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchRemarks();
-  }, [refreshKey, symbol]);
+    if (!symbol) return;
+    void stockStore.loadRemarks(symbol, { force: refreshKey > 0 });
+  }, [refreshKey, stockStore, symbol]);
+
+  const status = stockStore.getRemarkStatus(symbol);
 
   return {
-    remarks,
-    symbolName,
-    loading,
-    reQuery: fetchRemarks,
+    remarks: symbol ? stockStore.getRemarks(symbol) : [],
+    symbolName: symbol ? stockStore.getRemarkSymbolName(symbol) : '',
+    loading: status.loading,
+    refreshing: status.refreshing,
+    reQuery: () => stockStore.loadRemarks(symbol, { force: true }),
+    createRemark: (params: IStockRemarkCreateReq) => stockStore.createRemark(params),
+    updateRemark: (params: IStockRemarkUpdateReq) => stockStore.updateRemark(symbol, params),
+    deleteRemark: (params: IStockRemarkDeleteReq) => stockStore.deleteRemark(symbol, params),
+  };
+};
+
+export const useStockDividends = (symbol: string, refreshKey = 0) => {
+  const stockStore = useStockStore();
+
+  useEffect(() => {
+    if (!symbol) return;
+    void stockStore.loadDividends(symbol, { force: refreshKey > 0 });
+  }, [refreshKey, stockStore, symbol]);
+
+  const status = stockStore.getDividendStatus(symbol);
+
+  return {
+    events: symbol ? stockStore.getDividends(symbol) : [],
+    loading: status.loading,
+    refreshing: status.refreshing,
+    reQuery: () => stockStore.loadDividends(symbol, { force: true }),
+    updateMarking: (params: IStockDividendMarkingUpdateReq) => stockStore.updateDividendMarking(symbol, params),
   };
 };
 
 export const useStockFinancialStatements = (symbol: string, refreshKey = 0, limit = 5) => {
-  const [data, setData] = useState<IStockFinancialStatementListRes | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchStatements = async () => {
-    if (!symbol) {
-      setData(null);
-      return null;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await post<IStockFinancialStatementListReq, IStockFinancialStatementListRes>('/api/stock/financial-statement/list', { symbol, limit });
-      setData(res);
-      return res;
-    } catch (err) {
-      const message = (err as any)?.result ?? String(err);
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchStatements().catch(() => undefined);
-  }, [refreshKey, symbol, limit]);
+    if (!symbol) return;
+    void stockStore.loadFinancialStatements(symbol, limit, { force: refreshKey > 0 }).catch(() => undefined);
+  }, [refreshKey, stockStore, symbol, limit]);
+
+  const status = stockStore.getFinancialStatementStatus(symbol, limit);
 
   return {
-    data,
-    loading,
-    error,
-    reQuery: fetchStatements,
+    data: symbol ? stockStore.getFinancialStatements(symbol, limit) : null,
+    loading: status.loading,
+    refreshing: status.refreshing,
+    error: status.error,
+    reQuery: () => stockStore.loadFinancialStatements(symbol, limit, { force: true }),
   };
 };
 
 export const useStockSnapshots = (refreshKey = 0, limit = 120) => {
-  const [snapshots, setSnapshots] = useState<IStockSnapshotListRes['snapshots']>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchSnapshots = async () => {
-    setLoading(true);
-    try {
-      const res = await post<IStockSnapshotListReq, IStockSnapshotListRes>('/api/stock/snapshot/list', { limit });
-      setSnapshots(res.snapshots);
-      return res;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchSnapshots();
-  }, [refreshKey, limit]);
+    void stockStore.loadSnapshots(limit, { force: refreshKey > 0 });
+  }, [refreshKey, stockStore, limit]);
 
   return {
-    snapshots,
-    loading,
-    reQuery: fetchSnapshots,
+    snapshots: stockStore.snapshots,
+    loading: stockStore.snapshotsStatus.loading,
+    refreshing: stockStore.snapshotsStatus.refreshing,
+    reQuery: () => stockStore.loadSnapshots(limit, { force: true }),
+    createSnapshot: (params: IStockSnapshotCreateReq = {}) => stockStore.createSnapshot(params),
+    saving: stockStore.snapshotSaving,
   };
 };
 
 export const useStockSnapshotDetail = (snapshotId: number | null) => {
-  const [snapshot, setSnapshot] = useState<StockSnapshotDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchSnapshot = async () => {
-    if (!snapshotId) {
-      setSnapshot(null);
-      return null;
-    }
-
-    setLoading(true);
-    try {
-      const res = await post<IStockSnapshotDetailReq, IStockSnapshotDetailRes>('/api/stock/snapshot/detail', { id: snapshotId });
-      setSnapshot(res.snapshot);
-      return res;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const stockStore = useStockStore();
 
   useEffect(() => {
-    void fetchSnapshot();
-  }, [snapshotId]);
+    void stockStore.loadSnapshotDetail(snapshotId);
+  }, [snapshotId, stockStore]);
+
+  const status = stockStore.getSnapshotDetailStatus(snapshotId);
 
   return {
-    snapshot,
-    loading,
-    reQuery: fetchSnapshot,
+    snapshot: stockStore.getSnapshotDetail(snapshotId),
+    loading: status.loading,
+    refreshing: status.refreshing,
+    reQuery: () => stockStore.loadSnapshotDetail(snapshotId, { force: true }),
   };
 };

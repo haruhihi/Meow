@@ -380,6 +380,11 @@ export interface IStockPortfolioSymbolSummary {
   capitalExpenditureTtm?: number | null;
   normalizedDividend?: number | null;
   reportDate?: string | null;
+  deductedNetProfitCagr5?: number | null;
+  deductedPeg?: number | null;
+  goodwill?: number | null;
+  goodwillToNetAsset?: number | null;
+  goodwillToTotalAssets?: number | null;
   deductedPe?: number | null;
   deductedPeTtm?: number | null;
   pb?: number | null;

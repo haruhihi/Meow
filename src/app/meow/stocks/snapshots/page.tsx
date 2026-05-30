@@ -3,7 +3,9 @@
 import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import ReactECharts from 'echarts-for-react';
+import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useStockSnapshots } from '@utils/stock';
 import { formatMoney, PALETTE } from '@styles/theme';
 import styles from './snapshots.module.scss';
@@ -17,7 +19,7 @@ const formatDate = (value?: string | Date | null) => {
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`;
 
-export default function StockSnapshotsPage() {
+const StockSnapshotsPage = observer(function StockSnapshotsPage() {
   const router = useRouter();
   const { snapshots, loading } = useStockSnapshots();
   const latestSnapshot = snapshots[snapshots.length - 1];
@@ -147,9 +149,13 @@ export default function StockSnapshotsPage() {
             ))}
           </section>
         </>
+      ) : loading ? (
+        <LoadingState label="快照加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '快照加载中' : '暂无股票快照'} />
+        <Empty style={{ padding: '72px 0' }} description="暂无股票快照" />
       )}
     </main>
   );
-}
+});
+
+export default StockSnapshotsPage;

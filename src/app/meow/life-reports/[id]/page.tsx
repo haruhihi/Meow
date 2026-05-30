@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useLifeReports } from '@utils/ai-report';
 import styles from '../../ai-reports/[id]/report.module.scss';
 
@@ -40,8 +41,10 @@ export default function LifeReportDetailPage({ params }: { params: { id: string 
             <ReactMarkdown>{report.content}</ReactMarkdown>
           </article>
         </>
+      ) : loading ? (
+        <LoadingState label="报告加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '报告不存在'} />
+        <Empty style={{ padding: '72px 0' }} description="报告不存在" />
       )}
     </main>
   );

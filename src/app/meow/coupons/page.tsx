@@ -6,6 +6,7 @@ import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Input, List, Mo
 import { AddCircleOutline, EditSOutline, DeleteOutline, PayCircleOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import type { Coupon } from '@prisma/client';
+import { LoadingState } from '@components/loading';
 import { post } from '@libs/fetch';
 import {
   ICouponCreateReq,
@@ -174,8 +175,10 @@ export default function CouponsPage() {
             );
           })}
         </List>
+      ) : loading ? (
+        <LoadingState label="券加载中" />
       ) : (
-        <Empty style={{ padding: '64px 0' }} description={loading ? '加载中' : '该月份暂无券'} />
+        <Empty style={{ padding: '64px 0' }} description="该月份暂无券" />
       )}
 
       <CouponModal

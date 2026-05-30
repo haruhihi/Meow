@@ -2,7 +2,10 @@
 
 import { useEffect } from 'react';
 import { Empty, NavBar } from 'antd-mobile';
+import { observer } from 'mobx-react-lite';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useStockAiReports } from '@utils/stock';
 import styles from './reports.module.scss';
 
@@ -15,7 +18,7 @@ const formatDate = (value?: string | Date | null) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export default function AiReportsPage() {
+const AiReportsPage = observer(function AiReportsPage() {
   const router = useRouter();
   const { reports, loading } = useStockAiReports();
 
@@ -26,9 +29,8 @@ export default function AiReportsPage() {
     requestAnimationFrame(() => window.scrollTo(0, Number(value) || 0));
   }, [reports.length]);
 
-  const openReport = (id: number) => {
+  const rememberScroll = () => {
     window.sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
-    router.push(`/meow/ai-reports/${id}`);
   };
 
   return (
@@ -45,11 +47,12 @@ export default function AiReportsPage() {
       {reports.length > 0 ? (
         <section className={styles.reportList}>
           {reports.map((report) => (
-            <button
+            <Link
               key={report.id}
-              type="button"
+              prefetch={false}
               className={styles.reportCard}
-              onClick={() => openReport(report.id)}
+              href={`/meow/ai-reports/${report.id}`}
+              onClick={rememberScroll}
             >
               <div className={styles.reportTopline}>
                 <span>{report.symbol}</span>
@@ -57,12 +60,16 @@ export default function AiReportsPage() {
               </div>
               <strong>{report.title}</strong>
               <p>{report.summary}</p>
-            </button>
+            </Link>
           ))}
         </section>
+      ) : loading ? (
+        <LoadingState label="报告加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '报告加载中' : '暂无研报'} />
+        <Empty style={{ padding: '72px 0' }} description="暂无研报" />
       )}
     </main>
   );
-}
+});
+
+export default AiReportsPage;

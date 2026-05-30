@@ -1,32 +1,21 @@
 'use client';
 
 import { RefObject, useEffect, useMemo, useState } from 'react';
-import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Input, Modal, NavBar, TextArea, Toast } from 'antd-mobile';
+import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Input, Modal, NavBar, PullToRefresh, TextArea, Toast } from 'antd-mobile';
 import { AddCircleOutline, DeleteOutline, EditSOutline, FileOutline } from 'antd-mobile-icons';
+import { observer } from 'mobx-react-lite';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { post } from '@libs/fetch';
+import { InlineLoading, LoadingState } from '@components/loading';
 import {
-  IStockDividendListReq,
-  IStockDividendListRes,
-  IStockDividendMarkingUpdateReq,
-  IStockDividendMarkingUpdateRes,
-  IStockHoldingDeleteReq,
-  IStockHoldingUpdateReq,
-  IStockHoldingUpdateRes,
   IStockPortfolioSymbolSummary,
-  IStockRemarkCreateReq,
-  IStockRemarkCreateRes,
-  IStockRemarkDeleteReq,
-  IStockRemarkDeleteRes,
-  IStockRemarkUpdateReq,
-  IStockRemarkUpdateRes,
   StockDividendEventWithMarking,
   StockHoldingWithAccount,
   StockRemarkListItem,
 } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
 import { formatStockQuantity } from '@utils/stock-calculations';
-import { useStockAiPrompt, useStockAiReports, useStockPortfolio, useStockRemarks } from '@utils/stock';
+import { useStockAiPrompt, useStockAiReports, useStockDividends, useStockPortfolio, useStockRemarks } from '@utils/stock';
 import styles from './stock-detail.module.scss';
 
 type HoldingFormValues = {
@@ -74,23 +63,24 @@ const DIVIDEND_PREVIEW_COUNT = 4;
 const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <section className={styles.metricGrid}>
     <div><span>扣非 PE</span><strong>{formatOptionalNumber(summary.deductedPe)} / {formatOptionalNumber(summary.deductedPeTtm)}</strong><em>静 / TTM</em></div>
+    <div><span>扣非 PEG</span><strong>{formatOptionalNumber(summary.deductedPeg)}</strong><em>CAGR {formatPercent(summary.deductedNetProfitCagr5)}</em></div>
     <div><span>PB</span><strong>{formatOptionalNumber(summary.pb)}</strong><em>资产</em></div>
     <div><span>扣非 ROE</span><strong>{formatPercent(summary.deductedRoeTtm)}</strong><em>TTM</em></div>
     <div><span>股息率</span><strong>{formatPercent(summary.normalizedDividendYield)}</strong><em>常态</em></div>
+    <div><span>商誉</span><strong>{formatPercent(summary.goodwillToNetAsset)}</strong><em>占净资产 / {formatPercent(summary.goodwillToTotalAssets)}资产</em></div>
     <div><span>现金质量</span><strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)} / {formatOptionalNumber(summary.fcfDividendCoverage)}</strong><em>含金量 / 分红覆盖</em></div>
     <div><span>市值</span><strong>{formatMoney(summary.marketValue)}</strong><em>持仓口径</em></div>
   </section>
 );
 
-export default function StockDetailPage({ params }: { params: { symbol: string } }) {
+const StockDetailPage = observer(function StockDetailPage({ params }: { params: { symbol: string } }) {
   const router = useRouter();
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
-  const { data, loading: portfolioLoading, reQuery } = useStockPortfolio();
+  const { data, loading: portfolioLoading, reQuery, updateHolding, deleteHolding: deleteStockHolding } = useStockPortfolio();
   const { reports, loading: reportsLoading } = useStockAiReports(0, symbol);
   const { data: promptData, loading: promptLoading, error: promptError, reQuery: reQueryPrompt } = useStockAiPrompt(symbol);
-  const { remarks, loading: remarksLoading, reQuery: reQueryRemarks } = useStockRemarks(symbol);
-  const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
-  const [dividendLoading, setDividendLoading] = useState(false);
+  const { remarks, loading: remarksLoading, createRemark, updateRemark, deleteRemark: deleteStockRemark } = useStockRemarks(symbol);
+  const { events: dividendEvents, loading: dividendLoading, updateMarking: updateDividendMarking } = useStockDividends(symbol);
   const [promptVisible, setPromptVisible] = useState(false);
   const [remarkVisible, setRemarkVisible] = useState(false);
   const [editingRemark, setEditingRemark] = useState<EditingRemark>(null);
@@ -103,40 +93,28 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
   );
 
   useEffect(() => {
-    let cancelled = false;
     setShowAllDividends(false);
-    const loadDividends = async () => {
-      setDividendLoading(true);
-      try {
-        const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', { symbol });
-        if (!cancelled) setDividendEvents(res.events);
-      } catch (error) {
-        Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
-      } finally {
-        if (!cancelled) setDividendLoading(false);
-      }
-    };
-    void loadDividends();
-    return () => {
-      cancelled = true;
-    };
   }, [symbol]);
 
   const visibleDividendEvents = showAllDividends ? dividendEvents : dividendEvents.slice(0, DIVIDEND_PREVIEW_COUNT);
+
+  const refreshActive = async () => {
+    await reQuery();
+  };
 
   const saveHolding = async (values: HoldingFormValues) => {
     if (!summary) return;
     try {
       await Promise.all(holdings.map((holding) =>
-        post<IStockHoldingUpdateReq, IStockHoldingUpdateRes>('/api/stock/holding/update', {
+        updateHolding({
           id: holding.id,
           name: values.name,
           currentPrice: Number(values.currentPrice),
           quantity: Number(values.quantities[String(holding.id)]),
         })
       ));
+      await refreshActive();
       Toast.show({ content: '股票持仓已保存' });
-      await reQuery();
     } catch (error) {
       Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
     }
@@ -146,9 +124,8 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
     const ok = await Dialog.confirm({ title: '删除持仓', content: `确认删除「${holding.symbol} ${holding.name}」吗？` });
     if (!ok) return;
     try {
-      await post<IStockHoldingDeleteReq, { id: number }>('/api/stock/holding/delete', { id: holding.id });
+      await deleteStockHolding({ id: holding.id });
       Toast.show({ content: '持仓已删除' });
-      await reQuery();
     } catch (error) {
       Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
     }
@@ -156,17 +133,11 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
 
   const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
     try {
-      await post<IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes>('/api/stock/dividend/marking/update', {
+      await updateDividendMarking({
         eventId: event.id,
         countTowardNormalizedDividend: checked,
         note: event.marking?.note ?? null,
       });
-      setDividendEvents((events) => events.map((item) =>
-        item.id === event.id
-          ? { ...item, marking: { countTowardNormalizedDividend: checked, note: item.marking?.note ?? null } }
-          : item
-      ));
-      await reQuery();
     } catch (error) {
       Toast.show({ content: `标记失败: ${(error as any)?.result ?? error}` });
     }
@@ -190,13 +161,13 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
     }
     try {
       if (editingRemark) {
-        await post<IStockRemarkUpdateReq, IStockRemarkUpdateRes>('/api/stock/remark/update', {
+        await updateRemark({
           id: editingRemark.id,
           remarkDate: toRemarkDate(values.remarkDate),
           content,
         });
       } else {
-        await post<IStockRemarkCreateReq, IStockRemarkCreateRes>('/api/stock/remark/create', {
+        await createRemark({
           symbol,
           remarkDate: toRemarkDate(values.remarkDate),
           content,
@@ -204,7 +175,6 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
       }
       setRemarkVisible(false);
       Toast.show({ content: '已保存' });
-      await reQueryRemarks();
     } catch (error) {
       Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
     }
@@ -214,9 +184,8 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
     const ok = await Dialog.confirm({ title: '删除评语', content: `确认删除 ${formatDate(remark.remarkDate)} 的评语吗？` });
     if (!ok) return;
     try {
-      await post<IStockRemarkDeleteReq, IStockRemarkDeleteRes>('/api/stock/remark/delete', { id: remark.id });
+      await deleteStockRemark({ id: remark.id });
       Toast.show({ content: '已删除' });
-      await reQueryRemarks();
     } catch (error) {
       Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
     }
@@ -236,7 +205,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
     return (
       <main className={styles.page}>
         <NavBar onBack={() => router.back()} className={styles.navbar}>股票详情</NavBar>
-        <Empty style={{ padding: '72px 0' }} description="股票加载中" />
+        <LoadingState label="股票加载中" />
       </main>
     );
   }
@@ -254,41 +223,44 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
     <main className={styles.page}>
       <NavBar onBack={() => router.back()} className={styles.navbar}>股票详情</NavBar>
 
-      <header className={styles.header}>
-        <div>
-          <span className={styles.symbolCode}>{summary.symbol}</span>
-          <h1>{summary.name}</h1>
-          <p>{formatMoney(summary.currentPrice)} · {formatStockQuantity(summary.quantity)} 股 · {formatMoney(summary.marketValue)}</p>
-        </div>
-        <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
-          <span className={styles.buttonText}><FileOutline /> 财报</span>
-        </Button>
-      </header>
+      <PullToRefresh onRefresh={refreshActive}>
+        <header className={styles.header}>
+          <div>
+            <span className={styles.symbolCode}>{summary.symbol}</span>
+            <h1>{summary.name}</h1>
+            <p>{formatMoney(summary.currentPrice)} · {formatStockQuantity(summary.quantity)} 股 · {formatMoney(summary.marketValue)}</p>
+          </div>
+          <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
+            <span className={styles.buttonText}><FileOutline /> 财报</span>
+          </Button>
+        </header>
 
-      <MetricGrid summary={summary} />
+        <MetricGrid summary={summary} />
 
-      <section className={styles.promptBar}>
-        <button type="button" onClick={() => setPromptVisible(true)}>
-          <strong>Prompt</strong>
-          <span>{promptData ? `${promptData.frameworkCards.length} 张方法卡片` : promptLoading ? '生成中' : '查看'}</span>
-        </button>
-        {promptError && <button type="button" onClick={() => { void reQueryPrompt().catch(() => undefined); }}>重试</button>}
-      </section>
+        <section className={styles.promptBar}>
+          <button type="button" onClick={() => setPromptVisible(true)}>
+            <strong>Prompt</strong>
+            <span>{promptData ? `${promptData.frameworkCards.length} 张方法卡片` : promptLoading ? <InlineLoading label="生成中" /> : '查看'}</span>
+          </button>
+          {promptError && <button type="button" onClick={() => { void reQueryPrompt().catch(() => undefined); }}>重试</button>}
+        </section>
 
       <section className={styles.sectionBlock}>
         <div className={styles.sectionTitle}>AI 研报</div>
         {reports.length > 0 ? (
           <div className={styles.reportSwiper}>
             {reports.map((report) => (
-              <button key={report.id} type="button" className={styles.reportCard} onClick={() => router.push(`/meow/ai-reports/${report.id}`)}>
+              <Link key={report.id} prefetch={false} className={styles.reportCard} href={`/meow/ai-reports/${report.id}`}>
                 <span>{formatDate(report.reportDate)}</span>
                 <strong>{report.title}</strong>
                 <p>{report.summary}</p>
-              </button>
+              </Link>
             ))}
           </div>
+        ) : reportsLoading ? (
+          <LoadingState label="研报加载中" compact />
         ) : (
-          <Empty style={{ padding: '28px 0' }} description={reportsLoading ? '研报加载中' : '暂无研报'} />
+          <Empty style={{ padding: '28px 0' }} description="暂无研报" />
         )}
       </section>
 
@@ -314,8 +286,10 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
               </article>
             ))}
           </div>
+        ) : remarksLoading ? (
+          <LoadingState label="评语加载中" compact />
         ) : (
-          <Empty style={{ padding: '28px 0' }} description={remarksLoading ? '评语加载中' : '暂无评语'} />
+          <Empty style={{ padding: '28px 0' }} description="暂无评语" />
         )}
       </section>
 
@@ -351,7 +325,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
       <section className={styles.sectionBlock}>
         <div className={styles.sectionTitle}>分红事件</div>
         {dividendLoading ? (
-          <div className={styles.emptyHint}>分红加载中</div>
+          <div className={styles.emptyHint}><InlineLoading label="分红加载中" /></div>
         ) : dividendEvents.length > 0 ? (
           <>
             <div className={styles.dividendGrid}>
@@ -376,6 +350,7 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
           <div className={styles.emptyHint}>暂无分红事件</div>
         )}
       </section>
+      </PullToRefresh>
 
       <Modal
         visible={promptVisible}
@@ -389,8 +364,10 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
               <Button size="small" color="primary" onClick={copyPrompt}>复制 Prompt</Button>
               <pre>{promptData.prompt}</pre>
             </div>
+          ) : promptLoading ? (
+            <LoadingState label="Prompt 生成中" compact />
           ) : (
-            <Empty style={{ padding: '32px 0' }} description={promptLoading ? 'Prompt 生成中' : '暂无 Prompt'} />
+            <Empty style={{ padding: '32px 0' }} description="暂无 Prompt" />
           )
         }
       />
@@ -404,7 +381,9 @@ export default function StockDetailPage({ params }: { params: { symbol: string }
       />
     </main>
   );
-}
+});
+
+export default StockDetailPage;
 
 const RemarkModal: React.FC<{
   visible: boolean;

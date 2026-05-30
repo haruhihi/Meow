@@ -148,6 +148,10 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     where: { symbol: { in: symbols } },
     orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
   });
+  const balanceStatements = await prisma.stockFinancialStatement.findMany({
+    where: { symbol: { in: symbols }, statement: 'balance', reportName: { contains: '年报' } },
+    orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
+  });
   const overrides = await prisma.stockMetricOverride.findMany({
     where: { userId, symbol: { in: symbols } },
   });
@@ -161,9 +165,21 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   });
   const quoteBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
   const latestFundamentalBySymbol = new Map<string, StockFundamental>();
+  const annualFundamentalsBySymbol = new Map<string, StockFundamental[]>();
   fundamentals.forEach((fundamental) => {
     if (!latestFundamentalBySymbol.has(fundamental.symbol)) {
       latestFundamentalBySymbol.set(fundamental.symbol, fundamental);
+    }
+    if (fundamental.reportName?.includes('年报')) {
+      const annuals = annualFundamentalsBySymbol.get(fundamental.symbol) ?? [];
+      annuals.push(fundamental);
+      annualFundamentalsBySymbol.set(fundamental.symbol, annuals);
+    }
+  });
+  const latestAnnualBalanceBySymbol = new Map<string, { fields: unknown }>();
+  balanceStatements.forEach((statement) => {
+    if (!latestAnnualBalanceBySymbol.has(statement.symbol)) {
+      latestAnnualBalanceBySymbol.set(statement.symbol, { fields: statement.fields });
     }
   });
   const overrideBySymbol = new Map(overrides.map((override) => [override.symbol, override]));
@@ -189,7 +205,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, holdingsWithQuotes, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue, latestFundamentalBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
+  const symbolSummaries = buildSymbolSummaries(holdingsWithQuotes, totalAssetValue, latestFundamentalBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -248,6 +264,8 @@ const buildSymbolSummaries = (
   holdings: StockHoldingWithAccount[],
   totalMarketValue: number,
   fundamentalBySymbol: Map<string, StockFundamental>,
+  annualFundamentalsBySymbol: Map<string, StockFundamental[]>,
+  annualBalanceBySymbol: Map<string, { fields: unknown }>,
   overrideBySymbol: Map<string, StockMetricOverride>,
   markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
 ): IStockPortfolioSymbolSummary[] => {
@@ -284,6 +302,8 @@ const buildSymbolSummaries = (
       ...buildComputedMetrics(
         summary,
         fundamentalBySymbol.get(summary.symbol),
+        annualFundamentalsBySymbol.get(summary.symbol) ?? [],
+        annualBalanceBySymbol.get(summary.symbol),
         overrideBySymbol.get(summary.symbol),
         markedDividendEventsBySymbol.get(summary.symbol) ?? []
       ),
@@ -294,6 +314,8 @@ const buildSymbolSummaries = (
 const buildComputedMetrics = (
   summary: IStockPortfolioSymbolSummary,
   fundamental?: StockFundamental,
+  annualFundamentals: StockFundamental[] = [],
+  annualBalance?: { fields: unknown },
   override?: StockMetricOverride,
   dividendEvents: StockDividendEvent[] = []
 ) => {
@@ -319,6 +341,15 @@ const buildComputedMetrics = (
   const freeCashFlowTtm = operatingCashFlowTtm != null && capitalExpenditureTtm != null
     ? operatingCashFlowTtm - capitalExpenditureTtm
     : null;
+  const annualsByYear = new Map(annualFundamentals.map((item) => [item.reportDate.getFullYear(), item]));
+  const latestAnnual = annualFundamentals[0];
+  const baseAnnual = latestAnnual ? annualsByYear.get(latestAnnual.reportDate.getFullYear() - 5) : undefined;
+  const deductedNetProfitCagr5 = latestAnnual?.deductedNetProfit && latestAnnual.deductedNetProfit > 0 && baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0
+    ? (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / 5) - 1
+    : null;
+  const goodwill = readStatementNumber(annualBalance?.fields, 'goodwill');
+  const deductedPe = companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null;
+  const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
 
   return {
     totalShares,
@@ -336,8 +367,13 @@ const buildComputedMetrics = (
     capitalExpenditureTtm,
     normalizedDividend,
     reportDate: fundamental?.reportDate.toISOString() ?? null,
-    deductedPe: companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null,
-    deductedPeTtm: companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null,
+    deductedNetProfitCagr5,
+    deductedPeg: deductedPe && deductedNetProfitCagr5 && deductedNetProfitCagr5 > 0 ? roundStockValue(deductedPe / (deductedNetProfitCagr5 * 100)) : null,
+    goodwill,
+    goodwillToNetAsset: goodwill != null && netAsset && netAsset > 0 ? goodwill / netAsset : null,
+    goodwillToTotalAssets: goodwill != null && totalAssets && totalAssets > 0 ? goodwill / totalAssets : null,
+    deductedPe,
+    deductedPeTtm,
     pb: companyMarketCap && netAsset && netAsset > 0 ? roundStockValue(companyMarketCap / netAsset) : null,
     deductedRoe: deductedNetProfit && netAsset && netAsset > 0 ? deductedNetProfit / netAsset : null,
     deductedRoeTtm: deductedNetProfitTtm && netAsset && netAsset > 0 ? deductedNetProfitTtm / netAsset : null,
@@ -347,6 +383,14 @@ const buildComputedMetrics = (
     fcfDividendCoverage: freeCashFlowTtm != null && normalizedDividend && normalizedDividend > 0 ? freeCashFlowTtm / normalizedDividend : null,
     operatingCashFlowToDeductedNetProfit: operatingCashFlowTtm != null && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? operatingCashFlowTtm / deductedNetProfitTtm : null,
   };
+};
+
+const readStatementNumber = (fields: unknown, key: string) => {
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+  const value = (fields as Record<string, unknown>)[key];
+  const raw = Array.isArray(value) ? value[0] : value;
+  const numberValue = typeof raw === 'number' ? raw : Number(raw ?? Number.NaN);
+  return Number.isFinite(numberValue) ? numberValue : null;
 };
 
 const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: number | null) => {

@@ -1,7 +1,9 @@
 'use client';
 
 import { Button, Empty, NavBar, Tabs } from 'antd-mobile';
+import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
+import { LoadingState } from '@components/loading';
 import { useStockFinancialStatements } from '@utils/stock';
 import { StockFinancialStatementMappedSection, StockFinancialStatementMappedValue } from '@dtos/meow';
 import styles from './financials.module.scss';
@@ -50,7 +52,7 @@ const StatementTable = ({ section }: { section: StockFinancialStatementMappedSec
   </section>
 );
 
-export default function StockFinancialsPage({ params }: { params: { symbol: string } }) {
+const StockFinancialsPage = observer(function StockFinancialsPage({ params }: { params: { symbol: string } }) {
   const router = useRouter();
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
   const { data, loading, error, reQuery } = useStockFinancialStatements(symbol);
@@ -82,9 +84,13 @@ export default function StockFinancialsPage({ params }: { params: { symbol: stri
             </Tabs.Tab>
           ))}
         </Tabs>
+      ) : loading ? (
+        <LoadingState label="财报加载中" />
       ) : (
-        <Empty style={{ padding: '72px 0' }} description={loading ? '财报加载中' : '暂无财报'} />
+        <Empty style={{ padding: '72px 0' }} description="暂无财报" />
       )}
     </main>
   );
-}
+});
+
+export default StockFinancialsPage;

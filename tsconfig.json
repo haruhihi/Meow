@@ -25,6 +25,7 @@
       "@components/*": ["./src/components/*"],
       "@static/*": ["./src/static/*"],
       "@styles/*": ["./src/styles/*"],
+      "@stores/*": ["./src/stores/*"],
     },
     "target": "ES2017"
   },

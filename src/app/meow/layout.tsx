@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
 import { ClockCircleOutline, HistogramOutline, PayCircleOutline, UserOutline } from 'antd-mobile-icons';
+import { StockStoreProvider } from '@stores/stock-store-context';
 import styles from './index.module.scss';
 
 const Bottom: FC = () => {
@@ -50,12 +51,35 @@ const Bottom: FC = () => {
 };
 
 const App: React.FC<{ children: React.ReactNode }> = (props) => {
+  const pathname = usePathname();
+  const isStocksDocumentScrollRoute = pathname === '/meow/stocks' || /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname);
+
+  useEffect(() => {
+    if (!isStocksDocumentScrollRoute) return;
+
+    const root = document.documentElement;
+    const body = document.body;
+    const previousBodyHeight = body.style.height;
+
+    root.classList.add('meow-document-scroll');
+    body.classList.add('meow-document-scroll');
+    body.style.height = 'auto';
+
+    return () => {
+      root.classList.remove('meow-document-scroll');
+      body.classList.remove('meow-document-scroll');
+      body.style.height = previousBodyHeight;
+    };
+  }, [isStocksDocumentScrollRoute]);
+
   return (
-    <div className={styles.app}>
+    <div className={`${styles.app} ${isStocksDocumentScrollRoute ? styles.documentScrollApp : ''}`}>
       {/* <div className={styles.top}>
         <NavBar>Meow</NavBar>
       </div> */}
-      <div className={styles.body}>{props.children}</div>
+      <div className={styles.body}>
+        <StockStoreProvider>{props.children}</StockStoreProvider>
+      </div>
       <div className={styles.bottom}>
         <Bottom />
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Popup, SearchBar, CascaderOption } from 'antd-mobile';
+import { InlineLoading } from '@components/loading';
 import { FlatCategoryOption, flattenCategoryOptions } from '@utils/category';
 import styles from './form-cascader.module.scss';
 
@@ -144,7 +145,7 @@ export const FormCascader: React.FC<{
                 ))}
               </div>
             ) : (
-              <div className={styles.empty}>{loading ? '类目加载中' : '暂无类目'}</div>
+              <div className={styles.empty}>{loading ? <InlineLoading label="类目加载中" /> : '暂无类目'}</div>
             )
           )}
         </div>

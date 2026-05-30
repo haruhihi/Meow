@@ -59,9 +59,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
                 // 这段 JavaScript 会在页面加载之前执行
-                console.log('Setting body height: ' + document.documentElement.clientHeight + 'px')
-                document.body.style.height = document.documentElement.clientHeight + 'px';
-                // 你可以添加其他初始化脚本
+                if (!/^\/meow\/stocks(?:\/(?!snapshots$)[^/]+)?$/.test(window.location.pathname)) {
+                  console.log('Setting body height: ' + document.documentElement.clientHeight + 'px')
+                  document.body.style.height = document.documentElement.clientHeight + 'px';
+                  // 你可以添加其他初始化脚本
+                }
               `,
           }}
           strategy="afterInteractive"

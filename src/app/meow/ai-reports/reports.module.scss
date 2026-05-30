@@ -39,6 +39,7 @@
 }
 
 .reportCard {
+  display: block;
   width: 100%;
   border: 0;
   border-radius: 14px;
@@ -47,6 +48,7 @@
   padding: 12px;
   color: var(--meow-text);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 
   strong,

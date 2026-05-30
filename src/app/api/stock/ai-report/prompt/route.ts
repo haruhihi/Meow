@@ -14,6 +14,7 @@ import {
 import { buildStockPortfolio, normalizeSymbol } from '../../helpers';
 import { GLOBAL_FRAMEWORK_SYMBOL, stockFrameworkArticleConfig, StockFrameworkArticleConfigItem } from '../../../../../config/stock-ai-framework';
 import { stockFrameworkCardByArticleId } from '../../../../../config/stock-ai-framework-cards';
+import { formatStockReportTemplateForPrompt, getStockReportTemplate, StockReportPeer, StockReportTemplate } from '../../../../../config/stock-report-templates';
 
 type MarkedDividendEvent = Prisma.StockDividendMarkingGetPayload<{ include: { event: true } }>;
 
@@ -28,6 +29,22 @@ const formatDate = (value?: Date | string | null) => {
 };
 
 const toInputJson = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+
+const readStatementNumber = (fields: Prisma.JsonValue | undefined, key: string) => {
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+  const value = fields[key];
+  const raw = Array.isArray(value) ? value[0] : value;
+  const numberValue = typeof raw === 'number' ? raw : Number(raw ?? Number.NaN);
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const formatRatio = (value: number | null) => (value == null || !Number.isFinite(value) ? '缺数据' : value.toFixed(2));
+const formatRatioPercent = (value: number | null) => (value == null || !Number.isFinite(value) ? '缺数据' : `${(value * 100).toFixed(1)}%`);
+
+const divide = (numerator: number | null, denominator: number | null) => {
+  if (numerator == null || denominator == null || denominator === 0) return null;
+  return numerator / denominator;
+};
 
 const normalizeConfigItems = (symbol: string): { symbol: string; item: StockFrameworkArticleConfigItem }[] => [
   ...stockFrameworkArticleConfig.global.map((item) => ({ symbol: GLOBAL_FRAMEWORK_SYMBOL, item })),
@@ -107,11 +124,81 @@ const buildMetrics = (summary: IStockPortfolioSymbolSummary): IStockAiPromptMetr
   metric('常态股息率', formatPercent(summary.normalizedDividendYield), '基于你标记的常态分红计算，不能把高股息率自动当成安全。'),
   metric('扣非 PE', formatNumber(summary.deductedPe), '静态扣非口径估值，需结合现金流质量和增长稳定性。'),
   metric('扣非 PE TTM', formatNumber(summary.deductedPeTtm), '滚动扣非口径估值，适合观察最近四个季度盈利质量。'),
+  metric('扣非净利润 5 年 CAGR', formatPercent(summary.deductedNetProfitCagr5), '用于计算扣非 PEG；若历史增速受低基数影响，需要谨慎外推。'),
+  metric('扣非 PEG', formatNumber(summary.deductedPeg), '扣非 PE / 扣非净利润 5 年 CAGR，用于判断估值是否被增长支撑。'),
   metric('PB', formatNumber(summary.pb), '资产定价口径，中药品牌型公司不能只按 PB 判断便宜。'),
   metric('扣非 ROE TTM', formatPercent(summary.deductedRoeTtm), '需要用杜邦拆解判断来自净利率、周转率还是杠杆。'),
+  metric('商誉', formatMoney(summary.goodwill), '并购形成的资产，商誉较高时需要关注减值风险。'),
+  metric('商誉/净资产', formatPercent(summary.goodwillToNetAsset), '衡量商誉减值对股东权益和利润表的潜在冲击。'),
   metric('自由现金流分红覆盖', formatNumber(summary.fcfDividendCoverage), '自由现金流 / 你标记的常态分红，低于 1 需要重点解释。'),
   metric('经营现金流 / 扣非净利润', formatNumber(summary.operatingCashFlowToDeductedNetProfit), '用于判断利润是否变成现金；长期显著低于 1 是风险信号。'),
 ];
+
+const buildPeerComparisonText = async (peers: StockReportPeer[]) => {
+  if (peers.length === 0) return '暂无已配置横评股票池。';
+
+  const rows = await Promise.all(peers.map(async (peer) => {
+    if (peer.listed === false) {
+      return `| ${peer.symbol} ${peer.name} | 非上市质性对手 | ${peer.role} | - | - | - | - | - | - | - |`;
+    }
+
+    const statements = await prisma.stockFinancialStatement.findMany({
+      where: {
+        symbol: peer.symbol,
+        reportName: { contains: '年报' },
+        statement: { in: ['income', 'balance', 'cash_flow'] },
+      },
+      orderBy: [{ reportDate: 'desc' }, { statement: 'asc' }],
+      take: 9,
+    });
+
+    const periods = new Map<string, Record<string, Prisma.JsonValue>>();
+    statements.forEach((statement) => {
+      const key = statement.reportDate.toISOString();
+      periods.set(key, {
+        ...(periods.get(key) ?? {}),
+        [statement.statement]: statement.fields,
+      });
+    });
+
+    const latest = [...periods.entries()].find(([, item]) => item.income && item.balance && item.cash_flow);
+    if (!latest) return `| ${peer.symbol} ${peer.name} | 缺本地三表 | ${peer.role} | - | - | - | - | - | - | - |`;
+
+    const [reportDate, item] = latest;
+    const income = item.income;
+    const balance = item.balance;
+    const cashFlow = item.cash_flow;
+    const revenue = readStatementNumber(income, 'revenue');
+    const deductedNetProfit = readStatementNumber(income, 'net_profit_after_nrgal_atsolc');
+    const totalLiability = readStatementNumber(balance, 'total_liab');
+    const equity = readStatementNumber(balance, 'total_quity_atsopc');
+    const contractLiability = readStatementNumber(balance, 'contract_liabilities');
+    const receivables = readStatementNumber(balance, 'ar_and_br');
+    const inventory = readStatementNumber(balance, 'inventory');
+    const salesCash = readStatementNumber(cashFlow, 'cash_received_of_sales_service');
+    const operatingCashFlow = readStatementNumber(cashFlow, 'ncf_from_oa');
+    const reportYear = new Date(reportDate).getFullYear();
+
+    return [
+      `| ${peer.symbol} ${peer.name}`,
+      `${reportYear}年报`,
+      peer.role,
+      formatRatioPercent(divide(contractLiability, totalLiability)),
+      formatRatioPercent(divide(contractLiability, revenue)),
+      formatRatioPercent(divide(receivables, revenue)),
+      formatRatioPercent(divide(inventory, revenue)),
+      formatRatio(divide(salesCash, revenue)),
+      formatRatio(divide(operatingCashFlow, deductedNetProfit)),
+      `${formatRatioPercent(divide(deductedNetProfit, equity))} |`,
+    ].join(' | ');
+  }));
+
+  return [
+    '| 公司 | 本地数据期 | 横评角色 | 合同负债/总负债 | 合同负债/收入 | 应收/收入 | 存货/收入 | 销售收现/收入 | OCF/扣非 | 扣非ROE |',
+    '|---|---|---|---:|---:|---:|---:|---:|---:|---:|',
+    ...rows,
+  ].join('\n');
+};
 
 const buildPrompt = ({
   summary,
@@ -120,6 +207,8 @@ const buildPrompt = ({
   dividendEvents,
   articles,
   frameworkCards,
+  reportTemplate,
+  peerComparisonText,
 }: {
   summary: IStockPortfolioSymbolSummary;
   metrics: IStockAiPromptMetric[];
@@ -127,6 +216,8 @@ const buildPrompt = ({
   dividendEvents: MarkedDividendEvent[];
   articles: IStockAiPromptArticle[];
   frameworkCards: IStockAiFrameworkCard[];
+  reportTemplate: StockReportTemplate;
+  peerComparisonText: string;
 }) => `你是一名偏长期、保守、重视现金流和分红可持续性的基本面投资分析助手。
 
 我的投资目标：
@@ -154,30 +245,37 @@ ${dividendEvents.map((marking) => `- ${marking.event.reportPeriod ?? '未知报�
 盛京剑客方法论卡片：
 ${frameworkCards.map((card) => `## ${card.title}\n文章ID：${card.articleId}\n标签：${card.tags.join('、') || '无'}\n核心原则：\n${card.principles.map((item) => `- ${item}`).join('\n')}\n检查项：\n${card.checks.map((item) => `- ${item}`).join('\n')}\n使用方式：${card.promptInstruction}`).join('\n\n') || '暂无已配置方法论卡片。请明确说明缺少框架文章，只能基于财务数据和通用框架判断。'}
 
+研报模板规则：
+${formatStockReportTemplateForPrompt(reportTemplate)}
+
+同业横评数据（来自本地已持久化三表；缺数据时必须明说，不要编造）：
+${peerComparisonText}
+
 相关文章引用（用于溯源，不要机械复述）：
 ${articles.map((article) => `- ${article.title}（ID: ${article.articleId}，日期：${article.publishDate ?? '未知'}，原因：${article.reason ?? '未填写'}，摘要：${article.excerpt}`).join('\n') || '- 暂无相关文章引用'}
 
 请从以下角度输出分析：
 
-1. 一句话结论：买入 / 持有 / 观察 / 回避 / 等待更好价格，并说明核心原因。
-2. 结论置信度：高 / 中 / 低，说明还缺哪些数据。
-3. 是否赚到了真钱：重点看经营现金流、自由现金流、扣非净利润、应收、存货、一次性收益。
-4. 分红质量和可持续性：重点看自由现金流覆盖、股息支付率、历史稳定性、债务和资本开支压力。
-5. ROE 杜邦拆解：拆净利率、总资产周转率、权益乘数，判断 ROE 质量。
-6. 中药专项分析：品牌、独家品种、品类、医保/集采、OTC/院内/电商渠道、销售费用率、药材成本、提价能力、应收和存货质量、产品梯队。
-7. 资产负债表和治理风险：现金、有息负债、商誉、关联交易、资金占用、担保、资本开支。
-8. 成长性与成熟期判断：如果不增长，是否仍适合收息型持有。
-9. 估值与安全边际：区分好公司和好价格，给出买入/加仓/持有/回避的条件。
+1. 一句话结论：买入 / 持有 / 观察 / 回避 / 等待更好价格。必须优先使用百分比、倍数、覆盖率和同行位置，不要堆绝对金额。
+2. 基础质量：按模板要求分析赚钱质量、经营霸权或银行资产质量；非金融公司必须包含 ROE 杜邦拆解。
+3. 分红质量和可持续性：区分账面利润分红、自由现金流分红、资本约束分红。
+4. 同业横评：只和模板中的细分行业同行比较。横评表后必须解释关键指标分别说明什么、容易在哪里误读。若同行三表数据缺失，必须明确写“当前 DB 缺少某某同行数据，不能给出严肃横评”，并列出需要补的数据。
+5. PEG 专栏：必须单独成节，不要淹没在估值段里。解释 PE、盈利 CAGR、PEG、股息率、自由现金流覆盖和隐含长期回报之间的取舍；当历史分位低但 PEG 偏高时，要明确这是“相对过去便宜，但绝对回报要求仍高”。
+6. 商誉检查：必须列出商誉、商誉/净资产、商誉/总资产；商誉较高时说明减值风险会如何影响利润和净资产。
+7. 估值与安全边际：区分好公司和好价格，给出买入/加仓/持有/回避的条件。必须同时讨论历史 PE 分位、绝对 PE、盈利 CAGR、PEG 和股息率。
+8. 需要查什么来印证什么：用表格列出判断、应查信息、支持信号、反驳信号，替代“结论置信度”。
+9. 可能在哪里死掉：从业务、财务、估值、治理、行业结构多角度列出推翻结论的触发器。
 10. 盛京剑客文章框架映射：用表格列出文章标题、核心观点、对本公司的启发、与财务数据是否一致、需要继续验证的地方。
-11. 关键风险清单和触发信号。
-12. 后续每季/年报跟踪指标。
-13. 最终操作建议：已持有者、未持有者、分红复投策略、重新评估条件。
+11. 后续跟踪指标：优先列年报/中报核心指标；一季报只在出现异常触发信号时单独讨论。
+12. 最终操作建议：已持有者、未持有者、分红复投策略、重新评估条件。
 
 要求：
 - 不要使用空泛形容词。
 - 每个重要结论必须给出数据证据。
 - 不要只看增长率，要看现金流和资产质量。
 - 不要把高股息率自动等同于好投资。
+- 不要输出“结论置信度”章节。
+- 不要把一季报作为固定章节，除非它改变了核心趋势判断。
 - 如果数据不足，请明确说“不足以判断”，不要编造。
 - 投资建议仅作为研究辅助，不构成确定性买卖指令。`;
 
@@ -216,7 +314,9 @@ export async function POST(req: Request) {
     const articles = await loadFrameworkArticles(mappings);
     const frameworkCards = loadFrameworkCards(articles);
     const metrics = buildMetrics(summary);
-    const prompt = buildPrompt({ summary, metrics, fundamentals, dividendEvents, articles, frameworkCards });
+    const reportTemplate = getStockReportTemplate(symbol, summary.sector);
+    const peerComparisonText = await buildPeerComparisonText(reportTemplate.peers);
+    const prompt = buildPrompt({ summary, metrics, fundamentals, dividendEvents, articles, frameworkCards, reportTemplate, peerComparisonText });
 
     return success<IStockAiPromptRes>({
       symbol,

@@ -45,6 +45,16 @@ html, body {
   overscroll-behavior: none; /* 禁止滚动时的弹性 */
 }
 
+html.meow-document-scroll,
+html.meow-document-scroll body {
+  height: auto;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);

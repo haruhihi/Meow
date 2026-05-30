@@ -2,15 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
-import { post } from '@libs/fetch';
+import { InlineLoading, LoadingState } from '@components/loading';
 import {
-  IStockCashUpdateReq,
-  IStockCashUpdateRes,
   IStockPortfolioSymbolSummary,
   IStockRebalanceSaveReq,
-  IStockRebalanceSaveRes,
   IStockSnapshotCreateReq,
   IStockSnapshotCreateRes,
 } from '@dtos/meow';
@@ -57,9 +55,8 @@ const formatDate = (value?: string | Date | null) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export default function StocksPage() {
+const StocksPage = observer(function StocksPage() {
   const router = useRouter();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [includeCashInPosition, setIncludeCashInPosition] = useState(true);
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<string | null>(null);
@@ -73,9 +70,9 @@ export default function StocksPage() {
   const [rebalanceDiff, setRebalanceDiff] = useState<StockRebalanceDiff | null>(null);
   const [rebalanceAddVisible, setRebalanceAddVisible] = useState(false);
   const [isRebalanceSaving, setIsRebalanceSaving] = useState(false);
-  const { data, reQuery, refreshQuotes } = useStockPortfolio(refreshKey);
-  const { snapshots, reQuery: reQuerySnapshots } = useStockSnapshots(refreshKey);
-  const { snapshot: selectedSnapshot, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
+  const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
+  const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
+  const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
   const isSnapshotView = selectedSnapshotId != null;
   const activeData = isSnapshotView ? selectedSnapshot?.portfolio ?? null : data;
@@ -86,6 +83,7 @@ export default function StocksPage() {
   const totalAssetValue = displayData?.totalAssetValue ?? totalMarketValue;
   const cashAmount = displayData?.cashAmount ?? 0;
   const positionTotalValue = includeCashInPosition ? totalAssetValue : totalMarketValue;
+  const isInitialLoading = !displayData && (isSnapshotView ? snapshotLoading : portfolioLoading);
   const expectedDividend = calculateExpectedDividend(symbolSummaries);
   const portfolioDividendYield = calculatePortfolioDividendYield(totalMarketValue, expectedDividend);
   const isRebalanceCashInvalid = isRebalanceMode && cashAmount < 0;
@@ -123,8 +121,6 @@ export default function StocksPage() {
     setRebalanceDiff(null);
     setRebalanceAddVisible(false);
   }, [isSnapshotView]);
-
-  const refresh = () => setRefreshKey((key) => key + 1);
 
   const refreshActive = async () => {
     if (isSnapshotView) {
@@ -237,8 +233,7 @@ export default function StocksPage() {
             currentPrice: holding.currentPrice,
           })),
       };
-      const res = await post<IStockRebalanceSaveReq, IStockRebalanceSaveRes>('/api/stock/rebalance/save', payload);
-      await reQuery();
+      const res = await saveStockRebalance(payload);
       Toast.show({ content: `调仓已保存：更新 ${res.updated}，新增 ${res.created}，删除 ${res.deleted}` });
       setIsRebalanceMode(false);
       setRebalanceDraft(null);
@@ -253,12 +248,11 @@ export default function StocksPage() {
 
   const saveCash = async (values: CashFormValues) => {
     try {
-      await post<IStockCashUpdateReq, IStockCashUpdateRes>('/api/stock/cash/update', {
+      await updateCash({
         amount: Number(values.amount),
       });
       Toast.show({ content: '现金已保存' });
       setCashModalVisible(false);
-      refresh();
     } catch (error) {
       Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
     }
@@ -269,7 +263,6 @@ export default function StocksPage() {
     setIsQuoteRefreshing(true);
     try {
       const res = await refreshQuotes();
-      await reQuery();
       setQuoteFetchedAt(res.fetchedAt);
       if (res.failedSymbols.length > 0) {
         Toast.show({ content: `已更新 ${res.updated} 只，${res.failedSymbols.length} 只未更新` });
@@ -289,7 +282,7 @@ export default function StocksPage() {
     setIsSnapshotSaving(true);
     if (duplicatePolicy) setSnapshotConflict(null);
     try {
-      const res = await post<IStockSnapshotCreateReq, IStockSnapshotCreateRes>('/api/stock/snapshot/create', {
+      const res = await createSnapshot({
         duplicatePolicy,
       });
       if (res.status === 'exists') {
@@ -297,7 +290,6 @@ export default function StocksPage() {
         return;
       }
       if (res.status === 'created' && res.snapshot) {
-        await reQuerySnapshots();
         Toast.show({ content: `快照已保存：${formatDate(res.snapshot.snapshotAt)}` });
       }
     } catch (error) {
@@ -318,7 +310,7 @@ export default function StocksPage() {
         <div className={styles.summaryHeader}>
           <div className={styles.summaryActions}>
             <button type="button" className={styles.quoteButton} onClick={() => setSnapshotPickerVisible(true)}>
-              {selectedSnapshotLabel}
+              {selectedSnapshotId != null && !selectedSnapshot ? <InlineLoading label="快照加载中" /> : selectedSnapshotLabel}
             </button>
             {!isSnapshotView && (
               isRebalanceMode ? (
@@ -336,10 +328,10 @@ export default function StocksPage() {
                     编辑
                   </button>
                   <button type="button" className={styles.quoteButton} disabled={isSnapshotSaving} onClick={() => saveSnapshot()}>
-                    {isSnapshotSaving ? '保存中...' : '存快照'}
+                    存快照
                   </button>
                   <button type="button" className={styles.quoteButton} disabled={isQuoteRefreshing} onClick={refreshWithQuotes}>
-                    {isQuoteRefreshing ? '刷新中...' : '刷新数据'}
+                    刷新数据
                   </button>
                 </>
               )
@@ -375,6 +367,10 @@ export default function StocksPage() {
           <SummaryStat label={isRebalanceMode ? '股息率预估' : '综合股息率'} value={formatPercent(portfolioDividendYield)} />
         </div>
       </section>
+
+      {isInitialLoading && (
+        <LoadingState className={styles.portfolioLoadingBlock} label={isSnapshotView ? '快照加载中' : '正在加载持仓'} />
+      )}
 
       {isRebalanceMode && rebalanceDraft && (
         <RebalancePanel
@@ -521,12 +517,14 @@ export default function StocksPage() {
 
       {(isQuoteRefreshing || isSnapshotSaving) && (
         <div className={styles.refreshOverlay}>
-          <div className={styles.refreshPanel}>{isSnapshotSaving ? '正在保存快照...' : '正在刷新行情...'}</div>
+          <div className={styles.refreshPanel}><InlineLoading label={isSnapshotSaving ? '正在保存快照' : '正在刷新行情'} /></div>
         </div>
       )}
     </div>
   );
-}
+});
+
+export default StocksPage;
 
 const SummaryStat = ({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) => (
   <button type="button" className={onClick ? styles.summaryStatButton : styles.summaryStat} onClick={onClick}>
@@ -559,6 +557,11 @@ const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     <div className={styles.metricLine}>
       <span className={styles.metricTagQuality}>扣非 ROE: <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong>(TTM)</span>
       <span className={styles.metricTagDividend}>股息率: <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
+    </div>
+    <div className={styles.metricLine}>
+      <span className={styles.metricTagValue}>扣非 PEG<MetricHelp label="扣非 PEG" formula="扣非 PE / 扣非净利润 5年CAGR" align="start" />: <strong>{formatOptionalNumber(summary.deductedPeg)}</strong></span>
+      <span className={styles.metricTagQuality}>扣非 CAGR: <strong>{formatOptionalPercent(summary.deductedNetProfitCagr5)}</strong></span>
+      <span className={styles.metricTagAsset}>商誉/净资产: <strong>{formatOptionalPercent(summary.goodwillToNetAsset)}</strong></span>
     </div>
     <div className={styles.metricLine}>
       <span className={styles.metricTagQuality}>含金量<MetricHelp label="含金量" formula="经营现金流TTM / 扣非净利润TTM" align="start" />: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)</span>
