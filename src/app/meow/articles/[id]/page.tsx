@@ -1,12 +1,20 @@
 import { notFound } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
 import Link from 'next/link';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import { getArticleById } from '@libs/article-db';
 import styles from '../articles.module.scss';
 import PublishDateEditor from './publish-date-editor';
 
 export const dynamic = 'force-dynamic';
+
+const articleUrlTransform = (url: string, key: string) => {
+  if (key === 'src' && url.startsWith('data:image/')) {
+    return url;
+  }
+
+  return defaultUrlTransform(url);
+};
 
 export default async function ArticleDetailPage({ params }: { params: { id: string } }) {
   noStore();
@@ -44,11 +52,11 @@ export default async function ArticleDetailPage({ params }: { params: { id: stri
       </header>
 
       <article className={styles.content}>
-        <ReactMarkdown>{article.body}</ReactMarkdown>
+        <ReactMarkdown urlTransform={articleUrlTransform}>{article.body}</ReactMarkdown>
         {article.bonusBody && (
           <section className={styles.bonus}>
             <h2>补充内容</h2>
-            <ReactMarkdown>{article.bonusBody}</ReactMarkdown>
+            <ReactMarkdown urlTransform={articleUrlTransform}>{article.bonusBody}</ReactMarkdown>
           </section>
         )}
       </article>

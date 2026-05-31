@@ -11,6 +11,7 @@
     "update-db": "node scripts/with-database-url.mjs prisma format && node scripts/with-database-url.mjs prisma migrate dev --name update && node scripts/with-database-url.mjs prisma generate",
     "view": "node scripts/with-database-url.mjs prisma studio",
     "p": "node scripts/with-database-url.mjs prisma",
+    "sync:stock-valuations": "node scripts/sync-stock-valuation-snapshots.mjs",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"
   },

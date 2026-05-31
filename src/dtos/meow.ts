@@ -363,6 +363,39 @@ export interface IStockPortfolioAccountSummary {
   holdingCount: number;
 }
 
+export interface IStockPeValuationTarget {
+  percentile: number;
+  pe: number | null;
+  price: number | null;
+  upside: number | null;
+}
+
+export interface IStockProfitHistoryPoint {
+  reportDate: string;
+  year: number;
+  deductedNetProfit: number | null;
+  yoy: number | null;
+}
+
+export interface IStockValuationHistoryPoint {
+  date: string;
+  pe: number | null;
+  pb: number | null;
+  pePercentile: number | null;
+  pbPercentile: number | null;
+}
+
+export interface IStockPeValuationSummary {
+  currentPe: number | null;
+  currentPercentile: number | null;
+  sampleCount: number;
+  startDate: string | null;
+  endDate: string | null;
+  targets: IStockPeValuationTarget[];
+  profitHistory: IStockProfitHistoryPoint[];
+  valuationHistory: IStockValuationHistoryPoint[];
+}
+
 export interface IStockPortfolioSymbolSummary {
   symbol: StockHolding['symbol'];
   name: StockQuote['name'];
@@ -404,6 +437,7 @@ export interface IStockPortfolioSymbolSummary {
   freeCashFlowTtm?: number | null;
   fcfDividendCoverage?: number | null;
   operatingCashFlowToDeductedNetProfit?: number | null;
+  peValuation?: IStockPeValuationSummary | null;
 }
 
 export interface IStockPortfolioSectorSummary {

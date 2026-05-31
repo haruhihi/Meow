@@ -124,6 +124,8 @@ const buildMetrics = (summary: IStockPortfolioSymbolSummary): IStockAiPromptMetr
   metric('常态股息率', formatPercent(summary.normalizedDividendYield), '基于你标记的常态分红计算，不能把高股息率自动当成安全。'),
   metric('扣非 PE', formatNumber(summary.deductedPe), '静态扣非口径估值，需结合现金流质量和增长稳定性。'),
   metric('扣非 PE TTM', formatNumber(summary.deductedPeTtm), '滚动扣非口径估值，适合观察最近四个季度盈利质量。'),
+  metric('扣非 PE 历史分位', formatPercent(summary.peValuation?.currentPercentile), `基于 2015 年以来周频 Tushare 市值和扣非 TTM 自算，样本数 ${summary.peValuation?.sampleCount ?? 0}。`),
+  metric('扣非 PE 中位目标价', formatMoney(summary.peValuation?.targets.find((target) => target.percentile === 50)?.price ?? null), '用当前扣非 TTM 每股收益乘以历史扣非 PE 50% 分位，只是估值锚，不是确定性目标。'),
   metric(`扣非净利润 CAGR${summary.deductedNetProfitCagrYears ?? 5}`, formatPercent(summary.deductedNetProfitCagr5), '用于计算扣非 PEG；若 CAGR5 基期为负或缺失，会改用较近的正基期，仍需谨慎外推。'),
   metric('扣非 PEG', formatNumber(summary.deductedPeg), `扣非 PE / 扣非净利润 CAGR${summary.deductedNetProfitCagrYears ?? 5}，用于判断估值是否被增长支撑。`),
   metric('PB', formatNumber(summary.pb), '资产定价口径，中药品牌型公司不能只按 PB 判断便宜。'),
@@ -168,15 +170,15 @@ const buildPeerComparisonText = async (peers: StockReportPeer[]) => {
     const income = item.income;
     const balance = item.balance;
     const cashFlow = item.cash_flow;
-    const revenue = readStatementNumber(income, 'revenue');
-    const deductedNetProfit = readStatementNumber(income, 'net_profit_after_nrgal_atsolc');
+    const revenue = readStatementNumber(income, 'revenue') ?? readStatementNumber(income, 'total_revenue');
+    const deductedNetProfit = readStatementNumber(income, 'profit_dedt');
     const totalLiability = readStatementNumber(balance, 'total_liab');
-    const equity = readStatementNumber(balance, 'total_quity_atsopc');
-    const contractLiability = readStatementNumber(balance, 'contract_liabilities');
-    const receivables = readStatementNumber(balance, 'ar_and_br');
-    const inventory = readStatementNumber(balance, 'inventory');
-    const salesCash = readStatementNumber(cashFlow, 'cash_received_of_sales_service');
-    const operatingCashFlow = readStatementNumber(cashFlow, 'ncf_from_oa');
+    const equity = readStatementNumber(balance, 'total_hldr_eqy_exc_min_int');
+    const contractLiability = readStatementNumber(balance, 'contract_liab');
+    const receivables = readStatementNumber(balance, 'accounts_receiv_bill') ?? readStatementNumber(balance, 'accounts_receiv');
+    const inventory = readStatementNumber(balance, 'inventories');
+    const salesCash = readStatementNumber(cashFlow, 'c_fr_sale_sg');
+    const operatingCashFlow = readStatementNumber(cashFlow, 'n_cashflow_act');
     const reportYear = new Date(reportDate).getFullYear();
 
     return [

@@ -51,6 +51,8 @@ const formatOptionalNumber = (value?: number | null) => {
   return value.toFixed(1);
 };
 const formatOptionalPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
+const formatSignedPercent = (value?: number | null) => (value == null ? '—' : `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`);
+const formatOptionalMoney = (value?: number | null) => (value == null ? '—' : formatMoney(value));
 const formatQuoteTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -729,6 +731,11 @@ const StockMetricDetails = ({ summary }: { summary: IStockPortfolioSymbolSummary
         分红覆盖: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong>
       </MetricTagWithHelp>
       <span className={styles.metricTagAsset}>商誉/净资产: <strong>{formatOptionalPercent(summary.goodwillToNetAsset)}</strong></span>
+    </div>
+    <div className={styles.metricGridRow}>
+      <span className={styles.metricTagValue}>PE分位 <strong>{formatOptionalPercent(summary.peValuation?.currentPercentile)}</strong></span>
+      <span className={styles.metricTagValue}>PE中位价 <strong>{formatOptionalMoney(summary.peValuation?.targets.find((target) => target.percentile === 50)?.price)}</strong></span>
+      <span className={styles.metricTagQuality}>中位空间 <strong>{formatSignedPercent(summary.peValuation?.targets.find((target) => target.percentile === 50)?.upside)}</strong></span>
     </div>
   </div>
 );

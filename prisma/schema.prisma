@@ -215,6 +215,35 @@ model StockFinancialStatement {
   @@index([statement])
 }
 
+model StockValuationSnapshot {
+  id                   Int      @id @default(autoincrement())
+  symbol               String   @db.VarChar(32)
+  period               String   @default("WEEK") @db.VarChar(16)
+  tradeDate            DateTime
+  close                Float?
+  totalMarketCap       Float?
+  circulatingMarketCap Float?
+  totalShares          Float?
+  floatShares          Float?
+  freeShares           Float?
+  pe                   Float?
+  peTtm                Float?
+  pb                   Float?
+  dividendYield        Float?
+  dividendYieldTtm     Float?
+  deductedNetProfitTtm Float?
+  deductedPe           Float?
+  source               String   @db.VarChar(80)
+  fetchedAt            DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([symbol, period, tradeDate])
+  @@index([symbol, period, tradeDate])
+  @@index([tradeDate])
+  @@index([source])
+}
+
 model StockMetricOverride {
   id                 Int      @id @default(autoincrement())
   userId             Int

@@ -2,17 +2,21 @@ import { prisma } from '@libs/prisma';
 import { marketValueOf, percentOf, roundStockValue } from '@utils/stock-calculations';
 import { getStockSector, getStockUniverseItem, stockUniverse } from '../../../config/stock-universe';
 import type {
+  IStockPeValuationSummary,
   IStockPortfolioAccountSummary,
   IStockPortfolioSectorSummary,
   IStockPortfolioSymbolSummary,
+  IStockProfitHistoryPoint,
+  IStockValuationHistoryPoint,
   StockRemarkListItem,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, StockMetricOverride, StockQuote, StockRemark, StockValuationSnapshot } from '@prisma/client';
 
 export { marketValueOf, roundStockValue };
 
 const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
+const PE_VALUATION_PERCENTILES = [10, 25, 50, 75, 90];
 
 export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
@@ -131,6 +135,10 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     where: { symbol: { in: symbols }, statement: 'balance', reportName: { contains: '年报' } },
     orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
   });
+  const valuationSnapshots = await prisma.stockValuationSnapshot.findMany({
+    where: { symbol: { in: symbols }, period: 'WEEK', deductedPe: { not: null } },
+    orderBy: [{ symbol: 'asc' }, { tradeDate: 'asc' }],
+  });
   const overrides = await prisma.stockMetricOverride.findMany({
     where: { userId, symbol: { in: symbols } },
   });
@@ -162,6 +170,12 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
     }
   });
   const overrideBySymbol = new Map(overrides.map((override) => [override.symbol, override]));
+  const valuationSnapshotsBySymbol = new Map<string, StockValuationSnapshot[]>();
+  valuationSnapshots.forEach((snapshot) => {
+    const current = valuationSnapshotsBySymbol.get(snapshot.symbol) ?? [];
+    current.push(snapshot);
+    valuationSnapshotsBySymbol.set(snapshot.symbol, current);
+  });
   const markedDividendEventsBySymbol = new Map<string, StockDividendEvent[]>();
   markedDividends.forEach((marking) => {
     const current = markedDividendEventsBySymbol.get(marking.event.symbol) ?? [];
@@ -196,7 +210,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, displayedHoldings, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
+  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, overrideBySymbol, markedDividendEventsBySymbol, valuationSnapshotsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -260,7 +274,8 @@ const buildSymbolSummaries = (
   annualFundamentalsBySymbol: Map<string, StockFundamental[]>,
   annualBalanceBySymbol: Map<string, { fields: unknown }>,
   overrideBySymbol: Map<string, StockMetricOverride>,
-  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
+  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>,
+  valuationSnapshotsBySymbol: Map<string, StockValuationSnapshot[]>
 ): IStockPortfolioSymbolSummary[] => {
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
 
@@ -314,7 +329,8 @@ const buildSymbolSummaries = (
         annualFundamentalsBySymbol.get(summary.symbol) ?? [],
         annualBalanceBySymbol.get(summary.symbol),
         overrideBySymbol.get(summary.symbol),
-        markedDividendEventsBySymbol.get(summary.symbol) ?? []
+        markedDividendEventsBySymbol.get(summary.symbol) ?? [],
+        valuationSnapshotsBySymbol.get(summary.symbol) ?? []
       ),
     }))
     .sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol));
@@ -326,7 +342,8 @@ const buildComputedMetrics = (
   annualFundamentals: StockFundamental[] = [],
   annualBalance?: { fields: unknown },
   override?: StockMetricOverride,
-  dividendEvents: StockDividendEvent[] = []
+  dividendEvents: StockDividendEvent[] = [],
+  valuationSnapshots: StockValuationSnapshot[] = []
 ) => {
   const totalShares = fundamental?.totalShares ?? null;
   const deductedNetProfit = fundamental?.deductedNetProfit ?? null;
@@ -356,6 +373,7 @@ const buildComputedMetrics = (
   const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
   const deductedPe = companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
+  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, annualFundamentals, valuationSnapshots);
 
   return {
     totalShares,
@@ -391,8 +409,109 @@ const buildComputedMetrics = (
     freeCashFlowTtm: freeCashFlowTtm != null ? roundStockValue(freeCashFlowTtm) : null,
     fcfDividendCoverage: freeCashFlowTtm != null && normalizedDividend && normalizedDividend > 0 ? freeCashFlowTtm / normalizedDividend : null,
     operatingCashFlowToDeductedNetProfit: operatingCashFlowTtm != null && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? operatingCashFlowTtm / deductedNetProfitTtm : null,
+    peValuation,
   };
 };
+
+const percentileOfSorted = (sortedValues: number[], percentile: number) => {
+  if (sortedValues.length === 0) return null;
+  if (sortedValues.length === 1) return sortedValues[0];
+  const rank = (percentile / 100) * (sortedValues.length - 1);
+  const lowerIndex = Math.floor(rank);
+  const upperIndex = Math.ceil(rank);
+  const weight = rank - lowerIndex;
+  const lower = sortedValues[lowerIndex];
+  const upper = sortedValues[upperIndex];
+  return lower + (upper - lower) * weight;
+};
+
+const buildPeValuation = (
+  currentPrice: number,
+  totalShares: number | null,
+  deductedNetProfitTtm: number | null,
+  currentPe: number | null,
+  annualFundamentals: StockFundamental[],
+  snapshots: StockValuationSnapshot[]
+): IStockPeValuationSummary | null => {
+  const peValues = snapshots
+    .map((snapshot) => snapshot.deductedPe)
+    .filter((value): value is number => value != null && Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right);
+  const pbValues = snapshots
+    .map((snapshot) => snapshot.pb)
+    .filter((value): value is number => value != null && Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right);
+  if (peValues.length === 0 && pbValues.length === 0) return null;
+
+  const deductedEpsTtm = totalShares && totalShares > 0 && deductedNetProfitTtm && deductedNetProfitTtm > 0
+    ? deductedNetProfitTtm / totalShares
+    : null;
+  const resolvedCurrentPe = currentPrice > 0 && deductedEpsTtm && deductedEpsTtm > 0 ? currentPrice / deductedEpsTtm : currentPe;
+  const currentPercentile = resolvedCurrentPe != null && peValues.length > 0
+    ? percentileRank(peValues, resolvedCurrentPe)
+    : null;
+  const firstSnapshot = snapshots[0];
+  const lastSnapshot = snapshots[snapshots.length - 1];
+  const targets = PE_VALUATION_PERCENTILES.map((percentile) => {
+    const pe = percentileOfSorted(peValues, percentile);
+    const price = pe != null && deductedEpsTtm != null ? pe * deductedEpsTtm : null;
+    return {
+      percentile,
+      pe: pe != null ? roundStockValue(pe) : null,
+      price: price != null ? roundStockValue(price) : null,
+      upside: price != null && currentPrice > 0 ? price / currentPrice - 1 : null,
+    };
+  });
+
+  return {
+    currentPe: resolvedCurrentPe != null ? roundStockValue(resolvedCurrentPe) : null,
+    currentPercentile,
+    sampleCount: peValues.length,
+    startDate: firstSnapshot?.tradeDate.toISOString() ?? null,
+    endDate: lastSnapshot?.tradeDate.toISOString() ?? null,
+    targets,
+    profitHistory: buildProfitHistory(annualFundamentals),
+    valuationHistory: buildValuationHistory(snapshots, peValues, pbValues),
+  };
+};
+
+const percentileRank = (sortedValues: number[], value: number) => {
+  if (sortedValues.length === 0) return null;
+  return sortedValues.filter((item) => item <= value).length / sortedValues.length;
+};
+
+const buildProfitHistory = (annualFundamentals: StockFundamental[]): IStockProfitHistoryPoint[] => {
+  const rows = annualFundamentals
+    .filter((item) => item.deductedNetProfit != null)
+    .slice()
+    .sort((left, right) => left.reportDate.getTime() - right.reportDate.getTime());
+
+  return rows.map((item, index) => {
+    const deductedNetProfit = item.deductedNetProfit ?? null;
+    const previous = index > 0 ? rows[index - 1].deductedNetProfit : null;
+    const yoy = deductedNetProfit != null && previous != null && previous > 0
+      ? deductedNetProfit / previous - 1
+      : null;
+    return {
+      reportDate: item.reportDate.toISOString(),
+      year: item.reportDate.getFullYear(),
+      deductedNetProfit: deductedNetProfit != null ? roundStockValue(deductedNetProfit) : null,
+      yoy,
+    };
+  });
+};
+
+const buildValuationHistory = (
+  snapshots: StockValuationSnapshot[],
+  peValues: number[],
+  pbValues: number[]
+): IStockValuationHistoryPoint[] => snapshots.map((snapshot) => ({
+  date: snapshot.tradeDate.toISOString(),
+  pe: snapshot.deductedPe != null ? roundStockValue(snapshot.deductedPe) : null,
+  pb: snapshot.pb != null ? roundStockValue(snapshot.pb) : null,
+  pePercentile: snapshot.deductedPe != null ? percentileRank(peValues, snapshot.deductedPe) : null,
+  pbPercentile: snapshot.pb != null ? percentileRank(pbValues, snapshot.pb) : null,
+}));
 
 const readDeductedNetProfitCagr = (
   latestAnnual: StockFundamental | undefined,

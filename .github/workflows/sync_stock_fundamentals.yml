@@ -9,14 +9,14 @@ on:
         description: 'Optional stock symbols, separated by spaces. Empty means held symbols plus configured watchlist.'
         required: false
         default: ''
-      statement_count:
-        description: 'Raw statement rows to fetch from Xueqiu type=all.'
+      start_date:
+        description: 'Tushare financial statement start date in YYYYMMDD.'
         required: false
-        default: '40'
-      force_refresh:
-        description: 'Force full Xueqiu fetch even when the latest report is already cached.'
+        default: '20120101'
+      replace_source:
+        description: 'Delete old non-Tushare fundamentals/statements for each successfully fetched symbol.'
         required: false
-        default: 'false'
+        default: 'true'
 
 jobs:
   sync:
@@ -43,23 +43,33 @@ jobs:
             exit 1
           fi
 
+      - name: Check Tushare token
+        id: tushare-token
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: node scripts/check-tushare-token.mjs
+
       - name: Install dependencies
+        if: steps.tushare-token.outputs.valid == 'true'
         env:
           DATABASE: ${{ secrets.DATABASE }}
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
         run: |
           printf 'DATABASE=%s\n' "$DATABASE" >> .env
+          printf 'TUSHARE_TOKEN=%s\n' "$TUSHARE_TOKEN" >> .env
           npm install
 
       - name: Sync fundamentals
+        if: steps.tushare-token.outputs.valid == 'true'
         env:
           DATABASE: ${{ secrets.DATABASE }}
           SYMBOLS: ${{ github.event.inputs.symbols }}
-          STATEMENT_COUNT: ${{ github.event.inputs.statement_count }}
-          FORCE_REFRESH: ${{ github.event.inputs.force_refresh }}
+          START_DATE: ${{ github.event.inputs.start_date }}
+          REPLACE_SOURCE: ${{ github.event.inputs.replace_source }}
         run: |
-          args=(--sleep 1500 --statement-count "${STATEMENT_COUNT:-40}" --skip-unchanged)
-          if [ "$FORCE_REFRESH" = "true" ]; then
-            args+=(--force)
+          args=(--sleep 300 --start-date "${START_DATE:-20120101}")
+          if [ "${REPLACE_SOURCE:-true}" = "true" ]; then
+            args+=(--replace-source)
           fi
           if [ -n "$SYMBOLS" ]; then
             args+=(--symbols $SYMBOLS)

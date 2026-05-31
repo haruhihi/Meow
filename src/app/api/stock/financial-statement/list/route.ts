@@ -9,7 +9,7 @@ import {
   StockFinancialStatementName,
 } from '@dtos/meow';
 import { normalizeSymbol, requireOwnedStockSymbol } from '../../helpers';
-import { xueqiuFinancialFieldMaps } from '../../../../../config/xueqiu-financial-fields';
+import { tushareFinancialFieldMaps } from '../../../../../config/tushare-financial-fields';
 
 const STATEMENT_TITLES: Record<StockFinancialStatementName, string> = {
   income: '利润表',
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       statement,
       title: STATEMENT_TITLES[statement],
       periods,
-      rows: xueqiuFinancialFieldMaps[statement].map((mapItem) => ({
+      rows: tushareFinancialFieldMaps[statement].map((mapItem) => ({
         label: mapItem.label,
         field: mapItem.field,
         note: mapItem.note,
