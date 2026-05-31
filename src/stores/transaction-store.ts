@@ -8,6 +8,8 @@ import {
   ITransactionDeleteReq,
   ITransactionSearchReq,
   ITransactionSearchRes,
+  ITransactionUpdateReq,
+  ITransactionUpdateRes,
 } from '@dtos/meow';
 import { ResourceStatus, createStatus, dedupeRequest, getMapStatus, markStatusError, markStatusSuccess, setStatus } from './store-resource';
 
@@ -73,6 +75,19 @@ export class TransactionStore {
     this.transactionMutating = true;
     try {
       const res = await post<ITransactionCreateReq, ITransactionCreateRes>('/api/transaction/create', payload);
+      await this.refreshTransactions();
+      return res;
+    } finally {
+      runInAction(() => {
+        this.transactionMutating = false;
+      });
+    }
+  }
+
+  async updateTransaction(payload: ITransactionUpdateReq) {
+    this.transactionMutating = true;
+    try {
+      const res = await post<ITransactionUpdateReq, ITransactionUpdateRes>('/api/transaction/update', payload);
       await this.refreshTransactions();
       return res;
     } finally {

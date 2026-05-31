@@ -39,6 +39,14 @@ export interface ITransactionCreateRes {
   transaction: Transaction;
 }
 
+export interface ITransactionUpdateReq extends ITransactionCreateReq {
+  id: Transaction['id'];
+}
+
+export interface ITransactionUpdateRes {
+  transaction: Transaction;
+}
+
 export interface ITransactionSearchRes {
   transactions: TransactionWithCoupon[];
 }
@@ -381,6 +389,7 @@ export interface IStockPortfolioSymbolSummary {
   normalizedDividend?: number | null;
   reportDate?: string | null;
   deductedNetProfitCagr5?: number | null;
+  deductedNetProfitCagrYears?: number | null;
   deductedPeg?: number | null;
   goodwill?: number | null;
   goodwillToNetAsset?: number | null;
@@ -426,7 +435,7 @@ export interface IStockMagicFormulaSearchReq {
 }
 
 export interface IStockMagicFormulaMetric {
-  key: 'deductedPe' | 'deductedRoe' | 'deductedRoa' | 'dividendYield' | 'deductedPeg';
+  key: 'deductedPe' | 'deductedRoe' | 'deductedRoa' | 'dividendYield' | 'deductedPeg' | 'deductedNetProfitCagr5';
   label: string;
   direction: 'asc' | 'desc';
   value: number | null;
@@ -446,6 +455,7 @@ export interface IStockMagicFormulaItem {
   reportName?: string | null;
   reportDate?: string | null;
   deductedNetProfitCagr5?: number | null;
+  deductedNetProfitCagrYears?: number | null;
   goodwillToNetAsset?: number | null;
   operatingCashFlowToDeductedNetProfit?: number | null;
   fcfDividendCoverage?: number | null;

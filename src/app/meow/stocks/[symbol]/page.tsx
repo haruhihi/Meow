@@ -32,7 +32,13 @@ type RemarkFormValues = {
 type EditingRemark = StockRemarkListItem | null;
 
 const formatPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(2)}%`);
-const formatOptionalNumber = (value?: number | null) => (value == null ? '—' : value.toFixed(2));
+const formatOptionalNumber = (value?: number | null) => {
+  if (value == null) return '—';
+  const abs = Math.abs(value);
+  if (abs > 0 && abs < 0.01) return value.toFixed(4);
+  return value.toFixed(2);
+};
+const formatCagrMeta = (years?: number | null, value?: number | null) => `CAGR${years ?? 5} ${formatPercent(value)}`;
 const formatDate = (value?: string | Date | null) => {
   if (!value) return '未知日期';
   const date = new Date(value);
@@ -63,7 +69,7 @@ const DIVIDEND_PREVIEW_COUNT = 4;
 const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <section className={styles.metricGrid}>
     <div><span>扣非 PE</span><strong>{formatOptionalNumber(summary.deductedPe)} / {formatOptionalNumber(summary.deductedPeTtm)}</strong><em>静 / TTM</em></div>
-    <div><span>扣非 PEG</span><strong>{formatOptionalNumber(summary.deductedPeg)}</strong><em>CAGR {formatPercent(summary.deductedNetProfitCagr5)}</em></div>
+    <div><span>扣非 PEG</span><strong>{formatOptionalNumber(summary.deductedPeg)}</strong><em>{formatCagrMeta(summary.deductedNetProfitCagrYears, summary.deductedNetProfitCagr5)}</em></div>
     <div><span>PB</span><strong>{formatOptionalNumber(summary.pb)}</strong><em>资产</em></div>
     <div><span>扣非 ROE</span><strong>{formatPercent(summary.deductedRoeTtm)}</strong><em>TTM</em></div>
     <div><span>股息率</span><strong>{formatPercent(summary.normalizedDividendYield)}</strong><em>常态</em></div>

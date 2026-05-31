@@ -18,13 +18,14 @@ import type { StockDividendEvent, StockFinancialStatement, StockFundamental, Sto
 const ALL_SECTOR = '全部关注';
 const EXCLUDING_DIVIDEND_SECTOR = '除红利';
 const DIVIDEND_SECTOR = '红利';
+const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
 
 type MetricDefinition = {
   key: IStockMagicFormulaMetric['key'];
   label: string;
   direction: 'asc' | 'desc';
   getValue: (item: ScoreInput) => number | null;
-  format: (value: number | null) => string;
+  format: (value: number | null, item: ScoreInput) => string;
 };
 
 type ScoreInput = {
@@ -44,6 +45,13 @@ type ScoreInput = {
 
 const formatNumber = (value: number | null) => (value == null ? '—' : value.toFixed(1));
 const formatPercent = (value: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
+const formatCagr = (value: number | null, item: ScoreInput) => {
+  const years = readDeductedNetProfitCagr(item).years;
+  if (value == null || years == null) return '—';
+  return years === DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS
+    ? formatPercent(value)
+    : `CAGR${years} ${formatPercent(value)}`;
+};
 const roundStockValue = (value: number) => Math.round(value * 100) / 100;
 const percentOf = (value: number, total: number) => total > 0 ? value / total : 0;
 
@@ -62,15 +70,24 @@ const readMarketCap = (item: ScoreInput) => {
 
 const readGoodwill = (item: ScoreInput) => item.annualBalance ? readStatementNumber(item.annualBalance.fields, 'goodwill') ?? 0 : null;
 
-const readDeductedNetProfitCagr5 = (item: ScoreInput) => {
+const readDeductedNetProfitCagr = (item: ScoreInput): { value: number | null; years: number | null } => {
   const latestAnnual = item.annualFundamentals[0];
-  if (!latestAnnual) return null;
+  if (!latestAnnual?.deductedNetProfit || latestAnnual.deductedNetProfit <= 0) return { value: null, years: null };
   const annualsByYear = new Map(item.annualFundamentals.map((fundamental) => [fundamental.reportDate.getFullYear(), fundamental]));
-  const baseAnnual = annualsByYear.get(latestAnnual.reportDate.getFullYear() - 5);
-  return latestAnnual.deductedNetProfit && latestAnnual.deductedNetProfit > 0 && baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0
-    ? (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / 5) - 1
-    : null;
+  const latestYear = latestAnnual.reportDate.getFullYear();
+  for (let years = DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS; years >= 1; years -= 1) {
+    const baseAnnual = annualsByYear.get(latestYear - years);
+    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0) {
+      return {
+        value: (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / years) - 1,
+        years,
+      };
+    }
+  }
+  return { value: null, years: null };
 };
+
+const readDeductedNetProfitCagr5 = (item: ScoreInput) => readDeductedNetProfitCagr(item).value;
 
 const readDeductedPe = (item: ScoreInput) => {
   const marketCap = readMarketCap(item);
@@ -140,6 +157,7 @@ const metricDefinitions: MetricDefinition[] = [
   { key: 'deductedRoa', label: '扣非 ROA', direction: 'desc', getValue: readDeductedRoa, format: formatPercent },
   { key: 'dividendYield', label: '股息率', direction: 'desc', getValue: readDividendYield, format: formatPercent },
   { key: 'deductedPeg', label: '扣非 PEG', direction: 'asc', getValue: readDeductedPeg, format: formatNumber },
+  { key: 'deductedNetProfitCagr5', label: '扣非 CAGR5', direction: 'desc', getValue: readDeductedNetProfitCagr5, format: formatCagr },
 ];
 
 const buildFlags = (item: ScoreInput) => {
@@ -165,10 +183,10 @@ const toMagicFormulaItem = (
       label: definition.label,
       direction: definition.direction,
       value,
-      display: definition.format(value),
+      display: definition.format(value, item),
     };
   });
-  const cagr = readDeductedNetProfitCagr5(item);
+  const cagr = readDeductedNetProfitCagr(item);
   const goodwillToNetAsset = readGoodwillToNetAsset(item);
   const cashQuality = readOperatingCashFlowToDeductedNetProfit(item);
 
@@ -184,7 +202,8 @@ const toMagicFormulaItem = (
     flags: buildFlags(item),
     reportName: item.fundamental?.reportName ?? null,
     reportDate: item.fundamental?.reportDate.toISOString() ?? null,
-    deductedNetProfitCagr5: cagr,
+    deductedNetProfitCagr5: cagr.value,
+    deductedNetProfitCagrYears: cagr.years,
     goodwillToNetAsset,
     operatingCashFlowToDeductedNetProfit: cashQuality,
     fcfDividendCoverage: null,

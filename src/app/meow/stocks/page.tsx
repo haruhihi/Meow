@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Toast } from 'antd-mobile';
+import { DownOutline } from 'antd-mobile-icons';
 import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
 import type { StockAccount } from '@prisma/client';
@@ -40,8 +41,15 @@ type RebalanceAddHoldingFormValues = {
   currentPrice: string;
 };
 
+const STOCK_UI_SETTINGS_KEY = 'meow:stocks:ui-settings';
+
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
-const formatOptionalNumber = (value?: number | null) => (value == null ? '—' : value.toFixed(1));
+const formatOptionalNumber = (value?: number | null) => {
+  if (value == null) return '—';
+  const abs = Math.abs(value);
+  if (abs > 0 && abs < 0.1) return value.toFixed(3);
+  return value.toFixed(1);
+};
 const formatOptionalPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
 const formatQuoteTime = (value: string) => {
   const date = new Date(value);
@@ -70,6 +78,10 @@ const StocksPage = observer(function StocksPage() {
   const [rebalanceDiff, setRebalanceDiff] = useState<StockRebalanceDiff | null>(null);
   const [rebalanceAddVisible, setRebalanceAddVisible] = useState(false);
   const [isRebalanceSaving, setIsRebalanceSaving] = useState(false);
+  const [showWatchedSymbols, setShowWatchedSymbols] = useState(true);
+  const [expandAllSymbols, setExpandAllSymbols] = useState(false);
+  const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(() => new Set());
+  const [stockUiHydrated, setStockUiHydrated] = useState(false);
   const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
   const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
@@ -113,6 +125,63 @@ const StocksPage = observer(function StocksPage() {
       })),
     [displayData?.sectorSummaries, positionTotalValue]
   );
+  const visibleSectorSummaries = useMemo(
+    () => sectorSummaries
+      .map((sector) => {
+        const symbols = showWatchedSymbols
+          ? sector.symbols
+          : sector.symbols.filter((summary) => summary.holdingCount > 0 || summary.quantity > 0 || summary.marketValue > 0);
+        return { ...sector, symbols, symbolCount: symbols.length };
+      })
+      .filter((sector) => sector.symbols.length > 0),
+    [sectorSummaries, showWatchedSymbols]
+  );
+  const visibleSymbols = useMemo(
+    () => visibleSectorSummaries.flatMap((sector) => sector.symbols.map((summary) => summary.symbol)),
+    [visibleSectorSummaries]
+  );
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STOCK_UI_SETTINGS_KEY);
+      if (raw) {
+        const settings = JSON.parse(raw) as {
+          includeCashInPosition?: boolean;
+          showWatchedSymbols?: boolean;
+          expandAllSymbols?: boolean;
+          expandedSymbols?: string[];
+        };
+        if (typeof settings.includeCashInPosition === 'boolean') setIncludeCashInPosition(settings.includeCashInPosition);
+        if (typeof settings.showWatchedSymbols === 'boolean') setShowWatchedSymbols(settings.showWatchedSymbols);
+        if (typeof settings.expandAllSymbols === 'boolean') setExpandAllSymbols(settings.expandAllSymbols);
+        if (Array.isArray(settings.expandedSymbols)) setExpandedSymbols(new Set(settings.expandedSymbols));
+      }
+    } catch {
+      // Ignore invalid persisted UI state.
+    } finally {
+      setStockUiHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!stockUiHydrated) return;
+    try {
+      window.localStorage.setItem(STOCK_UI_SETTINGS_KEY, JSON.stringify({
+        includeCashInPosition,
+        showWatchedSymbols,
+        expandAllSymbols,
+        expandedSymbols: [...expandedSymbols],
+      }));
+    } catch {
+      // Ignore unavailable localStorage.
+    }
+  }, [expandAllSymbols, expandedSymbols, includeCashInPosition, showWatchedSymbols, stockUiHydrated]);
+
+  useEffect(() => {
+    if (!expandAllSymbols || visibleSymbols.length === 0) return;
+    setExpandedSymbols(new Set(visibleSymbols));
+  }, [expandAllSymbols, visibleSymbols]);
+
   useEffect(() => {
     if (!isSnapshotView) return;
     setCashModalVisible(false);
@@ -303,6 +372,30 @@ const StocksPage = observer(function StocksPage() {
     router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}`);
   };
 
+  const toggleSymbolExpanded = (symbol: string) => {
+    if (expandAllSymbols && expandedSymbols.has(symbol)) setExpandAllSymbols(false);
+    setExpandedSymbols((current) => {
+      const next = new Set(current);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  const changeExpandAllSymbols = (checked: boolean) => {
+    setExpandAllSymbols(checked);
+    setExpandedSymbols(checked ? new Set(visibleSymbols) : new Set());
+  };
+
+  const openOrExpandSymbol = (summary: IStockPortfolioSymbolSummary) => {
+    const isExpanded = expandedSymbols.has(summary.symbol);
+    if (!isExpanded) {
+      toggleSymbolExpanded(summary.symbol);
+      return;
+    }
+    if (!isSnapshotView && !isRebalanceMode) openSymbolPage(summary);
+  };
+
   return (
     <div className={styles.page}>
       <PullToRefresh onRefresh={refreshActive}>
@@ -339,10 +432,6 @@ const StocksPage = observer(function StocksPage() {
                 </>
               )
             )}
-            <label className={styles.positionToggle}>
-              <span>计现金</span>
-              <Switch checked={includeCashInPosition} onChange={setIncludeCashInPosition} />
-            </label>
           </div>
         </div>
         <div className={styles.summaryValueRow}>
@@ -390,10 +479,23 @@ const StocksPage = observer(function StocksPage() {
         />
       )}
 
-      {displayData && sectorSummaries.length > 0 && (
+      {displayData && visibleSectorSummaries.length > 0 && (
         <section className={styles.section}>
-          <div className={styles.sectionTitle}>股票占比</div>
-          {sectorSummaries.map((sector) => (
+          <div className={styles.sectionTitleRow}>
+            <div className={styles.sectionTitle}>股票占比</div>
+            <div className={styles.stockToggles}>
+              <button type="button" className={includeCashInPosition ? styles.stockToggleButtonActive : styles.stockToggleButton} aria-pressed={includeCashInPosition} onClick={() => setIncludeCashInPosition((value) => !value)}>
+                计现金
+              </button>
+              <button type="button" className={showWatchedSymbols ? styles.stockToggleButtonActive : styles.stockToggleButton} aria-pressed={showWatchedSymbols} onClick={() => setShowWatchedSymbols((value) => !value)}>
+                显示关注
+              </button>
+              <button type="button" className={expandAllSymbols ? styles.stockToggleButtonActive : styles.stockToggleButton} aria-pressed={expandAllSymbols} onClick={() => changeExpandAllSymbols(!expandAllSymbols)}>
+                全部展开
+              </button>
+            </div>
+          </div>
+          {visibleSectorSummaries.map((sector) => (
             <div key={sector.sector} className={styles.sectorGroup}>
               <div className={styles.sectorHeader}>
                 <div>
@@ -406,24 +508,45 @@ const StocksPage = observer(function StocksPage() {
                 <span style={{ width: `${Math.min(sector.percent * 100, 100)}%` }} />
               </div>
               <List className={styles.sectorList}>
-                {sector.symbols.map((summary) => (
-                  <List.Item key={summary.symbol} onClick={isSnapshotView || isRebalanceMode ? undefined : () => openSymbolPage(summary)} clickable={!isSnapshotView && !isRebalanceMode} arrow={false}>
-                    <div className={styles.symbolRow}>
-                      <div className={styles.symbolMain}>
-                        <span className={styles.symbolCode}>{summary.symbol}</span>
-                        <strong>{summary.name}</strong>
+                {sector.symbols.map((summary) => {
+                  const isExpanded = expandedSymbols.has(summary.symbol);
+                  return (
+                  <List.Item key={summary.symbol} className={isExpanded ? styles.symbolItemExpanded : styles.symbolItem} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
+                    <div className={styles.symbolCardContent}>
+                      <div className={styles.symbolRow}>
+                        <div className={styles.symbolMain}>
+                          <span className={styles.symbolCode}>{summary.symbol}</span>
+                          <strong>{summary.name}</strong>
+                          <span className={styles.symbolPercent}>{formatPercent(summary.percent)}</span>
+                        </div>
+                        <div className={styles.symbolRight}>
+                          <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
+                          <button
+                            type="button"
+                            className={isExpanded ? styles.expandButtonOpen : styles.expandButton}
+                            aria-label={isExpanded ? '收起股票指标' : '展开股票指标'}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleSymbolExpanded(summary.symbol);
+                            }}
+                          >
+                            <DownOutline />
+                          </button>
+                        </div>
                       </div>
-                      <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
-                    </div>
-                    <div className={styles.itemMeta}>
-                      {formatStockQuantity(summary.quantity)} 股 · {formatPercent(summary.percent)}
-                    </div>
-                    <StockMetricLines summary={summary} />
-                    <div className={styles.barTrack}>
-                      <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
+                      <StockMetricSummary summary={summary} />
+                      <div className={isExpanded ? styles.metricDetailsOpen : styles.metricDetails}>
+                        <div className={styles.metricDetailsInner}>
+                          <StockMetricDetails summary={summary} />
+                        </div>
+                      </div>
+                      <div className={styles.barTrack}>
+                        <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
+                      </div>
                     </div>
                   </List.Item>
-                ))}
+                  );
+                })}
               </List>
             </div>
           ))}
@@ -536,41 +659,78 @@ const SummaryStat = ({ label, value, onClick }: { label: string; value: string; 
   </button>
 );
 
-const MetricHelp = ({ label, formula, align = 'end' }: { label: string; formula: string; align?: 'start' | 'end' }) => (
-  <span className={[styles.metricHelpWrap, align === 'start' ? styles.metricHelpWrapStart : ''].join(' ')}>
-    <button
-      type="button"
-      className={styles.metricHelpButton}
-      aria-label={`${label}计算方式`}
-      onClick={(event) => event.stopPropagation()}
-    >
-      ?
-    </button>
+const MetricTagWithHelp = ({
+  children,
+  className,
+  label,
+  formula,
+  align = 'end',
+}: {
+  children: React.ReactNode;
+  className: string;
+  label: string;
+  formula: string;
+  align?: 'start' | 'end';
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+  <span className={[
+    className,
+    styles.metricHelpWrap,
+    align === 'start' ? styles.metricHelpWrapStart : '',
+    open ? styles.metricHelpWrapActive : '',
+  ].join(' ')}
+    role="button"
+    tabIndex={0}
+    aria-label={`${label}计算方式`}
+    aria-expanded={open}
+    onClick={(event) => {
+      event.stopPropagation();
+    }}
+    onKeyDown={(event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen((value) => !value);
+    }}
+    onPointerDown={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen((value) => !value);
+    }}
+  >
+    {children}
     <span className={styles.metricTooltip} role="tooltip">{formula}</span>
   </span>
+  );
+};
+
+const StockMetricSummary = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
+  <div className={styles.metricLineCompact}>
+    <span className={styles.metricTagTtm}>PE扣T <strong>{formatOptionalNumber(summary.deductedPeTtm)}</strong></span>
+    <span className={styles.metricTagDividend}>股息率 <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
+    <span className={styles.metricTagValue}>PEG扣 <strong>{formatOptionalNumber(summary.deductedPeg)}</strong></span>
+    <span className={styles.metricTagQuality}>CAGR{summary.deductedNetProfitCagrYears ?? 5} <strong>{formatOptionalPercent(summary.deductedNetProfitCagr5)}</strong></span>
+  </div>
 );
 
-const StockMetricLines = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
-  <>
-    <div className={styles.metricLine}>
-      <span className={styles.metricTagValue}>扣非 PE: <strong>{formatOptionalNumber(summary.deductedPe)}</strong>(静)</span>
-      <span className={styles.metricTagTtm}><strong>{formatOptionalNumber(summary.deductedPeTtm)}</strong>(TTM)</span>
+const StockMetricDetails = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
+  <div className={styles.metricGridDetails}>
+    <div className={styles.metricGridRow}>
+      <span className={styles.metricTagValue}>PE扣静 <strong>{formatOptionalNumber(summary.deductedPe)}</strong></span>
       <span className={styles.metricTagAsset}>PB <strong>{formatOptionalNumber(summary.pb)}</strong></span>
+      <span className={styles.metricTagQuality}>ROE扣T <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong></span>
     </div>
-    <div className={styles.metricLine}>
-      <span className={styles.metricTagQuality}>扣非 ROE: <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong>(TTM)</span>
-      <span className={styles.metricTagDividend}>股息率: <strong>{formatOptionalPercent(summary.normalizedDividendYield)}</strong></span>
-    </div>
-    <div className={styles.metricLine}>
-      <span className={styles.metricTagValue}>扣非 PEG<MetricHelp label="扣非 PEG" formula="扣非 PE / 扣非净利润 5年CAGR" align="start" />: <strong>{formatOptionalNumber(summary.deductedPeg)}</strong></span>
-      <span className={styles.metricTagQuality}>扣非 CAGR: <strong>{formatOptionalPercent(summary.deductedNetProfitCagr5)}</strong></span>
+    <div className={styles.metricGridRow}>
+      <MetricTagWithHelp className={styles.metricTagQuality} label="含金量" formula="经营现金流TTM / 扣非净利润TTM" align="start">
+        含金量: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)
+      </MetricTagWithHelp>
+      <MetricTagWithHelp className={styles.metricTagDividend} label="分红覆盖" formula="自由现金流TTM / 常态分红">
+        分红覆盖: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong>
+      </MetricTagWithHelp>
       <span className={styles.metricTagAsset}>商誉/净资产: <strong>{formatOptionalPercent(summary.goodwillToNetAsset)}</strong></span>
     </div>
-    <div className={styles.metricLine}>
-      <span className={styles.metricTagQuality}>含金量<MetricHelp label="含金量" formula="经营现金流TTM / 扣非净利润TTM" align="start" />: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)</span>
-      <span className={styles.metricTagDividend}>分红覆盖<MetricHelp label="分红覆盖" formula="自由现金流TTM / 常态分红" />: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong></span>
-    </div>
-  </>
+  </div>
 );
 
 const CashModal = ({

@@ -12,6 +12,8 @@ import type { StockAccount, StockDividendEvent, StockFundamental, StockHolding, 
 
 export { marketValueOf, roundStockValue };
 
+const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
+
 export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
 export const normalizeName = (name: string) => name.trim();
@@ -350,10 +352,7 @@ const buildComputedMetrics = (
     : null;
   const annualsByYear = new Map(annualFundamentals.map((item) => [item.reportDate.getFullYear(), item]));
   const latestAnnual = annualFundamentals[0];
-  const baseAnnual = latestAnnual ? annualsByYear.get(latestAnnual.reportDate.getFullYear() - 5) : undefined;
-  const deductedNetProfitCagr5 = latestAnnual?.deductedNetProfit && latestAnnual.deductedNetProfit > 0 && baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0
-    ? (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / 5) - 1
-    : null;
+  const deductedNetProfitCagr = readDeductedNetProfitCagr(latestAnnual, annualsByYear);
   const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
   const deductedPe = companyMarketCap && deductedNetProfit && deductedNetProfit > 0 ? roundStockValue(companyMarketCap / deductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
@@ -374,9 +373,10 @@ const buildComputedMetrics = (
     capitalExpenditureTtm,
     normalizedDividend,
     reportDate: fundamental?.reportDate.toISOString() ?? null,
-    deductedNetProfitCagr5,
-    deductedPeg: deductedPe != null && deductedNetProfitCagr5 != null && deductedNetProfitCagr5 !== 0
-      ? roundStockValue(deductedPe / (deductedNetProfitCagr5 * 100))
+    deductedNetProfitCagr5: deductedNetProfitCagr.value,
+    deductedNetProfitCagrYears: deductedNetProfitCagr.years,
+    deductedPeg: deductedPe != null && deductedNetProfitCagr.value != null && deductedNetProfitCagr.value !== 0
+      ? roundStockValue(deductedPe / (deductedNetProfitCagr.value * 100))
       : null,
     goodwill,
     goodwillToNetAsset: goodwill != null && netAsset && netAsset > 0 ? goodwill / netAsset : null,
@@ -392,6 +392,28 @@ const buildComputedMetrics = (
     fcfDividendCoverage: freeCashFlowTtm != null && normalizedDividend && normalizedDividend > 0 ? freeCashFlowTtm / normalizedDividend : null,
     operatingCashFlowToDeductedNetProfit: operatingCashFlowTtm != null && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? operatingCashFlowTtm / deductedNetProfitTtm : null,
   };
+};
+
+const readDeductedNetProfitCagr = (
+  latestAnnual: StockFundamental | undefined,
+  annualsByYear: Map<number, StockFundamental>
+): { value: number | null; years: number | null } => {
+  if (!latestAnnual?.deductedNetProfit || latestAnnual.deductedNetProfit <= 0) {
+    return { value: null, years: null };
+  }
+
+  const latestYear = latestAnnual.reportDate.getFullYear();
+  for (let years = DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS; years >= 1; years -= 1) {
+    const baseAnnual = annualsByYear.get(latestYear - years);
+    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0) {
+      return {
+        value: (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / years) - 1,
+        years,
+      };
+    }
+  }
+
+  return { value: null, years: null };
 };
 
 const readStatementNumber = (fields: unknown, key: string) => {

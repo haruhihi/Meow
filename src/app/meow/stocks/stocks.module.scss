@@ -518,6 +518,45 @@
   font-weight: 800;
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px 8px;
+
+  .sectionTitle {
+    padding: 0;
+  }
+}
+
+.stockToggles {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stockToggleButton,
+.stockToggleButtonActive {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--meow-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.stockToggleButtonActive {
+  color: var(--meow-primary);
+}
+
 .symbolRow {
   display: flex;
   align-items: center;
@@ -568,6 +607,29 @@
   overflow: hidden;
   --border-top: none;
   --border-bottom: none;
+
+  :global(.adm-list-item-content-main) {
+    padding: 0;
+  }
+
+  :global(.adm-list-item-content) {
+    border-top: 0;
+  }
+}
+
+.symbolItem,
+.symbolItemExpanded {
+  background: rgba(255, 255, 255, 0.95);
+  transition: background 0.22s ease, box-shadow 0.22s ease;
+}
+
+.symbolItemExpanded {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), color-mix(in srgb, var(--meow-accent-soft) 36%, white));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--meow-accent) 62%, var(--meow-primary));
+}
+
+.symbolCardContent {
+  padding: 12px;
 }
 
 .symbolMain {
@@ -584,6 +646,18 @@
     color: var(--meow-text);
     font-size: 14px;
   }
+}
+
+.symbolPercent {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--meow-primary);
+  background: color-mix(in srgb, var(--meow-primary) 11%, transparent);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
 }
 
 .symbolCode {
@@ -604,6 +678,42 @@
   font-variant-numeric: tabular-nums;
 }
 
+.symbolRight {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.expandButton,
+.expandButtonOpen {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--meow-accent) 24%, var(--meow-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--meow-surface-alt) 80%, white);
+  color: var(--meow-accent-strong);
+  font-size: 14px;
+  transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+
+  svg {
+    transition: transform 0.22s ease;
+  }
+}
+
+.expandButtonOpen {
+  border-color: color-mix(in srgb, var(--meow-accent) 42%, var(--meow-border));
+  background: var(--meow-accent-soft);
+
+  svg {
+    transform: rotate(180deg);
+  }
+}
+
 .itemMeta {
   margin-top: 3px;
   color: var(--meow-text-muted);
@@ -619,6 +729,66 @@
   color: var(--meow-text-sub);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.metricLineCompact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 9px;
+  color: var(--meow-text-sub);
+  font-size: 11px;
+  line-height: 1.4;
+
+  > span {
+    min-width: 0;
+    overflow: visible;
+  }
+}
+
+.metricGridDetails {
+  display: grid;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.metricGridRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  color: var(--meow-text-sub);
+  font-size: 11px;
+  line-height: 1.4;
+
+  > span {
+    min-width: 0;
+    overflow: visible;
+  }
+}
+
+.metricDetails,
+.metricDetailsOpen {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: grid-template-rows 0.24s ease, opacity 0.2s ease, transform 0.24s ease;
+}
+
+.metricDetailsOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+
+  .metricDetailsInner {
+    overflow: visible;
+  }
+}
+
+.metricDetailsInner {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 3px;
 }
 
 .metricTagValue,
@@ -666,23 +836,6 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  margin-left: 3px;
-}
-
-.metricHelpButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 13px;
-  height: 13px;
-  padding: 0;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1;
   cursor: pointer;
 }
 
@@ -713,8 +866,7 @@
   left: -8px;
 }
 
-.metricHelpWrap:hover .metricTooltip,
-.metricHelpWrap:focus-within .metricTooltip {
+.metricHelpWrapActive .metricTooltip {
   opacity: 1;
   transform: translateY(0);
 }

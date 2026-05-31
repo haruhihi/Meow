@@ -38,6 +38,7 @@ const formatDateTime = (value?: string | null) => {
 };
 
 const getMetric = (item: RankedItem, key: MetricKey) => item.metrics.find((metric) => metric.key === key) ?? null;
+const getSourceMetric = (item: IStockMagicFormulaItem, key: MetricKey) => item.metrics.find((metric) => metric.key === key) ?? null;
 
 const formatDividendPart = (value: number | null | undefined, prefix: string, suffix = '') =>
   value && value > 0 ? `${prefix}${Number(value.toFixed(4))}${suffix}` : '';
@@ -62,19 +63,21 @@ const buildRankMap = (items: IStockMagicFormulaItem[], metric: IStockMagicFormul
   return new Map(ranked.map((item, index) => [item.symbol, index + 1]));
 };
 
-const getActiveMetrics = (metrics: IStockMagicFormulaMetric[], selectedSector: string, includePeg: boolean) => {
+const getActiveMetrics = (metrics: IStockMagicFormulaMetric[], selectedSector: string, includePeg: boolean, includeDividendYield: boolean) => {
   const metricKeys: MetricKey[] = selectedSector === '红利'
-    ? ['deductedRoa', 'dividendYield']
+    ? includeDividendYield
+      ? ['deductedRoa', 'deductedPe', 'dividendYield']
+      : ['deductedRoa', 'deductedPe']
     : includePeg
-      ? ['deductedPe', 'deductedRoe', 'deductedPeg']
+      ? ['deductedPe', 'deductedRoe', 'deductedNetProfitCagr5']
       : ['deductedPe', 'deductedRoe'];
   return metricKeys
     .map((key) => metrics.find((metric) => metric.key === key))
     .filter((metric): metric is IStockMagicFormulaMetric => Boolean(metric));
 };
 
-const buildRankedItems = (items: IStockMagicFormulaItem[], selectedSector: string, includePeg: boolean): RankedItem[] => {
-  const activeMetrics = getActiveMetrics(items[0]?.metrics ?? [], selectedSector, includePeg);
+const buildRankedItems = (items: IStockMagicFormulaItem[], selectedSector: string, includePeg: boolean, includeDividendYield: boolean): RankedItem[] => {
+  const activeMetrics = getActiveMetrics(items[0]?.metrics ?? [], selectedSector, includePeg, includeDividendYield);
   const rankMaps = new Map(activeMetrics.map((metric) => [metric.key, buildRankMap(items, metric)]));
   const missingRank = items.length + 1;
   const maxRankSum = missingRank * activeMetrics.length;
@@ -111,7 +114,8 @@ export default function MagicFormulaPage() {
   const [data, setData] = useState<IStockMagicFormulaSearchRes | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [includePeg, setIncludePeg] = useState(false);
+  const [includePeg, setIncludePeg] = useState(true);
+  const [includeDividendYield, setIncludeDividendYield] = useState(false);
   const [sort, setSort] = useState<SortState>(null);
   const [selectedItem, setSelectedItem] = useState<RankedItem | null>(null);
   const [showAllDividends, setShowAllDividends] = useState(false);
@@ -149,7 +153,7 @@ export default function MagicFormulaPage() {
     value: item,
   }));
   const isDividendSector = sector === '红利';
-  const rankedItems = buildRankedItems(data?.items ?? [], sector, includePeg);
+  const rankedItems = buildRankedItems(data?.items ?? [], sector, includePeg, includeDividendYield);
   const metricColumns = rankedItems[0]?.metrics ?? [];
   const sortedItems = sortItems(rankedItems, sort);
   const visibleDividendEvents = showAllDividends ? dividendEvents : dividendEvents.slice(0, DIVIDEND_PREVIEW_COUNT);
@@ -230,13 +234,17 @@ export default function MagicFormulaPage() {
             }}
           />
           <label className={styles.pegToggle}>
-            <span>{isDividendSector ? '红利组: ROA + 股息率' : '加入 PEG'}</span>
+            <span>{isDividendSector ? '红利组加入股息率' : '开启 PEG'}</span>
             <Switch
-              checked={isDividendSector ? false : includePeg}
-              disabled={isDividendSector}
+              checked={isDividendSector ? includeDividendYield : includePeg}
               onChange={(checked) => {
-                setIncludePeg(checked);
-                if (!checked && sort?.key === 'deductedPeg') setSort(null);
+                if (isDividendSector) {
+                  setIncludeDividendYield(checked);
+                  if (!checked && sort?.key === 'dividendYield') setSort(null);
+                } else {
+                  setIncludePeg(checked);
+                  if (!checked && (sort?.key === 'deductedPeg' || sort?.key === 'deductedNetProfitCagr5')) setSort(null);
+                }
               }}
             />
           </label>
@@ -282,11 +290,13 @@ export default function MagicFormulaPage() {
                       </td>
                       {metricColumns.map((column) => {
                         const metric = getMetric(item, column.key);
+                        const pegMetric = column.key === 'deductedNetProfitCagr5' ? getSourceMetric(item, 'deductedPeg') : null;
                         return (
                           <td key={column.key} className={metric?.rank == null ? styles.missingMetricCell : undefined}>
                             <div className={styles.metricCell}>
                               <strong>{metric?.rank == null ? '—' : `#${metric.rank}`}</strong>
                               <span>{metric?.display ?? '—'}</span>
+                              {pegMetric && <em>PEG {pegMetric.display}</em>}
                             </div>
                           </td>
                         );

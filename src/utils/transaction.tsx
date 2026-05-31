@@ -6,6 +6,7 @@ import {
   ICouponSearchRes,
   ITransactionCreateReq,
   ITransactionDeleteReq,
+  ITransactionUpdateReq,
 } from '@dtos/meow';
 import dayjs from 'dayjs';
 
@@ -24,6 +25,7 @@ export const useTransactions = () => {
     hasMore: transactionStore.transactionHasMore,
     reQuery: transactionStore.refreshTransactions,
     createTransaction: (params: ITransactionCreateReq) => transactionStore.createTransaction(params),
+    updateTransaction: (params: ITransactionUpdateReq) => transactionStore.updateTransaction(params),
     deleteTransactions: (params: ITransactionDeleteReq) => transactionStore.deleteTransactions(params),
     mutating: transactionStore.transactionMutating,
   };

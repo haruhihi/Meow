@@ -70,10 +70,14 @@ export async function POST(req: Request) {
     const events = await prisma.stockDividendEvent.findMany({
       where: {
         symbol: { in: symbols },
-        OR: [
-          { exDividendDate: { gte: since } },
-          { exDividendDate: null, announcementDate: { gte: since } },
-        ],
+        ...(requestedSymbol
+          ? {}
+          : {
+              OR: [
+                { exDividendDate: { gte: since } },
+                { exDividendDate: null, announcementDate: { gte: since } },
+              ],
+            }),
       },
       include: {
         markings: {

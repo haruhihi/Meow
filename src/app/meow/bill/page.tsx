@@ -37,6 +37,7 @@ import {
   IActivityTypeCreateRes,
   ITimeEntryCreateReq,
   ITimeEntryCreateRes,
+  TransactionWithCoupon,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
@@ -60,10 +61,11 @@ const App = observer(function App() {
   const [showTrend, setShowTrend] = useState(true);
   const [includeCouponDiscount, setIncludeCouponDiscount] = useState(true);
   const [payTime, setPayTime] = useState(dayjs());
+  const [editingTransaction, setEditingTransaction] = useState<TransactionWithCoupon | null>(null);
   const [transactionSubmitting, setTransactionSubmitting] = useState(false);
 
   const categoryRes = useCategories();
-  const { transactions, reQuery, loadMore, hasMore, createTransaction, deleteTransactions } = useTransactions();
+  const { transactions, reQuery, loadMore, hasMore, createTransaction, updateTransaction, deleteTransactions } = useTransactions();
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
   const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
@@ -139,9 +141,17 @@ const App = observer(function App() {
     return (rankedOptions.length > 0 ? rankedOptions : flatCategoryOptions).slice(0, 6);
   }, [flatCategoryOptions, monthData?.transactions, recentTransactions]);
 
+  const availablePaymentCoupons = useMemo(() => {
+    const currentCoupon = editingTransaction?.coupon;
+    if (!currentCoupon || editingTransaction.couponDiscount <= 0 || paymentCoupons.some((coupon) => coupon.id === currentCoupon.id)) {
+      return paymentCoupons;
+    }
+    return [...paymentCoupons, currentCoupon];
+  }, [editingTransaction, paymentCoupons]);
+
   const couponOptions = useMemo(
     () =>
-      paymentCoupons.map((coupon) => ({
+      availablePaymentCoupons.map((coupon) => ({
         label: (
           <span className={styles.couponOption}>
             <span className={styles.couponOptionTitle}>
@@ -161,10 +171,11 @@ const App = observer(function App() {
         ),
         value: String(coupon.id),
       })),
-    [paymentCoupons]
+    [availablePaymentCoupons]
   );
-  const onClick = () => {
+  const openCreateTransaction = () => {
     const now = new Date();
+    setEditingTransaction(null);
     setPayTime(dayjs(now));
     form.resetFields();
     form.setFieldsValue({
@@ -178,6 +189,25 @@ const App = observer(function App() {
     });
     setVisible(true);
     setCategoryVisible(true);
+  };
+
+  const openEditTransaction = (transaction: TransactionWithCoupon) => {
+    const time = new Date(transaction.date);
+    const category = flatCategoryOptions.find((option) => option.value.at(-1) === String(transaction.category.id))?.value;
+    setEditingTransaction(transaction);
+    setPayTime(dayjs(time));
+    form.resetFields();
+    form.setFieldsValue({
+      time,
+      useCoupon: transaction.couponDiscount > 0,
+      couponId: transaction.couponId ? [String(transaction.couponId)] : undefined,
+      couponDiscount: transaction.couponDiscount > 0 ? String(transaction.couponDiscount) : undefined,
+      amount: String(transaction.amount),
+      category,
+      description: transaction.description ?? undefined,
+    });
+    setVisible(true);
+    setCategoryVisible(false);
   };
 
   const openTimeCreate = () => {
@@ -303,6 +333,7 @@ const App = observer(function App() {
                   Toast.show({ content: '删除成功' });
                   setRefreshKey((k) => k + 1);
                 }}
+                onEdit={openEditTransaction}
                 hasMore={hasMore && !selectedTop}
                 onLoadMore={loadMore}
               />
@@ -326,7 +357,7 @@ const App = observer(function App() {
           '--edge-distance': '44px',
           '--background': 'var(--meow-accent-gradient)',
         }}
-        onClick={onClick}
+        onClick={openCreateTransaction}
       >
         <span className={styles.actionIconWrap}><BillEntryIcon className={styles.actionIcon} /></span>
       </FloatingBubble>
@@ -340,9 +371,13 @@ const App = observer(function App() {
 
       <Modal
         visible={visible}
+        title={editingTransaction ? '编辑账单' : '新增账单'}
         closeOnMaskClick
         showCloseButton
-        onClose={() => setVisible(false)}
+        onClose={() => {
+          setVisible(false);
+          setEditingTransaction(null);
+        }}
         content={
           <Form
             form={form}
@@ -365,7 +400,7 @@ const App = observer(function App() {
               }
               const couponId = values.couponId?.[0];
               const hasValidCoupon = Boolean(
-                couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+                couponId && availablePaymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
               );
               if (!hasValidCoupon) {
                 form.setFields([
@@ -399,8 +434,11 @@ const App = observer(function App() {
                 const amountValue = roundMoney(amount);
                 const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
                 const selectedCoupon = selectedCouponId
-                  ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
+                  ? availablePaymentCoupons.find((coupon) => coupon.id === selectedCouponId)
                   : undefined;
+                const availableCouponAmount = selectedCoupon
+                  ? roundMoney(selectedCoupon.remainingAmount + (editingTransaction?.couponId === selectedCoupon.id ? editingTransaction.couponDiscount : 0))
+                  : 0;
                 if (discount < 0) {
                   Toast.show({ content: '抵扣金额不能小于 0' });
                   return;
@@ -413,23 +451,29 @@ const App = observer(function App() {
                   Toast.show({ content: '请选择要使用的券' });
                   return;
                 }
-                if (selectedCoupon && isMoneyGreater(discount, selectedCoupon.remainingAmount)) {
+                if (selectedCoupon && isMoneyGreater(discount, availableCouponAmount)) {
                   Toast.show({ content: '抵扣金额不能超过券余额' });
                   return;
                 }
-                await createTransaction({
+                const payload = {
                   amount: amountValue,
                   categoryId: Number(category[category.length - 1]),
                   date: dayjs(time).unix() * 1000,
                   description,
                   couponId: selectedCouponId,
                   couponDiscount: discount,
-                });
+                };
+                if (editingTransaction) {
+                  await updateTransaction({ id: editingTransaction.id, ...payload });
+                } else {
+                  await createTransaction(payload);
+                }
                 await new Promise<void>((resolve) => {
                   Toast.show({
-                    content: '记录成功',
+                    content: editingTransaction ? '修改成功' : '记录成功',
                     afterClose: () => {
                       setVisible(false);
+                      setEditingTransaction(null);
                       setRefreshKey((k) => k + 1);
                       resolve();
                     },
@@ -488,7 +532,7 @@ const App = observer(function App() {
                       {({ getFieldValue: getNestedFieldValue }) => {
                         const couponId = getNestedFieldValue('couponId')?.[0];
                         const hasValidCoupon = Boolean(
-                          couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+                          couponId && availablePaymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
                         );
 
                         return (
@@ -537,11 +581,12 @@ interface GroupedListProps {
   transactions: Txns;
   getTopName: (id: number) => string | undefined;
   onDelete: (id: number) => Promise<void>;
+  onEdit: (transaction: Txns[number]) => void;
   hasMore: boolean;
   onLoadMore: () => Promise<unknown>;
 }
 
-const GroupedList = ({ transactions, getTopName, onDelete, hasMore, onLoadMore }: GroupedListProps) => {
+const GroupedList = ({ transactions, getTopName, onDelete, onEdit, hasMore, onLoadMore }: GroupedListProps) => {
   const groups = useMemo(() => {
     const m = new Map<string, Txns>();
     transactions.forEach((t) => {
@@ -582,6 +627,12 @@ const GroupedList = ({ transactions, getTopName, onDelete, hasMore, onLoadMore }
                 <SwipeAction
                   key={transaction.id}
                   rightActions={[
+                    {
+                      key: 'edit',
+                      text: '编辑',
+                      color: 'primary',
+                      onClick: () => onEdit(transaction),
+                    },
                     {
                       key: 'delete',
                       text: '删除',
