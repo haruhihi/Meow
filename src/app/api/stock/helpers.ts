@@ -116,8 +116,9 @@ export const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' 
   event.transferSharesPerTen ?? 0,
 ].join('|');
 
-export const buildStockPortfolio = async (userId: number, keyword?: string) => {
+export const buildStockPortfolio = async (userId: number, keyword?: string, detailSymbol?: string) => {
   const trimmedKeyword = keyword?.trim();
+  const valuationDetailSymbol = detailSymbol ? normalizeSymbol(detailSymbol) : null;
   const accounts = await prisma.stockAccount.findMany({
     where: { userId },
     orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -236,7 +237,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, displayedHoldings, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, fundamentalsBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, metricStatementsBySymbol, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
+  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, fundamentalsBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, metricStatementsBySymbol, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol, valuationDetailSymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -305,7 +306,8 @@ const buildSymbolSummaries = (
   fundamentalCacheBySymbol: Map<string, StockMetricCache>,
   valuationCacheBySymbol: Map<string, StockMetricCache>,
   overrideBySymbol: Map<string, StockMetricOverride>,
-  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
+  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>,
+  valuationDetailSymbol: string | null
 ): IStockPortfolioSymbolSummary[] => {
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
 
@@ -363,7 +365,8 @@ const buildSymbolSummaries = (
         fundamentalCacheBySymbol.get(summary.symbol),
         valuationCacheBySymbol.get(summary.symbol),
         overrideBySymbol.get(summary.symbol),
-        markedDividendEventsBySymbol.get(summary.symbol) ?? []
+        markedDividendEventsBySymbol.get(summary.symbol) ?? [],
+        valuationDetailSymbol === summary.symbol
       ),
     }))
     .sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol));
@@ -379,7 +382,8 @@ const buildComputedMetrics = (
   fundamentalCache?: StockMetricCache,
   valuationCache?: StockMetricCache,
   override?: StockMetricOverride,
-  dividendEvents: StockDividendEvent[] = []
+  dividendEvents: StockDividendEvent[] = [],
+  includeValuationHistory = false
 ) => {
   const cacheMetrics = readCacheRecord(fundamentalCache?.metrics);
   const cacheWarnings = readCacheWarnings(fundamentalCache?.warnings);
@@ -414,7 +418,7 @@ const buildComputedMetrics = (
   const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
   const deductedPe = companyMarketCap && latestAnnualDeductedNetProfit && latestAnnualDeductedNetProfit > 0 ? roundStockValue(companyMarketCap / latestAnnualDeductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
-  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, annualFundamentals, valuationCache);
+  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, annualFundamentals, valuationCache, includeValuationHistory);
 
   return {
     totalShares,
@@ -480,7 +484,8 @@ const buildPeValuation = (
   deductedNetProfitTtm: number | null,
   currentPe: number | null,
   annualFundamentals: StockFundamental[],
-  valuationCache?: StockMetricCache
+  valuationCache?: StockMetricCache,
+  includeValuationHistory = false
 ): IStockPeValuationSummary | null => {
   const cachedValuation = readValuationCache(valuationCache);
   const peValues = cachedValuation?.peValues ?? [];
@@ -513,7 +518,7 @@ const buildPeValuation = (
     endDate: cachedValuation?.endDate ?? null,
     targets,
     profitHistory: buildProfitHistory(annualFundamentals),
-    valuationHistory: cachedValuation?.valuationHistory ?? [],
+    valuationHistory: includeValuationHistory ? cachedValuation?.valuationHistory ?? [] : [],
   };
 };
 

@@ -57,6 +57,7 @@ export class StockStore {
   portfolioStatus = createStatus();
   portfolioUpdating = false;
   quoteRefreshing = false;
+  private portfolioCacheKey = '';
 
   snapshots: IStockSnapshotListRes['snapshots'] = [];
   snapshotsStatus = createStatus();
@@ -129,7 +130,7 @@ export class StockStore {
 
   loadPortfolio(params: IStockSearchReq = {}, options: { force?: boolean } = {}) {
     const key = `portfolio:${JSON.stringify(params)}`;
-    if (this.portfolio && !options.force) {
+    if (this.portfolio && this.portfolioCacheKey === key && !options.force) {
       return Promise.resolve(this.portfolio);
     }
     return this.fetchPortfolio(key, params, Boolean(this.portfolio));
@@ -335,6 +336,7 @@ export class StockStore {
         const res = await post<IStockSearchReq, IStockSearchRes>('/api/stock/search', params);
         runInAction(() => {
           this.portfolio = res;
+          this.portfolioCacheKey = key;
           markStatusSuccess(this.portfolioStatus);
         });
         return res;

@@ -15,12 +15,12 @@ import {
 } from '@dtos/meow';
 import { useStockStore } from '@stores/stock-store-context';
 
-export const useStockPortfolio = (refreshKey = 0) => {
+export const useStockPortfolio = (refreshKey = 0, detailSymbol?: string) => {
   const stockStore = useStockStore();
 
   useEffect(() => {
-    void stockStore.loadPortfolio({}, { force: refreshKey > 0 });
-  }, [refreshKey, stockStore]);
+    void stockStore.loadPortfolio(detailSymbol ? { detailSymbol } : {}, { force: refreshKey > 0 });
+  }, [detailSymbol, refreshKey, stockStore]);
 
   const hasLoaded = stockStore.portfolioStatus.updatedAt != null || stockStore.portfolioStatus.error != null;
 
@@ -28,7 +28,7 @@ export const useStockPortfolio = (refreshKey = 0) => {
     data: stockStore.portfolio,
     loading: stockStore.portfolioStatus.loading || (!hasLoaded && !stockStore.portfolio),
     refreshing: stockStore.portfolioStatus.refreshing,
-    reQuery: (params: IStockSearchReq = {}) => stockStore.refreshPortfolio(params),
+    reQuery: (params: IStockSearchReq = {}) => stockStore.refreshPortfolio(detailSymbol ? { detailSymbol, ...params } : params),
     refreshQuotes: (params: IStockQuoteRefreshReq = {}) => stockStore.refreshQuotes(params),
     updateCash: (params: IStockCashUpdateReq) => stockStore.updateCash(params),
     saveRebalance: (params: IStockRebalanceSaveReq) => stockStore.saveRebalance(params),

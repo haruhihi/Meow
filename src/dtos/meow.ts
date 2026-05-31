@@ -458,6 +458,7 @@ export interface IStockPortfolioSectorSummary {
 
 export interface IStockSearchReq {
   keyword?: string;
+  detailSymbol?: string;
 }
 
 export interface IStockSearchRes {
