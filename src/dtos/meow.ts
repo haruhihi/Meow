@@ -409,6 +409,14 @@ export interface IStockPortfolioSymbolSummary {
   totalShares?: number | null;
   deductedNetProfit?: number | null;
   deductedNetProfitTtm?: number | null;
+  deductedNetProfitTtmWarning?: string | null;
+  financialCacheStatus?: string | null;
+  financialDataReportDate?: string | null;
+  financialDataReportName?: string | null;
+  valuationCacheStatus?: string | null;
+  valuationDataReportDate?: string | null;
+  valuationDataReportName?: string | null;
+  valuationDataSnapshotDate?: string | null;
   netProfit?: number | null;
   netProfitTtm?: number | null;
   revenue?: number | null;
@@ -462,6 +470,17 @@ export interface IStockSearchRes {
   accountSummaries: IStockPortfolioAccountSummary[];
   sectorSummaries: IStockPortfolioSectorSummary[];
   symbolSummaries: IStockPortfolioSymbolSummary[];
+  hiddenSymbols: string[];
+}
+
+export interface IStockSymbolVisibilityUpdateReq {
+  symbol: string;
+  isHidden: boolean;
+}
+
+export interface IStockSymbolVisibilityUpdateRes {
+  symbol: string;
+  isHidden: boolean;
 }
 
 export interface IStockMagicFormulaSearchReq {

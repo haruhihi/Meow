@@ -154,7 +154,6 @@ const buildEventKey = (event) => {
 const dividendEventDedupeKey = (event) => [
   event.symbol,
   event.reportPeriod ?? '',
-  event.cashPerTen ?? 0,
   event.bonusSharesPerTen ?? 0,
   event.transferSharesPerTen ?? 0,
 ].join('|');
@@ -224,9 +223,78 @@ const preferImplementedEvent = (left, right) => {
   const leftImplemented = /实施/.test(left.status ?? left.description ?? '');
   const rightImplemented = /实施/.test(right.status ?? right.description ?? '');
   if (leftImplemented !== rightImplemented) return leftImplemented ? left : right;
+  const leftApproved = /股东大会通过/.test(left.status ?? left.description ?? '');
+  const rightApproved = /股东大会通过/.test(right.status ?? right.description ?? '');
+  if (leftApproved !== rightApproved) return leftApproved ? left : right;
   const leftDate = left.exDividendDate ?? left.recordDate ?? left.announcementDate ?? new Date(0);
   const rightDate = right.exDividendDate ?? right.recordDate ?? right.announcementDate ?? new Date(0);
   return leftDate.getTime() >= rightDate.getTime() ? left : right;
+};
+
+const dedupeDividendEvents = (events) => {
+  const byKey = new Map();
+  for (const event of events) {
+    const key = dividendEventDedupeKey(event);
+    const current = byKey.get(key);
+    byKey.set(key, current ? preferImplementedEvent(current, event) : event);
+  }
+  return [...byKey.values()];
+};
+
+const moveMarkingToEvent = async (marking, targetEventId) => {
+  const existing = await prisma.stockDividendMarking.findUnique({
+    where: { userId_eventId: { userId: marking.userId, eventId: targetEventId } },
+  });
+  if (existing) {
+    await prisma.stockDividendMarking.update({
+      where: { id: existing.id },
+      data: {
+        countTowardNormalizedDividend: existing.countTowardNormalizedDividend || marking.countTowardNormalizedDividend,
+        note: existing.note ?? marking.note,
+      },
+    });
+    return;
+  }
+
+  await prisma.stockDividendMarking.create({
+    data: {
+      userId: marking.userId,
+      eventId: targetEventId,
+      countTowardNormalizedDividend: marking.countTowardNormalizedDividend,
+      note: marking.note,
+    },
+  });
+};
+
+const cleanupDuplicateTushareEvents = async (symbol) => {
+  const events = await prisma.stockDividendEvent.findMany({
+    where: { symbol, source: SOURCE },
+    include: { markings: true },
+  });
+  const byKey = new Map();
+  for (const event of events) {
+    const key = dividendEventDedupeKey(event);
+    const group = byKey.get(key) ?? [];
+    group.push(event);
+    byKey.set(key, group);
+  }
+
+  let deleted = 0;
+  let movedMarkings = 0;
+  for (const group of byKey.values()) {
+    if (group.length <= 1) continue;
+    const target = group.reduce((best, event) => preferImplementedEvent(best, event));
+    const duplicates = group.filter((event) => event.id !== target.id);
+    for (const duplicate of duplicates) {
+      for (const marking of duplicate.markings) {
+        await moveMarkingToEvent(marking, target.id);
+        movedMarkings += 1;
+      }
+      await prisma.stockDividendEvent.delete({ where: { id: duplicate.id } });
+      deleted += 1;
+    }
+  }
+  return { deleted, movedMarkings };
 };
 
 const migrateMarkingsToTushareEvents = async (symbol) => {
@@ -257,27 +325,7 @@ const migrateMarkingsToTushareEvents = async (symbol) => {
       continue;
     }
     for (const marking of oldEvent.markings) {
-      const existing = await prisma.stockDividendMarking.findUnique({
-        where: { userId_eventId: { userId: marking.userId, eventId: target.id } },
-      });
-      if (existing) {
-        await prisma.stockDividendMarking.update({
-          where: { id: existing.id },
-          data: {
-            countTowardNormalizedDividend: existing.countTowardNormalizedDividend || marking.countTowardNormalizedDividend,
-            note: existing.note ?? marking.note,
-          },
-        });
-      } else {
-        await prisma.stockDividendMarking.create({
-          data: {
-            userId: marking.userId,
-            eventId: target.id,
-            countTowardNormalizedDividend: marking.countTowardNormalizedDividend,
-            note: marking.note,
-          },
-        });
-      }
+      await moveMarkingToEvent(marking, target.id);
       moved += 1;
     }
   }
@@ -317,7 +365,7 @@ const main = async () => {
   const failed = [];
   for (const symbol of symbols) {
     try {
-      const events = await fetchDividendEvents(symbol);
+      const events = dedupeDividendEvents(await fetchDividendEvents(symbol));
       if (events.length === 0) {
         failed.push(symbol);
         console.error(`[${symbol}] no Tushare dividend events`);
@@ -331,7 +379,13 @@ const main = async () => {
       if (!args.dryRun && args.replaceSource) {
         const migrated = await migrateMarkingsToTushareEvents(symbol);
         const deleted = await deleteNonTushareEvents(symbol);
-        console.log(`[${symbol}] migrated dividendMarkings=${migrated.moved} skipped=${migrated.skipped} deleted old non-Tushare dividendEvents=${deleted}`);
+        const duplicateCleanup = await cleanupDuplicateTushareEvents(symbol);
+        console.log(`[${symbol}] migrated dividendMarkings=${migrated.moved} skipped=${migrated.skipped} deleted old non-Tushare dividendEvents=${deleted} deleted duplicate Tushare dividendEvents=${duplicateCleanup.deleted} moved duplicateMarkings=${duplicateCleanup.movedMarkings}`);
+      } else if (!args.dryRun) {
+        const duplicateCleanup = await cleanupDuplicateTushareEvents(symbol);
+        if (duplicateCleanup.deleted > 0 || duplicateCleanup.movedMarkings > 0) {
+          console.log(`[${symbol}] deleted duplicate Tushare dividendEvents=${duplicateCleanup.deleted} moved duplicateMarkings=${duplicateCleanup.movedMarkings}`);
+        }
       }
       ok += 1;
     } catch (error) {

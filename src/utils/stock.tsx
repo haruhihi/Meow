@@ -11,6 +11,7 @@ import {
   IStockRemarkUpdateReq,
   IStockSearchReq,
   IStockSnapshotCreateReq,
+  IStockSymbolVisibilityUpdateReq,
 } from '@dtos/meow';
 import { useStockStore } from '@stores/stock-store-context';
 
@@ -33,6 +34,7 @@ export const useStockPortfolio = (refreshKey = 0) => {
     saveRebalance: (params: IStockRebalanceSaveReq) => stockStore.saveRebalance(params),
     updateHolding: (params: IStockHoldingUpdateReq) => stockStore.updateHolding(params),
     deleteHolding: (params: IStockHoldingDeleteReq) => stockStore.deleteHolding(params),
+    updateSymbolVisibility: (params: IStockSymbolVisibilityUpdateReq) => stockStore.updateSymbolVisibility(params),
     updating: stockStore.portfolioUpdating,
     quoteRefreshing: stockStore.quoteRefreshing,
   };

@@ -31,6 +31,7 @@ const parseArgs = () => {
   let startDate = DEFAULT_START_DATE;
   let endDate = formatTushareDate(new Date());
   let replaceSource = false;
+  let skipCurrent = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -53,12 +54,14 @@ const parseArgs = () => {
       index += 1;
     } else if (arg === '--replace-source') {
       replaceSource = true;
+    } else if (arg === '--skip-current') {
+      skipCurrent = true;
     } else if (arg === '--dry-run') {
       dryRun = true;
     }
   }
 
-  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep: Math.max(0, sleep), startDate, endDate, replaceSource };
+  return { symbols: symbols.filter(Boolean), limit, dryRun, sleep: Math.max(0, sleep), startDate, endDate, replaceSource, skipCurrent };
 };
 
 function normalizeTushareDate(value) {
@@ -125,6 +128,44 @@ const fetchTushare = async (apiName, params, fields) => {
   return (payload.data?.items ?? []).map((item) => Object.fromEntries(responseFields.map((field, index) => [field, item[index]])));
 };
 
+const latestLocalReportOf = (symbol) => prisma.stockFundamental.findFirst({
+  where: { symbol, source: SOURCE },
+  orderBy: { reportDate: 'desc' },
+  select: { reportDate: true, reportName: true },
+});
+
+const fetchLatestRemoteReport = async (symbol, options, localReportDate) => {
+  const params = {
+    ts_code: toTsCode(symbol),
+    start_date: formatTushareDate(localReportDate),
+    end_date: options.endDate,
+  };
+  const rows = await fetchTushare('fina_indicator', params, ['ts_code', 'ann_date', 'end_date', 'update_flag']);
+  const latest = dedupeByEndDate(rows).at(-1);
+  if (!latest?.end_date) return null;
+  return {
+    endDate: normalizeTushareDate(latest.end_date),
+    reportName: reportNameFromEndDate(latest.end_date),
+  };
+};
+
+const shouldSkipCurrentFinancials = async (symbol, options) => {
+  if (!options.skipCurrent) return false;
+
+  const local = await latestLocalReportOf(symbol);
+  if (!local) return false;
+
+  const localEndDate = formatTushareDate(local.reportDate);
+  const latestRemote = await fetchLatestRemoteReport(symbol, options, local.reportDate);
+  if (!latestRemote || latestRemote.endDate <= localEndDate) {
+    console.log(`[${symbol}] latest local=${localEndDate} ${local.reportName ?? reportNameFromEndDate(localEndDate)} remote=${latestRemote?.endDate ?? 'none'} ${latestRemote?.reportName ?? ''}; skipped current financial statement fetch`);
+    return true;
+  }
+
+  console.log(`[${symbol}] new report detected local=${localEndDate} remote=${latestRemote.endDate} ${latestRemote.reportName}; fetching financial statements`);
+  return false;
+};
+
 const dateFromTushare = (value) => {
   const text = normalizeTushareDate(value);
   return new Date(`${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}T00:00:00.000Z`);
@@ -149,40 +190,31 @@ const reportNameFromEndDate = (endDate) => {
   return text;
 };
 
-const reportKey = (endDate) => {
-  const text = normalizeTushareDate(endDate);
-  return `${text.slice(0, 4)}-${text.slice(4, 6)}`;
-};
-
-const reportMonth = (endDate) => Number(normalizeTushareDate(endDate).slice(4, 6));
-
 const dedupeByEndDate = (rows) => {
   const map = new Map();
   for (const row of rows) {
     if (!row.end_date) continue;
     const existing = map.get(row.end_date);
-    const rowDate = String(row.f_ann_date ?? row.ann_date ?? '');
-    const existingDate = String(existing?.f_ann_date ?? existing?.ann_date ?? '');
-    if (!existing || rowDate >= existingDate) map.set(row.end_date, row);
+    if (!existing || shouldPreferTushareRow(row, existing)) map.set(row.end_date, row);
   }
   return [...map.values()].sort((left, right) => String(left.end_date).localeCompare(String(right.end_date)));
 };
 
-const ttmValue = (row, rowsByKey, field) => {
-  const current = numberOrNull(row?.[field]);
-  if (current == null || !row?.end_date) return null;
-  const text = normalizeTushareDate(row.end_date);
-  const year = Number(text.slice(0, 4));
-  const month = reportMonth(text);
-  if (month === 12) return current;
+const shouldPreferTushareRow = (row, existing) => {
+  const rowUpdated = String(row.update_flag ?? '') === '1' ? 1 : 0;
+  const existingUpdated = String(existing.update_flag ?? '') === '1' ? 1 : 0;
+  if (rowUpdated !== existingUpdated) return rowUpdated > existingUpdated;
 
-  const previousAnnual = rowsByKey.get(`${year - 1}-12`);
-  const previousSamePeriod = rowsByKey.get(`${year - 1}-${String(month).padStart(2, '0')}`);
-  const previousAnnualValue = numberOrNull(previousAnnual?.[field]);
-  const previousSamePeriodValue = numberOrNull(previousSamePeriod?.[field]);
-  if (previousAnnualValue == null || previousSamePeriodValue == null) return null;
-  return current + previousAnnualValue - previousSamePeriodValue;
+  const rowDate = String(row.f_ann_date ?? row.ann_date ?? '');
+  const existingDate = String(existing.f_ann_date ?? existing.ann_date ?? '');
+  if (rowDate !== existingDate) return rowDate > existingDate;
+
+  return meaningfulValueCount(row) > meaningfulValueCount(existing);
 };
+
+const meaningfulValueCount = (row) => Object.entries(row)
+  .filter(([key, value]) => key !== 'ts_code' && key !== 'end_date' && value != null && value !== '')
+  .length;
 
 const withAliases = (row, aliases) => {
   const normalized = { ...row };
@@ -316,9 +348,6 @@ const fetchFundamentals = async (symbol, options) => {
   const balanceByDate = new Map(balance.map((row) => [row.end_date, row]));
   const cashFlowByDate = new Map(cashFlow.map((row) => [row.end_date, row]));
   const indicatorByDate = new Map(indicators.map((row) => [row.end_date, row]));
-  const incomeByKey = new Map(income.map((row) => [reportKey(row.end_date), row]));
-  const cashFlowByKey = new Map(cashFlow.map((row) => [reportKey(row.end_date), row]));
-  const indicatorByKey = new Map(indicators.map((row) => [reportKey(row.end_date), row]));
   const dates = [...new Set([...incomeByDate.keys(), ...balanceByDate.keys(), ...cashFlowByDate.keys(), ...indicatorByDate.keys()])].sort();
 
   const fundamentals = dates.map((endDate) => {
@@ -332,17 +361,12 @@ const fetchFundamentals = async (symbol, options) => {
       reportName: reportNameFromEndDate(endDate),
       totalShares: numberOrNull(balanceRow?.total_share),
       deductedNetProfit: numberOrNull(indicator?.profit_dedt),
-      deductedNetProfitTtm: ttmValue(indicator, indicatorByKey, 'profit_dedt'),
       netProfit: numberOrNull(incomeRow?.n_income_attr_p) ?? numberOrNull(incomeRow?.n_income),
-      netProfitTtm: ttmValue(incomeRow, incomeByKey, 'n_income_attr_p') ?? ttmValue(incomeRow, incomeByKey, 'n_income'),
       revenue: numberOrNull(incomeRow?.revenue) ?? numberOrNull(incomeRow?.total_revenue),
-      revenueTtm: ttmValue(incomeRow, incomeByKey, 'revenue') ?? ttmValue(incomeRow, incomeByKey, 'total_revenue'),
       netAsset: numberOrNull(balanceRow?.total_hldr_eqy_exc_min_int) ?? numberOrNull(balanceRow?.total_hldr_eqy_inc_min_int),
       totalAssets: numberOrNull(balanceRow?.total_assets),
       operatingCashFlow: numberOrNull(cashFlowRow?.n_cashflow_act),
-      operatingCashFlowTtm: ttmValue(cashFlowRow, cashFlowByKey, 'n_cashflow_act'),
       capitalExpenditure: numberOrNull(cashFlowRow?.c_pay_acq_const_fiolta),
-      capitalExpenditureTtm: ttmValue(cashFlowRow, cashFlowByKey, 'c_pay_acq_const_fiolta'),
     };
   });
 
@@ -371,17 +395,12 @@ const upsertFundamental = async (item) => {
       reportName: item.reportName,
       totalShares: item.totalShares,
       deductedNetProfit: item.deductedNetProfit,
-      deductedNetProfitTtm: item.deductedNetProfitTtm,
       netProfit: item.netProfit,
-      netProfitTtm: item.netProfitTtm,
       revenue: item.revenue,
-      revenueTtm: item.revenueTtm,
       netAsset: item.netAsset,
       totalAssets: item.totalAssets,
       operatingCashFlow: item.operatingCashFlow,
-      operatingCashFlowTtm: item.operatingCashFlowTtm,
       capitalExpenditure: item.capitalExpenditure,
-      capitalExpenditureTtm: item.capitalExpenditureTtm,
       source: SOURCE,
       fetchedAt: new Date(),
     },
@@ -403,32 +422,38 @@ const main = async () => {
   console.log(`syncing Tushare fundamentals for ${symbols.length} symbols: ${symbols.join(', ')}`);
 
   let ok = 0;
+  let skippedCurrent = 0;
   let fundamentalsWritten = 0;
   let statementsWritten = 0;
   const failed = [];
   for (const symbol of symbols) {
     try {
-      const { fundamentals, statements } = await fetchFundamentals(symbol, args);
-      if (fundamentals.length === 0 && statements.length === 0) {
-        failed.push(symbol);
-        console.error(`[${symbol}] no Tushare fundamentals returned`);
-        continue;
+      const skipped = await shouldSkipCurrentFinancials(symbol, args);
+      if (skipped) {
+        skippedCurrent += 1;
+      } else {
+        const { fundamentals, statements } = await fetchFundamentals(symbol, args);
+        if (fundamentals.length === 0 && statements.length === 0) {
+          failed.push(symbol);
+          console.error(`[${symbol}] no Tushare fundamentals returned`);
+          continue;
+        }
+        if (!args.dryRun && args.replaceSource) {
+          const deleted = await deleteNonTushareFundamentals(symbol);
+          console.log(`[${symbol}] deleted old non-Tushare fundamentals=${deleted.fundamentals} statements=${deleted.statements}`);
+        }
+        for (const item of fundamentals) {
+          console.log(`[${symbol}] report=${item.reportDate.toISOString().slice(0, 10)} ${item.reportName} totalShares=${item.totalShares} deductedNetProfit=${item.deductedNetProfit} netAsset=${item.netAsset} operatingCashFlow=${item.operatingCashFlow}`);
+          if (!args.dryRun) await upsertFundamental(item);
+          fundamentalsWritten += 1;
+        }
+        for (const statement of statements) {
+          if (!args.dryRun) await upsertFinancialStatement(statement);
+          statementsWritten += 1;
+        }
+        console.log(`[${symbol}] financialStatements=${statements.length}`);
+        ok += 1;
       }
-      if (!args.dryRun && args.replaceSource) {
-        const deleted = await deleteNonTushareFundamentals(symbol);
-        console.log(`[${symbol}] deleted old non-Tushare fundamentals=${deleted.fundamentals} statements=${deleted.statements}`);
-      }
-      for (const item of fundamentals) {
-        console.log(`[${symbol}] report=${item.reportDate.toISOString().slice(0, 10)} ${item.reportName} totalShares=${item.totalShares} deductedNetProfit=${item.deductedNetProfit} deductedNetProfitTtm=${item.deductedNetProfitTtm} netAsset=${item.netAsset} operatingCashFlow=${item.operatingCashFlow}`);
-        if (!args.dryRun) await upsertFundamental(item);
-        fundamentalsWritten += 1;
-      }
-      for (const statement of statements) {
-        if (!args.dryRun) await upsertFinancialStatement(statement);
-        statementsWritten += 1;
-      }
-      console.log(`[${symbol}] financialStatements=${statements.length}`);
-      ok += 1;
     } catch (error) {
       if (isTushareTokenError(error)) throw error;
       failed.push(symbol);
@@ -437,8 +462,8 @@ const main = async () => {
     if (args.sleep > 0) await sleepMs(args.sleep);
   }
 
-  console.log(`done ok=${ok} fundamentals=${fundamentalsWritten} financialStatements=${statementsWritten} failed=${failed.length} failedSymbols=${failed.join(',')}`);
-  return ok > 0 || failed.length === 0 ? 0 : 1;
+  console.log(`done ok=${ok} skippedCurrent=${skippedCurrent} fundamentals=${fundamentalsWritten} financialStatements=${statementsWritten} failed=${failed.length} failedSymbols=${failed.join(',')}`);
+  return ok > 0 || skippedCurrent > 0 || failed.length === 0 ? 0 : 1;
 };
 
 main()

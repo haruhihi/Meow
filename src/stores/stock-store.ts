@@ -43,6 +43,8 @@ import {
   IStockSnapshotDetailRes,
   IStockSnapshotListReq,
   IStockSnapshotListRes,
+  IStockSymbolVisibilityUpdateReq,
+  IStockSymbolVisibilityUpdateRes,
   StockDividendEventWithMarking,
   StockSnapshotDetail,
 } from '@dtos/meow';
@@ -202,6 +204,21 @@ export class StockStore {
         this.portfolioUpdating = false;
       });
     }
+  }
+
+  async updateSymbolVisibility(payload: IStockSymbolVisibilityUpdateReq) {
+    const res = await post<IStockSymbolVisibilityUpdateReq, IStockSymbolVisibilityUpdateRes>('/api/stock/symbol-visibility/update', payload);
+    runInAction(() => {
+      if (!this.portfolio) return;
+      const hiddenSymbols = new Set(this.portfolio.hiddenSymbols ?? []);
+      if (res.isHidden) hiddenSymbols.add(res.symbol);
+      else hiddenSymbols.delete(res.symbol);
+      this.portfolio = {
+        ...this.portfolio,
+        hiddenSymbols: [...hiddenSymbols].sort(),
+      };
+    });
+    return res;
   }
 
   loadSnapshots(limit = 120, options: { force?: boolean } = {}) {

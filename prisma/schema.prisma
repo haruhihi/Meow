@@ -22,21 +22,22 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Transaction  Transaction[]  @relation
-  ActivityType ActivityType[] @relation
-  TimeEntry    TimeEntry[]    @relation
-  StockAccount StockAccount[] @relation
-  StockHolding StockHolding[] @relation
-  StockQuote   StockQuote[]   @relation
-  StockCash    StockCash?     @relation
-  StockAiReport StockAiReport[] @relation
-  StockFrameworkArticle StockFrameworkArticle[] @relation
-  StockSnapshot StockSnapshot[] @relation
-  LifeAnalysisProfile UserLifeAnalysisProfile? @relation
-  LifeAnalysisReports UserLifeAnalysisReport[] @relation
-  StockMetricOverride StockMetricOverride[] @relation
-  StockDividendMarking StockDividendMarking[] @relation
-  StockRemark StockRemark[] @relation
+  Transaction           Transaction[]            @relation
+  ActivityType          ActivityType[]           @relation
+  TimeEntry             TimeEntry[]              @relation
+  StockAccount          StockAccount[]           @relation
+  StockHolding          StockHolding[]           @relation
+  StockQuote            StockQuote[]             @relation
+  StockCash             StockCash?               @relation
+  StockAiReport         StockAiReport[]          @relation
+  StockFrameworkArticle StockFrameworkArticle[]  @relation
+  StockSnapshot         StockSnapshot[]          @relation
+  LifeAnalysisProfile   UserLifeAnalysisProfile? @relation
+  LifeAnalysisReports   UserLifeAnalysisReport[] @relation
+  StockMetricOverride   StockMetricOverride[]    @relation
+  StockDividendMarking  StockDividendMarking[]   @relation
+  StockRemark           StockRemark[]            @relation
+  StockSymbolPreference StockSymbolPreference[]  @relation
 }
 
 model UserLifeAnalysisProfile {
@@ -127,24 +128,24 @@ model StockSnapshot {
 }
 
 model StockDividendEvent {
-  id                    Int      @id @default(autoincrement())
-  eventKey              String   @unique @db.VarChar(160)
-  symbol                String   @db.VarChar(32)
-  reportPeriod          String?  @db.VarChar(80)
-  announcementDate      DateTime?
-  recordDate            DateTime?
-  exDividendDate        DateTime?
-  paymentDate           DateTime?
-  cashPerTen            Float?
-  bonusSharesPerTen     Float?
-  transferSharesPerTen  Float?
-  dividendBaseShares    Float?
-  status                String?  @db.VarChar(80)
-  description           String?  @db.VarChar(255)
-  source                String   @db.VarChar(80)
-  fetchedAt             DateTime @default(now())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   Int       @id @default(autoincrement())
+  eventKey             String    @unique @db.VarChar(160)
+  symbol               String    @db.VarChar(32)
+  reportPeriod         String?   @db.VarChar(80)
+  announcementDate     DateTime?
+  recordDate           DateTime?
+  exDividendDate       DateTime?
+  paymentDate          DateTime?
+  cashPerTen           Float?
+  bonusSharesPerTen    Float?
+  transferSharesPerTen Float?
+  dividendBaseShares   Float?
+  status               String?   @db.VarChar(80)
+  description          String?   @db.VarChar(255)
+  source               String    @db.VarChar(80)
+  fetchedAt            DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   markings StockDividendMarking[] @relation
 
@@ -171,27 +172,22 @@ model StockDividendMarking {
 }
 
 model StockFundamental {
-  id                  Int      @id @default(autoincrement())
-  symbol              String   @db.VarChar(32)
-  reportDate          DateTime
-  reportName          String?  @db.VarChar(80)
-  totalShares         Float?
-  deductedNetProfit   Float?
-  deductedNetProfitTtm Float?
-  netProfit           Float?
-  netProfitTtm        Float?
-  revenue             Float?
-  revenueTtm          Float?
-  netAsset            Float?
-  totalAssets         Float?
-  operatingCashFlow   Float?
-  operatingCashFlowTtm Float?
-  capitalExpenditure  Float?
-  capitalExpenditureTtm Float?
-  source              String   @db.VarChar(80)
-  fetchedAt           DateTime @default(now())
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  symbol             String   @db.VarChar(32)
+  reportDate         DateTime
+  reportName         String?  @db.VarChar(80)
+  totalShares        Float?
+  deductedNetProfit  Float?
+  netProfit          Float?
+  revenue            Float?
+  netAsset           Float?
+  totalAssets        Float?
+  operatingCashFlow  Float?
+  capitalExpenditure Float?
+  source             String   @db.VarChar(80)
+  fetchedAt          DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@unique([symbol, reportDate])
   @@index([symbol])
@@ -231,8 +227,6 @@ model StockValuationSnapshot {
   pb                   Float?
   dividendYield        Float?
   dividendYieldTtm     Float?
-  deductedNetProfitTtm Float?
-  deductedPe           Float?
   source               String   @db.VarChar(80)
   fetchedAt            DateTime @default(now())
   createdAt            DateTime @default(now())
@@ -242,6 +236,28 @@ model StockValuationSnapshot {
   @@index([symbol, period, tradeDate])
   @@index([tradeDate])
   @@index([source])
+}
+
+model StockMetricCache {
+  id                            Int       @id @default(autoincrement())
+  symbol                        String    @db.VarChar(32)
+  domain                        String    @db.VarChar(64)
+  status                        String    @db.VarChar(32)
+  calculationVersion            Int       @default(1)
+  calculatedThroughReportDate   DateTime?
+  calculatedThroughReportName   String?   @db.VarChar(80)
+  calculatedThroughSnapshotDate DateTime?
+  metrics                       Json
+  warnings                      Json?
+  calculatedAt                  DateTime  @default(now())
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+
+  @@unique([symbol, domain])
+  @@index([symbol])
+  @@index([domain, status])
+  @@index([calculatedThroughReportDate])
+  @@index([calculatedThroughSnapshotDate])
 }
 
 model StockMetricOverride {
@@ -274,6 +290,22 @@ model StockRemark {
   @@unique([userId, symbol, remarkDate])
   @@index([userId, symbol, remarkDate])
   @@index([symbol])
+}
+
+model StockSymbolPreference {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  symbol    String   @db.VarChar(32)
+  isHidden  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol])
+  @@index([userId])
+  @@index([symbol])
+  @@index([userId, isHidden])
 }
 
 model StockCash {

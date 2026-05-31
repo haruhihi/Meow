@@ -6,13 +6,11 @@ import { IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes } from '
 const duplicateDividendWhere = (event: {
   symbol: string;
   reportPeriod: string | null;
-  cashPerTen: number | null;
   bonusSharesPerTen: number | null;
   transferSharesPerTen: number | null;
 }) => ({
   symbol: event.symbol,
   reportPeriod: event.reportPeriod,
-  cashPerTen: event.cashPerTen,
   bonusSharesPerTen: event.bonusSharesPerTen,
   transferSharesPerTen: event.transferSharesPerTen,
 });

@@ -42,6 +42,7 @@ type RebalanceAddHoldingFormValues = {
 };
 
 const STOCK_UI_SETTINGS_KEY = 'meow:stocks:ui-settings';
+const EMPTY_SYMBOLS: string[] = [];
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
 const formatOptionalNumber = (value?: number | null) => {
@@ -65,6 +66,11 @@ const formatDate = (value?: string | Date | null) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const readPeTtm = (summary: IStockPortfolioSymbolSummary) => {
+  if (!summary.totalShares || summary.totalShares <= 0 || !summary.netProfitTtm || summary.netProfitTtm <= 0) return null;
+  return summary.currentPrice * summary.totalShares / summary.netProfitTtm;
+};
+
 const StocksPage = observer(function StocksPage() {
   const router = useRouter();
   const [cashModalVisible, setCashModalVisible] = useState(false);
@@ -83,22 +89,28 @@ const StocksPage = observer(function StocksPage() {
   const [showWatchedSymbols, setShowWatchedSymbols] = useState(true);
   const [expandAllSymbols, setExpandAllSymbols] = useState(false);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(() => new Set());
+  const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(() => new Set());
   const [stockUiHydrated, setStockUiHydrated] = useState(false);
-  const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
+  const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance, updateSymbolVisibility } = useStockPortfolio();
   const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
   const isSnapshotView = selectedSnapshotId != null;
   const activeData = isSnapshotView ? selectedSnapshot?.portfolio ?? null : data;
   const displayData = isRebalanceMode && rebalanceDraft ? rebalanceDraft : activeData;
+  const portfolioHiddenSymbols = data?.hiddenSymbols ?? EMPTY_SYMBOLS;
   const accounts = displayData?.accounts ?? [];
   const symbolSummaries = displayData?.symbolSummaries ?? [];
-  const totalMarketValue = displayData?.totalMarketValue ?? 0;
-  const totalAssetValue = displayData?.totalAssetValue ?? totalMarketValue;
+  const activeSymbolSummaries = useMemo(
+    () => symbolSummaries.filter((summary) => !hiddenSymbols.has(summary.symbol)),
+    [hiddenSymbols, symbolSummaries]
+  );
+  const totalMarketValue = activeSymbolSummaries.reduce((sum, summary) => sum + summary.marketValue, 0);
   const cashAmount = displayData?.cashAmount ?? 0;
+  const totalAssetValue = totalMarketValue + cashAmount;
   const positionTotalValue = includeCashInPosition ? totalAssetValue : totalMarketValue;
   const isInitialLoading = !displayData && (isSnapshotView ? snapshotLoading : portfolioLoading);
-  const expectedDividend = calculateExpectedDividend(symbolSummaries);
+  const expectedDividend = calculateExpectedDividend(activeSymbolSummaries);
   const portfolioDividendYield = calculatePortfolioDividendYield(totalMarketValue, expectedDividend);
   const isRebalanceCashInvalid = isRebalanceMode && cashAmount < 0;
   const accountOptions = accounts.map((account) => ({ label: account.name, value: String(account.id) }));
@@ -119,13 +131,18 @@ const StocksPage = observer(function StocksPage() {
     () =>
       (displayData?.sectorSummaries ?? []).map((sector) => ({
         ...sector,
-        percent: percentOf(sector.marketValue, positionTotalValue),
+        marketValue: sector.symbols
+          .filter((summary) => !hiddenSymbols.has(summary.symbol))
+          .reduce((sum, summary) => sum + summary.marketValue, 0),
+        percent: percentOf(sector.symbols
+          .filter((summary) => !hiddenSymbols.has(summary.symbol))
+          .reduce((sum, summary) => sum + summary.marketValue, 0), positionTotalValue),
         symbols: sector.symbols.map((summary) => ({
           ...summary,
-          percent: percentOf(summary.marketValue, positionTotalValue),
+          percent: hiddenSymbols.has(summary.symbol) ? 0 : percentOf(summary.marketValue, positionTotalValue),
         })),
       })),
-    [displayData?.sectorSummaries, positionTotalValue]
+    [displayData?.sectorSummaries, hiddenSymbols, positionTotalValue]
   );
   const visibleSectorSummaries = useMemo(
     () => sectorSummaries
@@ -133,15 +150,19 @@ const StocksPage = observer(function StocksPage() {
         const symbols = showWatchedSymbols
           ? sector.symbols
           : sector.symbols.filter((summary) => summary.holdingCount > 0 || summary.quantity > 0 || summary.marketValue > 0);
-        return { ...sector, symbols, symbolCount: symbols.length };
+        return { ...sector, symbols, symbolCount: symbols.filter((summary) => !hiddenSymbols.has(summary.symbol)).length };
       })
       .filter((sector) => sector.symbols.length > 0),
-    [sectorSummaries, showWatchedSymbols]
+    [hiddenSymbols, sectorSummaries, showWatchedSymbols]
   );
   const visibleSymbols = useMemo(
     () => visibleSectorSummaries.flatMap((sector) => sector.symbols.map((summary) => summary.symbol)),
     [visibleSectorSummaries]
   );
+
+  useEffect(() => {
+    setHiddenSymbols(new Set(portfolioHiddenSymbols));
+  }, [portfolioHiddenSymbols]);
 
   useEffect(() => {
     try {
@@ -199,6 +220,29 @@ const StocksPage = observer(function StocksPage() {
       return;
     }
     await reQuery();
+  };
+
+  const toggleSymbolHidden = async (symbol: string) => {
+    const wasHidden = hiddenSymbols.has(symbol);
+    const isHidden = !wasHidden;
+    setHiddenSymbols((current) => {
+      const next = new Set(current);
+      if (isHidden) next.add(symbol);
+      else next.delete(symbol);
+      return next;
+    });
+
+    try {
+      await updateSymbolVisibility({ symbol, isHidden });
+    } catch (error) {
+      setHiddenSymbols((current) => {
+        const next = new Set(current);
+        if (wasHidden) next.add(symbol);
+        else next.delete(symbol);
+        return next;
+      });
+      Toast.show({ content: `更新失败: ${(error as any)?.result ?? error}` });
+    }
   };
 
   const changeSnapshot = (value: string) => {
@@ -456,7 +500,7 @@ const StocksPage = observer(function StocksPage() {
           quoteFetchedAt && <div className={styles.quoteTime}>行情 {formatQuoteTime(quoteFetchedAt)}</div>
         )}
         <div className={styles.summaryGrid}>
-          <SummaryStat label="持仓" value={`${symbolSummaries.length}`} />
+          <SummaryStat label="持仓" value={`${activeSymbolSummaries.length}`} />
           <SummaryStat label={isRebalanceMode ? '预期分红预估' : '预期分红'} value={formatMoney(expectedDividend)} />
           <SummaryStat label={isRebalanceMode ? '股息率预估' : '综合股息率'} value={formatPercent(portfolioDividendYield)} />
         </div>
@@ -497,8 +541,10 @@ const StocksPage = observer(function StocksPage() {
               </button>
             </div>
           </div>
-          {visibleSectorSummaries.map((sector) => (
-            <div key={sector.sector} className={styles.sectorGroup}>
+          {visibleSectorSummaries.map((sector) => {
+            const isSectorHidden = sector.symbols.length > 0 && sector.symbols.every((summary) => hiddenSymbols.has(summary.symbol));
+            return (
+            <div key={sector.sector} className={isSectorHidden ? `${styles.sectorGroup} ${styles.sectorGroupHidden}` : styles.sectorGroup}>
               <div className={styles.sectorHeader}>
                 <div>
                   <div className={styles.sectorName}>{sector.sector}</div>
@@ -512,14 +558,25 @@ const StocksPage = observer(function StocksPage() {
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => {
                   const isExpanded = expandedSymbols.has(summary.symbol);
+                  const isHidden = hiddenSymbols.has(summary.symbol);
+                  const itemClassName = [isExpanded ? styles.symbolItemExpanded : styles.symbolItem, isHidden ? styles.symbolItemHidden : ''].filter(Boolean).join(' ');
                   return (
-                  <List.Item key={summary.symbol} className={isExpanded ? styles.symbolItemExpanded : styles.symbolItem} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
+                  <List.Item key={summary.symbol} className={itemClassName} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
                     <div className={styles.symbolCardContent}>
                       <div className={styles.symbolRow}>
                         <div className={styles.symbolMain}>
-                          <span className={styles.symbolCode}>{summary.symbol}</span>
                           <strong>{summary.name}</strong>
                           <span className={styles.symbolPercent}>{formatPercent(summary.percent)}</span>
+                          <button
+                            type="button"
+                            className={isHidden ? styles.symbolVisibilityButtonActive : styles.symbolVisibilityButton}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void toggleSymbolHidden(summary.symbol);
+                            }}
+                          >
+                            {isHidden ? 'show' : 'hide'}
+                          </button>
                         </div>
                         <div className={styles.symbolRight}>
                           <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
@@ -551,7 +608,8 @@ const StocksPage = observer(function StocksPage() {
                 })}
               </List>
             </div>
-          ))}
+            );
+          })}
         </section>
       )}
 
@@ -719,7 +777,7 @@ const StockMetricSummary = ({ summary }: { summary: IStockPortfolioSymbolSummary
 const StockMetricDetails = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <div className={styles.metricGridDetails}>
     <div className={styles.metricGridRow}>
-      <span className={styles.metricTagValue}>PE扣静 <strong>{formatOptionalNumber(summary.deductedPe)}</strong></span>
+      <span className={styles.metricTagValue}>PE TTM <strong>{formatOptionalNumber(readPeTtm(summary))}</strong></span>
       <span className={styles.metricTagAsset}>PB <strong>{formatOptionalNumber(summary.pb)}</strong></span>
       <span className={styles.metricTagQuality}>ROE扣T <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong></span>
     </div>

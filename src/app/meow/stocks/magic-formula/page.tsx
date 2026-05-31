@@ -1,20 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Button, Empty, Modal, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Empty, PullToRefresh, Selector, Switch, Toast } from 'antd-mobile';
 import { LeftOutline } from 'antd-mobile-icons';
 import { useRouter } from 'next/navigation';
 import { LoadingState } from '@components/loading';
 import {
-  IStockDividendListReq,
-  IStockDividendListRes,
-  IStockDividendMarkingUpdateReq,
-  IStockDividendMarkingUpdateRes,
   IStockMagicFormulaItem,
   IStockMagicFormulaMetric,
   IStockMagicFormulaSearchReq,
   IStockMagicFormulaSearchRes,
-  StockDividendEventWithMarking,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import styles from './magic-formula.module.scss';
@@ -28,7 +23,49 @@ type RankedItem = Omit<IStockMagicFormulaItem, 'metrics'> & {
   maxRankSum: number;
   metrics: RankedMetric[];
 };
-const DIVIDEND_PREVIEW_COUNT = 6;
+const MAGIC_FORMULA_SETTINGS_KEY = 'meow:stocks:magic-formula-settings';
+const ALL_SECTOR = '全部关注';
+const EXCLUDING_DIVIDEND_SECTOR = '除红利';
+const DIVIDEND_SECTOR = '红利';
+
+type MagicFormulaSettings = {
+  sector: string;
+  includePeg: boolean;
+  includeDividendYield: boolean;
+  sort: SortState;
+};
+
+const defaultMagicFormulaSettings: MagicFormulaSettings = {
+  sector: '全部关注',
+  includePeg: false,
+  includeDividendYield: false,
+  sort: null,
+};
+
+const readMagicFormulaSettings = () => {
+  if (typeof window === 'undefined') return defaultMagicFormulaSettings;
+  try {
+    const raw = window.localStorage.getItem(MAGIC_FORMULA_SETTINGS_KEY);
+    if (!raw) return defaultMagicFormulaSettings;
+    const parsed = JSON.parse(raw) as Partial<MagicFormulaSettings>;
+    return {
+      sector: typeof parsed.sector === 'string' && parsed.sector ? parsed.sector : defaultMagicFormulaSettings.sector,
+      includePeg: typeof parsed.includePeg === 'boolean' ? parsed.includePeg : defaultMagicFormulaSettings.includePeg,
+      includeDividendYield: typeof parsed.includeDividendYield === 'boolean' ? parsed.includeDividendYield : defaultMagicFormulaSettings.includeDividendYield,
+      sort: parsed.sort && typeof parsed.sort.key === 'string' && (parsed.sort.direction === 'asc' || parsed.sort.direction === 'desc') ? parsed.sort as SortState : null,
+    };
+  } catch {
+    return defaultMagicFormulaSettings;
+  }
+};
+
+const saveMagicFormulaSettings = (settings: MagicFormulaSettings) => {
+  try {
+    window.localStorage.setItem(MAGIC_FORMULA_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore unavailable localStorage.
+  }
+};
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '';
@@ -40,19 +77,11 @@ const formatDateTime = (value?: string | null) => {
 const getMetric = (item: RankedItem, key: MetricKey) => item.metrics.find((metric) => metric.key === key) ?? null;
 const getSourceMetric = (item: IStockMagicFormulaItem, key: MetricKey) => item.metrics.find((metric) => metric.key === key) ?? null;
 
-const formatDividendPart = (value: number | null | undefined, prefix: string, suffix = '') =>
-  value && value > 0 ? `${prefix}${Number(value.toFixed(4))}${suffix}` : '';
-
-const formatDividendPlan = (event: StockDividendEventWithMarking) => {
-  const parts = [
-    formatDividendPart(event.cashPerTen, '10派', '元'),
-    formatDividendPart(event.bonusSharesPerTen, '10送', '股'),
-    formatDividendPart(event.transferSharesPerTen, '10转', '股'),
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : event.description || '暂无方案';
+const matchSelectedSector = (item: { sector: string }, selectedSector: string) => {
+  if (selectedSector === ALL_SECTOR) return true;
+  if (selectedSector === EXCLUDING_DIVIDEND_SECTOR) return item.sector !== DIVIDEND_SECTOR;
+  return item.sector === selectedSector;
 };
-
-const isDividendPlan = (event: StockDividendEventWithMarking) => /预案/.test(event.status ?? event.description ?? '');
 
 const buildRankMap = (items: IStockMagicFormulaItem[], metric: IStockMagicFormulaMetric) => {
   const ranked = items
@@ -114,14 +143,13 @@ export default function MagicFormulaPage() {
   const [data, setData] = useState<IStockMagicFormulaSearchRes | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [includePeg, setIncludePeg] = useState(true);
+  const [includePeg, setIncludePeg] = useState(defaultMagicFormulaSettings.includePeg);
   const [includeDividendYield, setIncludeDividendYield] = useState(false);
   const [sort, setSort] = useState<SortState>(null);
-  const [selectedItem, setSelectedItem] = useState<RankedItem | null>(null);
-  const [showAllDividends, setShowAllDividends] = useState(false);
-  const [dividendEvents, setDividendEvents] = useState<StockDividendEventWithMarking[]>([]);
-  const [dividendLoading, setDividendLoading] = useState(false);
-  const selectedSymbol = selectedItem?.symbol ?? '';
+
+  const persistSettings = (next: Partial<MagicFormulaSettings>) => {
+    saveMagicFormulaSettings({ sector, includePeg, includeDividendYield, sort, ...next });
+  };
 
   const loadData = async (nextSector = sector, background = false) => {
     if (background) setRefreshing(true);
@@ -132,6 +160,7 @@ export default function MagicFormulaPage() {
       });
       setData(res);
       setSector(res.selectedSector);
+      if (res.selectedSector !== nextSector) persistSettings({ sector: res.selectedSector });
     } catch (error) {
       Toast.show({ content: `加载失败: ${(error as any)?.result ?? error}` });
     } finally {
@@ -141,71 +170,44 @@ export default function MagicFormulaPage() {
   };
 
   useEffect(() => {
-    void loadData('全部关注');
+    const settings = readMagicFormulaSettings();
+    setSector(settings.sector);
+    setIncludePeg(settings.includePeg);
+    setIncludeDividendYield(settings.includeDividendYield);
+    setSort(settings.sort);
+    void loadData(settings.sector);
   }, []);
-
-  useEffect(() => {
-    setShowAllDividends(false);
-  }, [selectedSymbol]);
 
   const sectorOptions = (data?.sectors ?? ['全部关注', '除红利', '消费', '白酒', '中药', '医药', '红利']).map((item) => ({
     label: item,
     value: item,
   }));
   const isDividendSector = sector === '红利';
-  const rankedItems = buildRankedItems(data?.items ?? [], sector, includePeg, includeDividendYield);
+  const filteredItems = useMemo(
+    () => (data?.items ?? []).filter((item) => matchSelectedSector(item, sector)),
+    [data?.items, sector]
+  );
+  const rankedItems = buildRankedItems(filteredItems, sector, includePeg, includeDividendYield);
   const metricColumns = rankedItems[0]?.metrics ?? [];
   const sortedItems = sortItems(rankedItems, sort);
-  const visibleDividendEvents = showAllDividends ? dividendEvents : dividendEvents.slice(0, DIVIDEND_PREVIEW_COUNT);
 
   const toggleSort = (key: MetricKey) => {
     setSort((current) => current?.key === key
       ? current.direction === 'asc'
-        ? { key, direction: 'desc' }
-        : null
-      : { key, direction: 'asc' });
-  };
-
-  const loadDividendEvents = async (symbol: string) => {
-    setDividendLoading(true);
-    try {
-      const res = await post<IStockDividendListReq, IStockDividendListRes>('/api/stock/dividend/events', { symbol });
-      setDividendEvents(res.events);
-    } catch (error) {
-      setDividendEvents([]);
-      Toast.show({ content: `分红加载失败: ${(error as any)?.result ?? error}` });
-    } finally {
-      setDividendLoading(false);
-    }
-  };
-
-  const openDividendModal = (item: RankedItem) => {
-    setSelectedItem(item);
-    setShowAllDividends(false);
-    setDividendEvents([]);
-    void loadDividendEvents(item.symbol);
-  };
-
-  const closeDividendModal = () => {
-    setSelectedItem(null);
-    setShowAllDividends(false);
-    setDividendEvents([]);
-  };
-
-  const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
-    if (!selectedSymbol) return;
-    try {
-      await post<IStockDividendMarkingUpdateReq, IStockDividendMarkingUpdateRes>('/api/stock/dividend/marking/update', {
-        eventId: event.id,
-        countTowardNormalizedDividend: checked,
-        note: event.marking?.note ?? null,
-      });
-      await loadDividendEvents(selectedSymbol);
-      await loadData(sector, true);
-      Toast.show({ content: checked ? '已计入常态分红' : '已取消计入' });
-    } catch (error) {
-      Toast.show({ content: `标记失败: ${(error as any)?.result ?? error}` });
-    }
+        ? (() => {
+            const next = { key, direction: 'desc' as const };
+            persistSettings({ sort: next });
+            return next;
+          })()
+        : (() => {
+            persistSettings({ sort: null });
+            return null;
+          })()
+      : (() => {
+          const next = { key, direction: 'asc' as const };
+          persistSettings({ sort: next });
+          return next;
+        })());
   };
 
   return (
@@ -230,7 +232,7 @@ export default function MagicFormulaPage() {
               const nextSector = String(value[0] ?? sector);
               setSector(nextSector);
               setSort(null);
-              void loadData(nextSector);
+              persistSettings({ sector: nextSector, sort: null });
             }}
           />
           <label className={styles.pegToggle}>
@@ -240,23 +242,27 @@ export default function MagicFormulaPage() {
               onChange={(checked) => {
                 if (isDividendSector) {
                   setIncludeDividendYield(checked);
-                  if (!checked && sort?.key === 'dividendYield') setSort(null);
+                  const nextSort = !checked && sort?.key === 'dividendYield' ? null : sort;
+                  if (nextSort !== sort) setSort(nextSort);
+                  persistSettings({ includeDividendYield: checked, sort: nextSort });
                 } else {
                   setIncludePeg(checked);
-                  if (!checked && (sort?.key === 'deductedPeg' || sort?.key === 'deductedNetProfitCagr5')) setSort(null);
+                  const nextSort = !checked && (sort?.key === 'deductedPeg' || sort?.key === 'deductedNetProfitCagr5') ? null : sort;
+                  if (nextSort !== sort) setSort(nextSort);
+                  persistSettings({ includePeg: checked, sort: nextSort });
                 }
               }}
             />
           </label>
           <div className={styles.headerMeta}>
-            <span>{data ? `${data.items.length} 只` : '加载中'}</span>
+            <span>{data ? `${filteredItems.length} 只` : '加载中'}</span>
             <span>{data?.updatedAt ? `更新 ${formatDateTime(data.updatedAt)}` : ' '}</span>
           </div>
         </section>
 
         {loading && !data ? (
           <LoadingState className={styles.loadingBlock} label="正在计算评分" />
-        ) : data && data.items.length > 0 ? (
+        ) : data && filteredItems.length > 0 ? (
           <section className={styles.matrixCard}>
             <div className={styles.matrixSummary}>
               <span>{sort ? `按 ${metricColumns.find((metric) => metric.key === sort.key)?.label ?? '指标'} ${sort.direction === 'asc' ? '升序' : '降序'}` : '按综合名次排序'}</span>
@@ -281,7 +287,7 @@ export default function MagicFormulaPage() {
                   {sortedItems.map((item) => (
                     <tr key={item.symbol}>
                       <td className={styles.stockColumn}>
-                        <button type="button" className={styles.stockCellButton} onClick={() => openDividendModal(item)}>
+                        <button type="button" className={styles.stockCellButton} onClick={() => router.push(`/meow/stocks/${encodeURIComponent(item.symbol)}`)}>
                           <strong>{item.name}</strong>
                           <span>{item.symbol} · {item.sector}</span>
                           <em>综合 #{item.overallRank} · 名次和 {item.rankSum}</em>
@@ -315,44 +321,6 @@ export default function MagicFormulaPage() {
           <Button block fill="outline" loading={refreshing} onClick={() => loadData(sector, true)}>刷新评分</Button>
         </div>
       </PullToRefresh>
-
-      <Modal
-        visible={Boolean(selectedItem)}
-        title={selectedItem ? `${selectedItem.symbol} ${selectedItem.name}` : '分红事件'}
-        closeOnMaskClick
-        showCloseButton
-        onClose={closeDividendModal}
-        content={
-          <section className={styles.dividendModal}>
-            <p>点击分红方案切换是否计入常态分红，神奇公式会随标记刷新。</p>
-            {dividendLoading ? (
-              <LoadingState label="分红加载中" compact />
-            ) : dividendEvents.length > 0 ? (
-              <>
-                <div className={styles.dividendGrid}>
-                  {visibleDividendEvents.map((event) => {
-                    const checked = Boolean(event.marking?.countTowardNormalizedDividend);
-                    return (
-                      <button key={event.id} type="button" className={checked ? styles.dividendCardActive : styles.dividendCard} onClick={() => toggleDividendEvent(event, !checked)}>
-                        <strong>{event.reportPeriod ?? '未知报告期'}</strong>
-                        <span>{formatDividendPlan(event)}</span>
-                        <em>{isDividendPlan(event) ? '预案' : '实施'} · {checked ? '已计入' : '未计入'}</em>
-                      </button>
-                    );
-                  })}
-                </div>
-                {dividendEvents.length > DIVIDEND_PREVIEW_COUNT && (
-                  <button type="button" className={styles.showMoreButton} onClick={() => setShowAllDividends((value) => !value)}>
-                    {showAllDividends ? '收起' : `展示更多（${dividendEvents.length - DIVIDEND_PREVIEW_COUNT}）`}
-                  </button>
-                )}
-              </>
-            ) : (
-              <Empty style={{ padding: '32px 0' }} description="暂无分红事件" />
-            )}
-          </section>
-        }
-      />
     </div>
   );
 }

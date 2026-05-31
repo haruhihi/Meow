@@ -11,7 +11,10 @@
     "update-db": "node scripts/with-database-url.mjs prisma format && node scripts/with-database-url.mjs prisma migrate dev --name update && node scripts/with-database-url.mjs prisma generate",
     "view": "node scripts/with-database-url.mjs prisma studio",
     "p": "node scripts/with-database-url.mjs prisma",
+    "sync:stock-source-data": "node scripts/sync-stock-source-data.mjs",
+    "sync:stock-financial-cache": "node scripts/sync-stock-source-data.mjs",
     "sync:stock-valuations": "node scripts/sync-stock-valuation-snapshots.mjs",
+    "refresh:stock-metric-cache": "node scripts/refresh-stock-metric-cache.mjs",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"
   },

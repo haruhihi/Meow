@@ -588,6 +588,11 @@
   box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
 }
 
+.sectorGroupHidden {
+  filter: grayscale(0.85);
+  opacity: 0.56;
+}
+
 .sectorHeader {
   display: flex;
   align-items: flex-start;
@@ -628,6 +633,11 @@
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--meow-accent) 62%, var(--meow-primary));
 }
 
+.symbolItemHidden {
+  filter: grayscale(0.92);
+  opacity: 0.52;
+}
+
 .symbolCardContent {
   padding: 12px;
 }
@@ -658,6 +668,25 @@
   font-weight: 900;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
+}
+
+.symbolVisibilityButton,
+.symbolVisibilityButtonActive {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid rgba(20, 184, 166, 0.18);
+  border-radius: 999px;
+  background: white;
+  color: var(--meow-text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 18px;
+}
+
+.symbolVisibilityButtonActive {
+  border-color: color-mix(in srgb, var(--meow-primary) 34%, transparent);
+  color: var(--meow-primary);
 }
 
 .symbolCode {

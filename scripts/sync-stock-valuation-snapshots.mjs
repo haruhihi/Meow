@@ -83,13 +83,6 @@ function formatTushareDate(date) {
   return `${year}${month}${day}`;
 }
 
-function addYearsToTushareDate(value, years) {
-  const text = normalizeTushareDate(value);
-  const date = dateFromTushare(text);
-  date.setUTCFullYear(date.getUTCFullYear() + years);
-  return formatTushareDate(date);
-}
-
 const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const loadStockUniverseSymbols = () => {
@@ -172,130 +165,6 @@ const multiplyOrNull = (value, factor) => {
   return number == null ? null : number * factor;
 };
 
-const addDays = (date, days) => {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-};
-
-const conservativeAvailabilityDate = (reportDate) => {
-  const month = reportDate.getUTCMonth() + 1;
-  if (month === 12) return addDays(reportDate, 120);
-  if (month === 6) return addDays(reportDate, 75);
-  return addDays(reportDate, 45);
-};
-
-const valueOfStatementField = (field) => {
-  if (Array.isArray(field)) return numberOrNull(field[0]);
-  return numberOrNull(field);
-};
-
-const reportKey = (reportDate) => `${reportDate.getUTCFullYear()}-${String(reportDate.getUTCMonth() + 1).padStart(2, '0')}`;
-
-const reportKeyFromTushareDate = (value) => {
-  const text = normalizeTushareDate(value);
-  return `${text.slice(0, 4)}-${text.slice(4, 6)}`;
-};
-
-const reportMonthFromTushareDate = (value) => Number(normalizeTushareDate(value).slice(4, 6));
-
-const calculateDeductedNetProfitTtm = (row, rowsByYearMonth) => {
-  const reportDate = row.reportDate;
-  const year = reportDate.getUTCFullYear();
-  const month = reportDate.getUTCMonth() + 1;
-  const current = valueOfStatementField(row.fields?.net_profit_after_nrgal_atsolc);
-  if (current == null) return null;
-  if (month === 12) return current;
-
-  const previousAnnual = rowsByYearMonth.get(`${year - 1}-12`);
-  const previousSamePeriod = rowsByYearMonth.get(`${year - 1}-${String(month).padStart(2, '0')}`);
-  const previousAnnualValue = valueOfStatementField(previousAnnual?.fields?.net_profit_after_nrgal_atsolc);
-  const previousSamePeriodValue = valueOfStatementField(previousSamePeriod?.fields?.net_profit_after_nrgal_atsolc);
-  if (previousAnnualValue == null || previousSamePeriodValue == null) return null;
-
-  return current + previousAnnualValue - previousSamePeriodValue;
-};
-
-const calculateTushareDeductedNetProfitTtm = (row, rowsByYearMonth) => {
-  const endDate = normalizeTushareDate(row.end_date);
-  const year = Number(endDate.slice(0, 4));
-  const month = reportMonthFromTushareDate(endDate);
-  const current = numberOrNull(row.profit_dedt);
-  if (current == null) return null;
-  if (month === 12) return current;
-
-  const previousAnnual = rowsByYearMonth.get(`${year - 1}-12`);
-  const previousSamePeriod = rowsByYearMonth.get(`${year - 1}-${String(month).padStart(2, '0')}`);
-  const previousAnnualValue = numberOrNull(previousAnnual?.profit_dedt);
-  const previousSamePeriodValue = numberOrNull(previousSamePeriod?.profit_dedt);
-  if (previousAnnualValue == null || previousSamePeriodValue == null) return null;
-
-  return current + previousAnnualValue - previousSamePeriodValue;
-};
-
-const buildTushareIndicatorFundamentalRows = (indicatorRows) => {
-  const rowsByEndDate = new Map();
-  for (const row of indicatorRows) {
-    if (!row.end_date || !row.ann_date) continue;
-    const existing = rowsByEndDate.get(row.end_date);
-    if (!existing || String(row.ann_date) >= String(existing.ann_date)) rowsByEndDate.set(row.end_date, row);
-  }
-  const rows = [...rowsByEndDate.values()].sort((left, right) => String(left.end_date).localeCompare(String(right.end_date)));
-  const rowsByYearMonth = new Map(rows.map((row) => [reportKeyFromTushareDate(row.end_date), row]));
-
-  return rows
-    .map((row) => ({
-      availableDate: dateFromTushare(row.ann_date),
-      deductedNetProfitTtm: calculateTushareDeductedNetProfitTtm(row, rowsByYearMonth),
-    }))
-    .filter((row) => row.deductedNetProfitTtm != null && row.deductedNetProfitTtm > 0);
-};
-
-const buildStatementFundamentalRows = async (symbol) => {
-  const rows = await prisma.stockFinancialStatement.findMany({
-    where: { symbol, statement: 'income' },
-    select: { reportDate: true, fields: true },
-    orderBy: { reportDate: 'asc' },
-  });
-  const rowsByYearMonth = new Map(rows.map((row) => [reportKey(row.reportDate), row]));
-  return rows
-    .map((row) => ({
-      availableDate: conservativeAvailabilityDate(row.reportDate),
-      deductedNetProfitTtm: calculateDeductedNetProfitTtm(row, rowsByYearMonth),
-    }))
-    .filter((row) => row.deductedNetProfitTtm != null && row.deductedNetProfitTtm > 0);
-};
-
-const buildCompactFundamentalRows = async (symbol) => {
-  const rows = await prisma.stockFundamental.findMany({
-    where: { symbol },
-    select: { reportDate: true, deductedNetProfitTtm: true },
-    orderBy: { reportDate: 'asc' },
-  });
-  return rows
-    .map((row) => ({
-      availableDate: conservativeAvailabilityDate(row.reportDate),
-      deductedNetProfitTtm: numberOrNull(row.deductedNetProfitTtm),
-    }))
-    .filter((row) => row.deductedNetProfitTtm != null && row.deductedNetProfitTtm > 0);
-};
-
-const buildFundamentalMatcher = async (symbol, indicatorRows) => {
-  const tushareRows = buildTushareIndicatorFundamentalRows(indicatorRows);
-  const statementRows = tushareRows.length > 0 ? [] : await buildStatementFundamentalRows(symbol);
-  const compactRows = tushareRows.length > 0 || statementRows.length > 0 ? [] : await buildCompactFundamentalRows(symbol);
-  const availableRows = [...tushareRows, ...statementRows, ...compactRows]
-    .sort((left, right) => left.availableDate.getTime() - right.availableDate.getTime());
-
-  let cursor = -1;
-  return (tradeDate) => {
-    while (cursor + 1 < availableRows.length && availableRows[cursor + 1].availableDate.getTime() <= tradeDate.getTime()) {
-      cursor += 1;
-    }
-    return cursor >= 0 ? availableRows[cursor] : null;
-  };
-};
-
 const fetchWeeklyRows = (tsCode, startDate, endDate) => fetchTushare(
   'weekly',
   { ts_code: tsCode, start_date: startDate, end_date: endDate },
@@ -308,15 +177,8 @@ const fetchDailyBasicRows = (tsCode, startDate, endDate) => fetchTushare(
   ['ts_code', 'trade_date', 'close', 'pe', 'pe_ttm', 'pb', 'dv_ratio', 'dv_ttm', 'total_share', 'float_share', 'free_share', 'total_mv', 'circ_mv'],
 );
 
-const fetchFinaIndicatorRows = (tsCode, startDate, endDate) => fetchTushare(
-  'fina_indicator',
-  { ts_code: tsCode, start_date: addYearsToTushareDate(startDate, -2), end_date: endDate },
-  ['ts_code', 'ann_date', 'end_date', 'profit_dedt'],
-);
-
-const buildSnapshots = async (symbol, weeklyRows, dailyBasicRows, indicatorRows) => {
+const buildSnapshots = (symbol, weeklyRows, dailyBasicRows) => {
   const basicByDate = new Map(dailyBasicRows.map((row) => [String(row.trade_date), row]));
-  const findFundamental = await buildFundamentalMatcher(symbol, indicatorRows);
 
   return weeklyRows
     .slice()
@@ -327,11 +189,6 @@ const buildSnapshots = async (symbol, weeklyRows, dailyBasicRows, indicatorRows)
 
       const tradeDate = dateFromTushare(weekly.trade_date);
       const totalMarketCap = multiplyOrNull(basic.total_mv, 10000);
-      const fundamental = findFundamental(tradeDate);
-      const deductedNetProfitTtm = fundamental?.deductedNetProfitTtm ?? null;
-      const deductedPe = totalMarketCap != null && deductedNetProfitTtm != null && deductedNetProfitTtm > 0
-        ? totalMarketCap / deductedNetProfitTtm
-        : null;
 
       return {
         symbol,
@@ -348,8 +205,6 @@ const buildSnapshots = async (symbol, weeklyRows, dailyBasicRows, indicatorRows)
         pb: numberOrNull(basic.pb),
         dividendYield: numberOrNull(basic.dv_ratio),
         dividendYieldTtm: numberOrNull(basic.dv_ttm),
-        deductedNetProfitTtm,
-        deductedPe,
         source: SOURCE,
       };
     })
@@ -378,8 +233,6 @@ const upsertSnapshot = async (snapshot) => {
       pb: snapshot.pb,
       dividendYield: snapshot.dividendYield,
       dividendYieldTtm: snapshot.dividendYieldTtm,
-      deductedNetProfitTtm: snapshot.deductedNetProfitTtm,
-      deductedPe: snapshot.deductedPe,
       source: snapshot.source,
       fetchedAt: new Date(),
     },
@@ -388,17 +241,15 @@ const upsertSnapshot = async (snapshot) => {
 
 const syncSymbol = async (symbol, args) => {
   const tsCode = toTsCode(symbol);
-  const [weeklyRows, dailyBasicRows, indicatorRows] = await Promise.all([
+  const [weeklyRows, dailyBasicRows] = await Promise.all([
     fetchWeeklyRows(tsCode, args.startDate, args.endDate),
     fetchDailyBasicRows(tsCode, args.startDate, args.endDate),
-    fetchFinaIndicatorRows(tsCode, args.startDate, args.endDate),
   ]);
-  const snapshots = await buildSnapshots(symbol, weeklyRows, dailyBasicRows, indicatorRows);
+  const snapshots = buildSnapshots(symbol, weeklyRows, dailyBasicRows);
   if (!args.dryRun) {
     for (const snapshot of snapshots) await upsertSnapshot(snapshot);
   }
-  const withDeductedPe = snapshots.filter((snapshot) => snapshot.deductedPe != null).length;
-  return { weeklyRows: weeklyRows.length, dailyBasicRows: dailyBasicRows.length, indicatorRows: indicatorRows.length, snapshots: snapshots.length, withDeductedPe };
+  return { weeklyRows: weeklyRows.length, dailyBasicRows: dailyBasicRows.length, snapshots: snapshots.length };
 };
 
 const main = async () => {
@@ -410,15 +261,13 @@ const main = async () => {
 
   let ok = 0;
   let written = 0;
-  let deductedPeCount = 0;
   const failed = [];
   for (const symbol of symbols) {
     try {
       const result = await syncSymbol(symbol, args);
       written += result.snapshots;
-      deductedPeCount += result.withDeductedPe;
       ok += 1;
-      console.log(`[${symbol}] weekly=${result.weeklyRows} dailyBasic=${result.dailyBasicRows} indicators=${result.indicatorRows} snapshots=${result.snapshots} deductedPe=${result.withDeductedPe}`);
+      console.log(`[${symbol}] weekly=${result.weeklyRows} dailyBasic=${result.dailyBasicRows} snapshots=${result.snapshots}`);
     } catch (error) {
       if (isTushareTokenError(error)) throw error;
       failed.push(symbol);
@@ -427,7 +276,7 @@ const main = async () => {
     if (args.sleep > 0) await sleepMs(args.sleep);
   }
 
-  console.log(`done ok=${ok} snapshots=${written} deductedPe=${deductedPeCount} failed=${failed.length} failedSymbols=${failed.join(',')}`);
+  console.log(`done ok=${ok} snapshots=${written} failed=${failed.length} failedSymbols=${failed.join(',')}`);
   return ok > 0 || failed.length === 0 ? 0 : 1;
 };
 

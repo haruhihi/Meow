@@ -1,4 +1,4 @@
-name: Sync stock fundamentals
+name: Sync stock source data
 
 on:
   schedule:
@@ -14,7 +14,11 @@ on:
         required: false
         default: '20120101'
       replace_source:
-        description: 'Delete old non-Tushare fundamentals/statements for each successfully fetched symbol.'
+        description: 'Delete old non-Tushare dividend events/fundamentals/statements for each successfully fetched symbol.'
+        required: false
+        default: 'true'
+      skip_current:
+        description: 'Skip full financial statement fetch when the latest Tushare report period already exists locally.'
         required: false
         default: 'true'
 
@@ -59,19 +63,23 @@ jobs:
           printf 'TUSHARE_TOKEN=%s\n' "$TUSHARE_TOKEN" >> .env
           npm install
 
-      - name: Sync fundamentals
+      - name: Sync dividends, fundamentals, and cache
         if: steps.tushare-token.outputs.valid == 'true'
         env:
           DATABASE: ${{ secrets.DATABASE }}
           SYMBOLS: ${{ github.event.inputs.symbols }}
           START_DATE: ${{ github.event.inputs.start_date }}
           REPLACE_SOURCE: ${{ github.event.inputs.replace_source }}
+          SKIP_CURRENT: ${{ github.event.inputs.skip_current }}
         run: |
           args=(--sleep 300 --start-date "${START_DATE:-20120101}")
           if [ "${REPLACE_SOURCE:-true}" = "true" ]; then
             args+=(--replace-source)
           fi
+          if [ "${SKIP_CURRENT:-true}" = "true" ]; then
+            args+=(--skip-current)
+          fi
           if [ -n "$SYMBOLS" ]; then
             args+=(--symbols $SYMBOLS)
           fi
-          node scripts/sync-stock-fundamentals.mjs "${args[@]}"
+          npm run sync:stock-source-data -- "${args[@]}"

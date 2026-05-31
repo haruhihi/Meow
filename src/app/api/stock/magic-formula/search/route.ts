@@ -13,12 +13,13 @@ import {
   getStockUniverseSectors,
   stockUniverse,
 } from '../../../../../config/stock-universe';
-import type { StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricOverride, StockQuote } from '@prisma/client';
+import type { StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote } from '@prisma/client';
 
 const ALL_SECTOR = '全部关注';
 const EXCLUDING_DIVIDEND_SECTOR = '除红利';
 const DIVIDEND_SECTOR = '红利';
 const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
+const FUNDAMENTAL_CACHE_DOMAIN = 'fundamental_latest';
 
 type MetricDefinition = {
   key: IStockMagicFormulaMetric['key'];
@@ -37,6 +38,7 @@ type ScoreInput = {
   marketValue: number;
   percent: number;
   fundamental: StockFundamental | null;
+  fundamentalCache: StockMetricCache | null;
   annualFundamentals: StockFundamental[];
   annualBalance: Pick<StockFinancialStatement, 'fields'> | null;
   override: StockMetricOverride | null;
@@ -48,12 +50,21 @@ const formatPercent = (value: number | null) => (value == null ? '—' : `${(val
 const formatCagr = (value: number | null, item: ScoreInput) => {
   const years = readDeductedNetProfitCagr(item).years;
   if (value == null || years == null) return '—';
-  return years === DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS
-    ? formatPercent(value)
-    : `CAGR${years} ${formatPercent(value)}`;
+  return `CAGR${years} ${formatPercent(value)}`;
 };
 const roundStockValue = (value: number) => Math.round(value * 100) / 100;
 const percentOf = (value: number, total: number) => total > 0 ? value / total : 0;
+
+const readCacheRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+);
+
+const readCacheNumber = (record: Record<string, unknown>, key: string) => {
+  const value = record[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const readFundamentalMetric = (item: ScoreInput, key: string) => readCacheNumber(readCacheRecord(item.fundamentalCache?.metrics), key);
 
 const readStatementNumber = (fields: unknown, key: string) => {
   if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
@@ -64,7 +75,7 @@ const readStatementNumber = (fields: unknown, key: string) => {
 };
 
 const readMarketCap = (item: ScoreInput) => {
-  const totalShares = item.fundamental?.totalShares;
+  const totalShares = readFundamentalMetric(item, 'totalShares') ?? item.fundamental?.totalShares;
   return item.currentPrice != null && totalShares && totalShares > 0 ? item.currentPrice * totalShares : null;
 };
 
@@ -76,8 +87,11 @@ const readDeductedNetProfitCagr = (item: ScoreInput): { value: number | null; ye
   const annualsByYear = new Map(item.annualFundamentals.map((fundamental) => [fundamental.reportDate.getFullYear(), fundamental]));
   const latestYear = latestAnnual.reportDate.getFullYear();
   for (let years = DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS; years >= 1; years -= 1) {
-    const baseAnnual = annualsByYear.get(latestYear - years);
-    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0) {
+    const baseYear = latestYear - years;
+    const baseAnnual = annualsByYear.get(baseYear);
+    const previousBaseAnnual = annualsByYear.get(baseYear - 1);
+    const isRecoveryBase = previousBaseAnnual && (!previousBaseAnnual.deductedNetProfit || previousBaseAnnual.deductedNetProfit <= 0);
+    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0 && !isRecoveryBase) {
       return {
         value: (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / years) - 1,
         years,
@@ -91,19 +105,19 @@ const readDeductedNetProfitCagr5 = (item: ScoreInput) => readDeductedNetProfitCa
 
 const readDeductedPe = (item: ScoreInput) => {
   const marketCap = readMarketCap(item);
-  const profit = item.fundamental?.deductedNetProfit;
+  const profit = readFundamentalMetric(item, 'deductedNetProfitTtm') ?? item.fundamental?.deductedNetProfit;
   return marketCap != null && profit && profit > 0 ? marketCap / profit : null;
 };
 
 const readDeductedRoe = (item: ScoreInput) => {
-  const netAsset = item.fundamental?.netAsset;
-  const profit = item.fundamental?.deductedNetProfitTtm ?? item.fundamental?.deductedNetProfit;
+  const netAsset = readFundamentalMetric(item, 'netAsset') ?? item.fundamental?.netAsset;
+  const profit = readFundamentalMetric(item, 'deductedNetProfitTtm') ?? item.fundamental?.deductedNetProfit;
   return profit != null && netAsset && netAsset > 0 ? profit / netAsset : null;
 };
 
 const readDeductedRoa = (item: ScoreInput) => {
-  const totalAssets = item.fundamental?.totalAssets;
-  const profit = item.fundamental?.deductedNetProfitTtm ?? item.fundamental?.deductedNetProfit;
+  const totalAssets = readFundamentalMetric(item, 'totalAssets') ?? item.fundamental?.totalAssets;
+  const profit = readFundamentalMetric(item, 'deductedNetProfitTtm') ?? item.fundamental?.deductedNetProfit;
   return profit != null && totalAssets && totalAssets > 0 ? profit / totalAssets : null;
 };
 
@@ -114,8 +128,8 @@ const readDeductedPeg = (item: ScoreInput) => {
 };
 
 const readOperatingCashFlowToDeductedNetProfit = (item: ScoreInput) => {
-  const operatingCashFlow = item.fundamental?.operatingCashFlowTtm;
-  const profit = item.fundamental?.deductedNetProfitTtm;
+  const operatingCashFlow = readFundamentalMetric(item, 'operatingCashFlowTtm');
+  const profit = readFundamentalMetric(item, 'deductedNetProfitTtm');
   return operatingCashFlow != null && profit && profit > 0 ? operatingCashFlow / profit : null;
 };
 
@@ -140,14 +154,13 @@ const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: numb
 const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' | 'reportPeriod' | 'cashPerTen' | 'bonusSharesPerTen' | 'transferSharesPerTen'>) => [
   event.symbol,
   event.reportPeriod ?? '',
-  event.cashPerTen ?? 0,
   event.bonusSharesPerTen ?? 0,
   event.transferSharesPerTen ?? 0,
 ].join('|');
 
 const readDividendYield = (item: ScoreInput) => {
   const marketCap = readMarketCap(item);
-  const normalizedDividend = sumMarkedDividendEvents(item.dividendEvents, item.fundamental?.totalShares ?? null) ?? item.override?.normalizedDividend ?? null;
+  const normalizedDividend = sumMarkedDividendEvents(item.dividendEvents, readFundamentalMetric(item, 'totalShares') ?? item.fundamental?.totalShares ?? null) ?? item.override?.normalizedDividend ?? null;
   return marketCap != null && normalizedDividend != null && normalizedDividend > 0 ? normalizedDividend / marketCap : null;
 };
 
@@ -157,7 +170,7 @@ const metricDefinitions: MetricDefinition[] = [
   { key: 'deductedRoa', label: '扣非 ROA', direction: 'desc', getValue: readDeductedRoa, format: formatPercent },
   { key: 'dividendYield', label: '股息率', direction: 'desc', getValue: readDividendYield, format: formatPercent },
   { key: 'deductedPeg', label: '扣非 PEG', direction: 'asc', getValue: readDeductedPeg, format: formatNumber },
-  { key: 'deductedNetProfitCagr5', label: '扣非 CAGR5', direction: 'desc', getValue: readDeductedNetProfitCagr5, format: formatCagr },
+  { key: 'deductedNetProfitCagr5', label: '扣非 CAGR', direction: 'desc', getValue: readDeductedNetProfitCagr5, format: formatCagr },
 ];
 
 const buildFlags = (item: ScoreInput) => {
@@ -224,10 +237,14 @@ const buildUniverseSymbols = (holdings: Pick<StockHolding, 'symbol'>[]) => {
   return [...map.values()].sort((left, right) => left.sector.localeCompare(right.sector) || left.symbol.localeCompare(right.symbol));
 };
 
-const matchSelectedSector = (item: { sector: string }, selectedSector: string) => {
-  if (selectedSector === ALL_SECTOR) return true;
-  if (selectedSector === EXCLUDING_DIVIDEND_SECTOR) return item.sector !== DIVIDEND_SECTOR;
-  return item.sector === selectedSector;
+const sectorOptionsFor = (items: { sector: string }[]) => {
+  const activeSectors = new Set(items.map((item) => item.sector));
+  const hasNonDividendItems = items.some((item) => item.sector !== DIVIDEND_SECTOR);
+  return [
+    ALL_SECTOR,
+    ...(hasNonDividendItems ? [EXCLUDING_DIVIDEND_SECTOR] : []),
+    ...getStockUniverseSectors().filter((sector) => activeSectors.has(sector)),
+  ];
 };
 
 export async function POST(req: Request) {
@@ -236,12 +253,19 @@ export async function POST(req: Request) {
     if (!uid) throw new Error('unauthorized');
 
     const body = (await req.json().catch(() => ({}))) as IStockMagicFormulaSearchReq;
-    const selectedSector = body.sector?.trim() || ALL_SECTOR;
+    const requestedSector = body.sector?.trim() || ALL_SECTOR;
+    const hiddenPreferences = await prisma.stockSymbolPreference.findMany({
+      where: { userId: uid, isHidden: true },
+      select: { symbol: true },
+    });
+    const hiddenSymbols = new Set(hiddenPreferences.map((preference) => preference.symbol));
     const holdings = await prisma.stockHolding.findMany({
       where: { userId: uid },
       select: { symbol: true, quantity: true },
     });
-    const universeItems = buildUniverseSymbols(holdings);
+    const universeItems = buildUniverseSymbols(holdings).filter((item) => !hiddenSymbols.has(item.symbol));
+    const sectors = sectorOptionsFor(universeItems);
+    const selectedSector = sectors.includes(requestedSector) ? requestedSector : ALL_SECTOR;
     const symbols = universeItems.map((item) => item.symbol);
     const quotes = await prisma.stockQuote.findMany({
       where: { userId: uid, symbol: { in: symbols } },
@@ -249,6 +273,9 @@ export async function POST(req: Request) {
     const fundamentals = await prisma.stockFundamental.findMany({
       where: { symbol: { in: symbols } },
       orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
+    });
+    const metricCaches = await prisma.stockMetricCache.findMany({
+      where: { symbol: { in: symbols }, domain: FUNDAMENTAL_CACHE_DOMAIN },
     });
     const balanceStatements = await prisma.stockFinancialStatement.findMany({
       where: { symbol: { in: symbols }, statement: 'balance', reportName: { contains: '年报' } },
@@ -263,6 +290,7 @@ export async function POST(req: Request) {
     });
 
     const quoteBySymbol = new Map<string, StockQuote>(quotes.map((quote) => [quote.symbol, quote]));
+    const fundamentalCacheBySymbol = new Map(metricCaches.map((cache) => [cache.symbol, cache]));
     const overrideBySymbol = new Map(overrides.map((override) => [override.symbol, override]));
     const holdingsBySymbol = new Map<string, number>();
     holdings.forEach((holding) => holdingsBySymbol.set(holding.symbol, (holdingsBySymbol.get(holding.symbol) ?? 0) + holding.quantity));
@@ -293,7 +321,6 @@ export async function POST(req: Request) {
     }, 0));
 
     const scoreInputs = universeItems
-      .filter((item) => matchSelectedSector(item, selectedSector))
       .map((item): ScoreInput => {
         const quote = quoteBySymbol.get(item.symbol);
         const quantity = holdingsBySymbol.get(item.symbol) ?? 0;
@@ -308,6 +335,7 @@ export async function POST(req: Request) {
           marketValue,
           percent: percentOf(marketValue, totalHeldMarketValue),
           fundamental: latestFundamentalBySymbol.get(item.symbol) ?? null,
+          fundamentalCache: fundamentalCacheBySymbol.get(item.symbol) ?? null,
           annualFundamentals: annualFundamentalsBySymbol.get(item.symbol) ?? [],
           annualBalance: annualBalanceBySymbol.get(item.symbol) ?? null,
           override: overrideBySymbol.get(item.symbol) ?? null,
@@ -317,7 +345,7 @@ export async function POST(req: Request) {
 
     return success<IStockMagicFormulaSearchRes>({
       selectedSector,
-      sectors: [ALL_SECTOR, EXCLUDING_DIVIDEND_SECTOR, ...getStockUniverseSectors()],
+      sectors,
       items: scoreInputs.map(toMagicFormulaItem),
       updatedAt: new Date().toISOString(),
     });

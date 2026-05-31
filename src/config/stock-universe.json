@@ -20,11 +20,13 @@
   { "symbol": "601888", "name": "中国中免", "sector": "消费" },
   { "symbol": "603027", "name": "千禾味业", "sector": "消费" },
   { "symbol": "600305", "name": "恒顺醋业", "sector": "消费" },
+  { "symbol": "000895", "name": "双汇发展", "sector": "消费" },
   { "symbol": "000333", "name": "美的集团", "sector": "家电" },
   { "symbol": "000651", "name": "格力电器", "sector": "家电" },
   { "symbol": "002032", "name": "苏泊尔", "sector": "家电" },
   { "symbol": "000963", "name": "华东医药", "sector": "医药" },
   { "symbol": "600161", "name": "天坛生物", "sector": "医药" },
+  { "symbol": "300015", "name": "爱尔眼科", "sector": "医药" },
   { "symbol": "601006", "name": "大秦铁路", "sector": "红利" },
   { "symbol": "601728", "name": "中国电信", "sector": "红利" },
   { "symbol": "600941", "name": "中国移动", "sector": "红利" },
@@ -33,5 +35,6 @@
   { "symbol": "600900", "name": "长江电力", "sector": "红利" },
   { "symbol": "600377", "name": "宁沪高速", "sector": "红利" },
   { "symbol": "601088", "name": "中国神华", "sector": "红利" },
+  { "symbol": "601857", "name": "中国石油", "sector": "红利" },
   { "symbol": "601318", "name": "中国平安", "sector": "红利" }
 ]
