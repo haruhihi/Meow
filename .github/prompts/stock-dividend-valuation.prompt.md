@@ -1,142 +1,113 @@
 ---
-description: "Use when: analyzing a dividend-oriented stock with normal dividend, payout coverage, deducted profit trend, normalized operating cash flow, and target price."
+description: "Use when: valuing a dividend-oriented stock with deducted profit, deducted PE percentiles, marked normal dividends, and financial-report anomaly checks."
 name: "Stock Dividend Valuation"
-argument-hint: "Stock symbol/name and any chosen normal dividend or target yield"
+argument-hint: "Stock symbol/name, optional normal dividend, optional valuation window"
 agent: "agent"
 ---
 
-Analyze the stock as a dividend-oriented long-term holding. Use persisted local project data first: `StockFinancialStatement`, `StockFundamental`, `StockDividendEvent`, user `StockDividendMarking`, `StockMetricOverride`, `StockQuote`, and existing `StockAiReport` records. Do not refresh/sync external vendor data unless the user explicitly asks or required rows are missing.
+Analyze the stock as a long-term, dividend-aware holding. Use the latest method as the default: value the company from sustainable deducted profit and historical deducted PE percentiles, then use the user-marked normal dividend to infer the dividend yield at each PE-derived price edge.
 
-Data planning note:
-- For historical PE/PB percentiles, prefer self-calculated local data over vendor headline ratios.
-- Tushare weekly price plus matching `daily_basic` rows is sufficient for the first local PE/PB/dividend-yield percentile implementation. Store weekly close, market cap, total shares, float shares, PE/PB/dividend-yield fields, and source metadata locally before calculating percentiles.
-- Use Tushare or another source for historical market cap/total shares when possible. Avoid using the current share count to calculate old market caps unless clearly labeled as approximate.
-- Default the local A-share valuation history to the post-2015 crash period rather than all available history. Earlier data can be added for specific companies or long-cycle studies, but should not be required for the first PE/PB percentile implementation.
-- For post-2015 A-share weekly valuation snapshots, expect roughly 3 million rows for the full market. Plan for a few GB of PostgreSQL storage after indexes; this is acceptable for local/dev use and is preferred over storing full daily valuation history in the first version.
+Use persisted local project data first. Prefer `StockFinancialStatement`, `StockFundamental`, `StockValuationSnapshot`, `StockDividendEvent`, user `StockDividendMarking`, `StockMetricOverride`, and `StockQuote`. Treat Tushare-backed local DB rows as the canonical data source unless the user explicitly asks to refresh or required rows are missing.
 
-Inputs to clarify or infer:
-- Stock symbol and company name.
-- User-selected normal dividend events, especially the recurring cash dividend per 10 shares.
-- User target dividend yield, defaulting to 3% when the user accepts a 3% yield.
-- Whether unusual one-off items, asset disposals, tax payments, or consolidation-scope changes distort recent profit or cash flow.
+Do not rely on old generated AI reports as evidence. They may contain obsolete methods. If an existing report is useful, use it only as context and re-check every important claim against current DB rows and financial statements.
 
-Core workflow:
+## Core Method
 
-1. Establish the dividend baseline.
-   - Use only user-marked normal dividend events or an explicit `StockMetricOverride.normalizedDividend` as the normal dividend source.
-   - Treat repeated annual dividends, such as two consecutive years with the same cash-per-10 amount, as evidence for a single-year normal dividend level. Do not add multiple years together unless the user explicitly asks for a multi-year total.
-   - Compute annual dividend cash amount from `cashPerTen / 10 * shares`, and compute DPS from `cashPerTen / 10`.
+1. Define the valuation denominator.
+   - Use deducted net profit, deducted net profit TTM, or sustainable deducted net profit as the main earnings base.
+   - Use reported net profit only as context when non-recurring gains/losses, disposals, fair-value changes, impairments, consolidation changes, or tax effects distort the headline PE.
+   - If headline PE and deducted PE disagree sharply, explain why before valuing the stock.
 
-2. Separate reported profit from recurring profit.
-   - Use net profit only as context when it contains large non-recurring items.
-   - Prefer deducted net profit for recurring earnings coverage.
-   - Identify asset disposals, investment income spikes, fair-value changes, impairment, consolidation-scope changes, and tax disturbances that make reported profit or cash flow misleading.
+2. Build the deducted profit evidence base.
+   - Pull at least five years of annual deducted net profit when available; prefer ten years when the company has stable business continuity and the DB contains enough rows.
+   - Include the latest TTM deducted profit.
+   - Compute or describe: latest annual value, current TTM, three-year average, five-year average, five-year or ten-year CAGR when valid, and any clean prior high point.
+   - Do not create scenarios by mechanically applying 80%/90%/100%/110%/120% to current TTM.
+   - Provide exactly five deducted-profit tiers from bear to bull. Each tier must cite its basis, such as latest annual value, current TTM, recent average, prior clean high point, or a recovery case supported by quarterly trend or business evidence.
 
-3. Measure payout coverage with a three-layer test.
-   - Deducted profit coverage: `deducted net profit / normal dividend cash amount`.
-   - Normalized operating cash flow coverage: use multi-year operating cash flow or adjusted operating cash flow when a clear one-off tax/working-capital disturbance exists.
-   - Free cash flow coverage: `free cash flow / normal dividend cash amount`; keep it as the strictest safety test, but do not let a clearly one-off distorted year dominate the whole valuation.
-   - Calculate historical `K` from prior annual reports when dividend events and annual fundamentals are available: `K = annual deducted net profit / annual cash dividend amount`.
-   - Use historical `K` as evidence, not as a mechanical rule. A company with several years of `K < 1` after a payout step-up may be relying on cash reserves, asset sales, or an aggressive payout policy rather than recurring earnings.
-   - Compare historical deducted-profit coverage with operating-cash-flow and free-cash-flow coverage to identify whether low `K` is a true earnings problem or a cash-flow timing/one-off-tax problem.
+3. Build the deducted PE valuation base.
+   - Prefer self-calculated historical deducted PE from `StockValuationSnapshot.deductedPe`.
+   - Use weekly snapshots by default. Prefer ten years or post-2015 history when available; if only five years are available, say so.
+   - Exclude or winsorize invalid samples where deducted profit is negative, near zero, missing, or known to be distorted by one-off items.
+   - Calculate five historical PE percentiles: P10, P25, P50, P75, P90.
+   - Also calculate the current deducted PE from current price, total shares, and current deducted profit TTM.
+   - Present six PE anchors in total: P10, P25, P50, current deducted PE, P75, P90. If current PE is almost equal to a percentile, keep both and explain what that means.
+   - Explain the meaning of the five historical PE tiers: historical low, conservative, median, optimistic, expensive.
+   - Avoid opaque vendor headline PE when the thesis is based on deducted profit.
 
-4. Analyze visible recurring profit trend instead of anchoring on one year.
-   - Pull at least 5 years of annual deducted net profit when available.
-   - Compute multi-year CAGR for deducted net profit using the latest annual value and the earliest valid positive base year.
-   - Also inspect the slope: compare the latest 3-year average, 5-year average, and most recent annual/TTM value.
-   - If a year is distorted by asset disposals, business divestiture, scope changes, or unusual impairment, label it and avoid treating it as a clean base.
-   - Estimate next-year deducted net profit with scenarios rather than a single mechanical forecast:
-     - Bear: flat or mild decline from latest recurring profit.
-     - Base: latest recurring profit plus visible normalized growth/CAGR, capped by business reality.
-     - Bull: requires evidence such as recent quarterly acceleration, price/volume recovery, or margin repair.
+4. Convert deducted profit into price.
+   - Use `target price = sustainable deducted profit C * deducted PE / total shares N`.
+   - Combine the five deducted-profit tiers with the six PE anchors to form a price matrix.
+   - Explain which profit tiers are already visible and which are conditional on recovery.
+   - Interpret price areas in decision terms: safety area, reasonable area, conditional optimistic area, and expensive area.
 
-5. Convert coverage into target price.
-   - Primary dividend target price: `DPS / target dividend yield`.
-   - This target price is valid only if recurring deducted profit coverage and normalized operating cash flow coverage are close to or above 1.
-   - Define variables explicitly before calculating:
-     - `N`: total shares.
-     - `C`: expected sustainable deducted net profit.
-     - `M`: required dividend yield.
-     - `K`: required dividend coverage ratio, where `K = C / dividend cash amount`.
-     - `R`: payout ratio, where `R = dividend cash amount / C = 1 / K`.
-   - Default to `K = 1.1` for dividend-oriented valuation unless the user specifies otherwise. This requires sustainable deducted profit to be about 10% higher than the dividend cash amount, leaving a modest safety margin.
-   - If using coverage ratio: `target price = C / (K * N * M)`.
-   - If using payout ratio: `target price = C * R / (N * M)`.
-   - Do not mix per-share and total-company units. `P * N * M` is total dividend cash implied by market cap and target yield, while `C / K` or `C * R` is total affordable dividend cash.
-   - If coverage is below 1.1, discount the target price or mark it as conditional on profit/cash-flow recovery.
-   - Use PE only as a cross-check, based on recurring deducted net profit, not non-recurring reported net profit.
-   - Provide at least five valuation tiers from bear to bull, using visible deducted-profit trend, CAGR, and latest TTM as the basis for `C`.
-   - Do not build profit scenarios by mechanically applying 80%/90%/100%/110%/120% to current TTM. Build recovery scenarios from evidence: latest annual deducted profit, current TTM, recent 3-year average, prior clean high point, and a conditional strong-recovery case that requires cash-flow confirmation.
-   - Prefer sensitivity tables over coverage-ratio tables: keep `K = 1.1` fixed, then show target prices at required dividend yields such as 3%, 3.5%, 4%, 4.5%, 5%, 5.5%, and 6%.
-    - Use PE as the primary valuation model when dividend-yield variables become too noisy. If ten-year PE percentile data is available, build five valuation tiers from historical market consensus:
-       - Low: 10th percentile PE.
-       - Conservative: 25th percentile PE.
-       - Base: 50th percentile PE.
-       - Optimistic: 75th percentile PE.
-       - Expensive: 90th percentile PE.
-    - Prefer ten-year PE percentiles over short windows when the stock has stable business continuity, because it captures bull/bear cycles after major market regimes such as the 2015 A-share crash. Do not use it mechanically when the company has had major business-model, asset, share-count, accounting, or one-off-profit changes.
-   - Do not rely on opaque vendor headline PE when the valuation thesis is based on deducted net profit. Headline PE usually uses reported net profit or another opaque denominator, so it can be distorted by disposals, fair-value gains, or one-off losses.
-    - Prefer self-calculated deducted PE percentiles when data is available:
-       - Historical market cap = historical close price * contemporaneous total shares.
-       - Historical deducted PE = historical market cap / latest available deducted net profit TTM at that date.
-       - Avoid look-ahead bias: a financial statement can only be used after its announcement/publication date. If announcement dates are unavailable, label the result approximate and use conservative lag rules.
-       - Winsorize or exclude invalid samples where deducted profit is negative, near zero, missing, or distorted by explicitly identified one-off accounting events.
-   - For PE percentile valuation, use recurring deducted net profit or expected sustainable deducted net profit as `C`, not reported net profit distorted by disposals or fair-value gains. Formula: `target price = C * PE / N`.
-   - When showing a PE price-space matrix, combine five recovery-based deducted-profit scenarios with five self-calculated deducted PE percentiles. The matrix should explain which profit scenarios are already visible and which are conditional on recovery, instead of treating every scenario as equally proven.
-    - Cross-check PE-derived target prices with dividend coverage. A PE-based target can be reasonable but still unattractive for a dividend account if normal dividends are not covered by recurring profit or normalized operating cash flow.
+5. Infer dividend yield from PE-derived prices.
+   - Use only user-marked normal dividend events or `StockMetricOverride.normalizedDividend` as the normal dividend source.
+   - Treat duplicate or repeated rows for the same annual dividend as one normal annual dividend level; do not sum duplicate rows.
+   - Compute DPS from `cashPerTen / 10`.
+   - For each important price edge, compute `implied dividend yield = normal DPS / PE-derived target price`.
+   - Do not use `K` to derive implied dividend yield. `K` belongs only to payout coverage analysis.
+   - Present the main price matrix as `price / implied yield` when that is easier to read.
 
-7. Data quality and reconciliation.
-   - Treat Tushare as the canonical persisted source for local fundamentals, financial statements, dividends, historical market cap, PE/PB, and dividend-yield snapshots.
-   - When derived ratios look absurd, inspect Tushare field mappings, units, announcement dates, and historical share/market-cap fields before changing valuation logic. Known risk: total shares/share-capital fields can be misunderstood, causing absurd market cap or PE values.
-   - Store enough provenance to explain every derived ratio: source, fetched time, statement date, announcement date if available, and whether the value is raw, adjusted, or approximated.
+6. Check dividend coverage separately.
+   - Compute annual normal dividend cash amount as `normal DPS * total shares`.
+   - Deducted-profit coverage: `deducted net profit / normal dividend cash amount`.
+   - Operating-cash-flow coverage: normalized operating cash flow divided by normal dividend cash amount.
+   - Free-cash-flow coverage: free cash flow divided by normal dividend cash amount, but do not let a clearly one-off distorted year dominate the whole conclusion.
+   - Use historical `K = annual deducted net profit / annual dividend cash amount` only as evidence of coverage quality, not as a valuation shortcut.
 
-8. State the result in decision terms.
-   - Give a current verified value based on already proven recurring profit.
-   - Give a conditional target price if next-year deducted profit and normalized operating cash flow recover.
-   - Explicitly name the evidence needed to upgrade or downgrade the target.
-   - Distinguish between short-term dividend ability supported by cash reserves and long-term dividend sustainability supported by recurring operations.
+7. Investigate anomalies from financial reports.
+   - When the ratios look odd, go back to the financial statements and, if needed, the official annual/interim report or announcements to find the reason.
+   - Typical triggers: headline PE suddenly much lower than deducted PE, profit jumps without cash flow, dividend payout exceeds recurring earnings, large investment income, asset disposal, equity sale, impairment reversal, consolidation-scope change, tax disturbance, or share-count jump.
+   - For example, Darentang's headline PE was disturbed by the sale of the Sino-American Tianjin SmithKline equity stake; the right response was to inspect the financial report, identify the one-off disposal gain, and switch the main valuation denominator to deducted profit.
+   - Apply this habit to every stock: if a number contradicts the business story, do not force the model. Find the accounting or business event first, then decide whether to adjust the valuation base.
 
-Preferred output format:
+8. Optional PEG/mean-reversion check.
+   - Use only after the PE price matrix is built.
+   - Formula: `annualized return = (PE2 / PE1)^(1/n) * (1 + g) - 1`, where `PE1` is current deducted PE, `PE2` is a future deducted PE anchor, and `g` is the annualized growth or recovery rate of sustainable deducted profit.
+   - Use this as a return sanity check, not as the main valuation table.
+
+## Required Output
+
+Write a concise method-first report. Do not dump raw data. The report should answer four questions only: what six PE anchors are used, why the five profit tiers are chosen, what price/yield matrix they imply, and how to read that matrix.
+
+Use this structure:
 
 ```markdown
 ## Conclusion
 
-One-paragraph verdict: whether the stock qualifies as a comfortable dividend holding now, and whether the target price is current or conditional.
+One or two short paragraphs. State the current valuation area, whether the price is supported by already visible deducted profit or depends on recovery, and what the marked normal dividend implies at current/target prices.
 
-## Dividend Baseline
+## 1. Six Deducted PE Anchors
 
-- Normal dividend: ...
-- Annual dividend cash amount: ...
-- Target yield: ...
-- Dividend-yield target price: ...
+Show five historical deducted PE percentiles plus current deducted PE. Include snapshot window, frequency, sample count, and any company-specific reason to prefer deducted PE over headline PE. Keep the explanation short.
 
-## Coverage
+| PE anchor | PE | Meaning |
+|---|---:|---|
 
-| Metric | Value | Coverage | Judgment |
-|---|---:|---:|---|
-| Deducted net profit | ... | ... | ... |
-| Normalized operating cash flow | ... | ... | ... |
-| Free cash flow | ... | ... | ... |
+## 2. Five Deducted Profit Tiers
 
-## Deducted Profit Trend
+Give exactly five deducted-profit tiers and clear reasons. This is the most company-specific part of the report; use financial statements and announcements to explain any unusual profit disturbance.
 
-Show 5-year deducted net profit, CAGR, 3-year average, latest TTM, and next-year bear/base/bull recurring profit assumptions.
+| Tier | Deducted profit | Basis | Evidence quality |
+|---|---:|---|---|
 
-## Target Price
+## 3. Price And Implied Dividend Yield
 
-When ten-year PE percentile data is available, include this table first:
+Each cell should show `price / implied yield` when a marked normal dividend exists.
 
-| Scenario | Recurring deducted profit | PE percentile | PE | Target price | Dividend coverage check | Status |
-|---|---:|---:|---:|---:|---|---|
+| Deducted profit | P10 | P25 | P50 | Current PE | P75 | P90 |
+|---|---:|---:|---:|---:|---:|---:|
 
-Then include the dividend-yield sensitivity table as a safety check:
+## 4. Reading The Table
 
-| Scenario | Recurring deducted profit | K | 3% | 3.5% | 4% | 4.5% | 5% | 5.5% | 6% | Status |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-
-## Risks And Revision Triggers
-
-List what would make the target too optimistic or too conservative.
+Explain the table in plain decision language: what price range is supported by current visible profit, what range requires recovery, what range is expensive, and what later financial-report items should be watched. Include dividend coverage only if it changes the conclusion.
 ```
 
-When updating a saved report, append or replace a clearly named section instead of duplicating old conclusions.
+Rules:
+- Do not invent missing data.
+- Do not treat high dividend yield as automatically safe.
+- Do not mix per-share and total-company units.
+- Do not hide one-off accounting distortions inside a generic PE number.
+- Do not reuse old report conclusions without recalculating from current DB data.
+- Keep the report focused on the valuation method and decision implication.

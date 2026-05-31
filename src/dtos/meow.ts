@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockFrameworkArticle, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -724,46 +724,6 @@ export interface IStockAiReportCreateReq {
 
 export interface IStockAiReportCreateRes {
   report: StockAiReportListItem;
-}
-
-export interface IStockAiPromptReq {
-  symbol: StockQuote['symbol'];
-}
-
-export interface IStockAiPromptArticle {
-  articleId: StockFrameworkArticle['articleId'];
-  title: string;
-  source: string;
-  publishDate: string | null;
-  reason: StockFrameworkArticle['reason'];
-  tags: string[];
-  excerpt: string;
-  body: string;
-}
-
-export interface IStockAiPromptMetric {
-  label: string;
-  value: string;
-  interpretation: string;
-}
-
-export interface IStockAiFrameworkCard {
-  articleId: string;
-  title: string;
-  tags: string[];
-  principles: string[];
-  checks: string[];
-  promptInstruction: string;
-}
-
-export interface IStockAiPromptRes {
-  symbol: StockQuote['symbol'];
-  name: StockQuote['name'];
-  prompt: string;
-  frameworkArticles: IStockAiPromptArticle[];
-  frameworkCards: IStockAiFrameworkCard[];
-  metrics: IStockAiPromptMetric[];
-  generatedAt: string;
 }
 
 export type StockFinancialStatementName = 'income' | 'balance' | 'cash_flow';

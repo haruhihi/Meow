@@ -10,8 +10,6 @@ import {
   setStatus,
 } from '@stores/store-resource';
 import {
-  IStockAiPromptReq,
-  IStockAiPromptRes,
   IStockAiReportListReq,
   IStockAiReportListRes,
   IStockCashUpdateReq,
@@ -67,9 +65,6 @@ export class StockStore {
   reportsByKey = new Map<string, IStockAiReportListRes['reports']>();
   reportStatuses = new Map<string, ResourceStatus>();
 
-  promptsBySymbol = new Map<string, IStockAiPromptRes>();
-  promptStatuses = new Map<string, ResourceStatus>();
-
   remarksBySymbol = new Map<string, IStockRemarkListRes>();
   remarkStatuses = new Map<string, ResourceStatus>();
 
@@ -100,14 +95,6 @@ export class StockStore {
 
   getReportStatus(symbol?: string) {
     return getMapStatus(this.reportStatuses, reportKey(symbol));
-  }
-
-  getPrompt(symbol: string) {
-    return this.promptsBySymbol.get(symbol.toUpperCase()) ?? null;
-  }
-
-  getPromptStatus(symbol: string) {
-    return getMapStatus(this.promptStatuses, symbol.toUpperCase());
   }
 
   getRemarks(symbol: string) {
@@ -260,15 +247,6 @@ export class StockStore {
     return this.fetchReports(inflightKey, symbol, Boolean(existing));
   }
 
-  loadPrompt(symbol: string, options: { force?: boolean } = {}) {
-    const normalized = symbol.toUpperCase();
-    const existing = this.promptsBySymbol.get(normalized) ?? null;
-    if (existing && !options.force) {
-      return Promise.resolve(existing);
-    }
-    return this.fetchPrompt(`prompt:${normalized}`, normalized, Boolean(existing));
-  }
-
   loadRemarks(symbol: string, options: { force?: boolean } = {}) {
     const normalized = symbol.toUpperCase();
     const existing = this.remarksBySymbol.get(normalized) ?? null;
@@ -394,24 +372,6 @@ export class StockStore {
         const res = await post<IStockAiReportListReq, IStockAiReportListRes>('/api/stock/ai-report/list', { symbol });
         runInAction(() => {
           this.reportsByKey.set(normalizedKey, res.reports);
-          markStatusSuccess(status);
-        });
-        return res;
-      } catch (error) {
-        runInAction(() => markStatusError(status, error));
-        throw error;
-      }
-    });
-  }
-
-  private fetchPrompt(key: string, symbol: string, background: boolean) {
-    const status = getMapStatus(this.promptStatuses, symbol);
-    setStatus(status, background ? 'refreshing' : 'loading', true);
-    return dedupeRequest(this.inflight, key, async () => {
-      try {
-        const res = await post<IStockAiPromptReq, IStockAiPromptRes>('/api/stock/ai-report/prompt', { symbol });
-        runInAction(() => {
-          this.promptsBySymbol.set(symbol, res);
           markStatusSuccess(status);
         });
         return res;

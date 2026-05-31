@@ -101,46 +101,11 @@
   }
 }
 
-.promptBar,
 .sectionBlock {
   margin: 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 8px 24px rgba(15, 118, 110, 0.08);
-}
-
-.promptBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-
-  button {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    border-radius: 10px;
-    background: var(--meow-surface-alt);
-    padding: 9px;
-    color: var(--meow-text);
-    text-align: left;
-  }
-
-  strong,
-  span {
-    display: block;
-  }
-
-  strong {
-    font-size: 13px;
-    font-weight: 900;
-  }
-
-  span {
-    margin-top: 2px;
-    color: var(--meow-text-muted);
-    font-size: 11px;
-  }
 }
 
 .sectionBlock {
@@ -492,26 +457,6 @@
   margin-top: 10px;
   color: var(--meow-text-muted);
   font-size: 12px;
-}
-
-.promptModal {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-
-  pre {
-    max-height: 60vh;
-    margin: 0;
-    overflow: auto;
-    border-radius: 10px;
-    background: var(--meow-surface-alt);
-    padding: 10px;
-    color: var(--meow-text-sub);
-    font-size: 12px;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
 }
 
 @media (max-width: 360px) {

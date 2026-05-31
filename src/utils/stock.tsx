@@ -57,25 +57,6 @@ export const useStockAiReports = (refreshKey = 0, symbol?: string) => {
   };
 };
 
-export const useStockAiPrompt = (symbol: string, refreshKey = 0) => {
-  const stockStore = useStockStore();
-
-  useEffect(() => {
-    if (!symbol) return;
-    void stockStore.loadPrompt(symbol, { force: refreshKey > 0 }).catch(() => undefined);
-  }, [refreshKey, stockStore, symbol]);
-
-  const status = stockStore.getPromptStatus(symbol);
-
-  return {
-    data: symbol ? stockStore.getPrompt(symbol) : null,
-    loading: status.loading,
-    refreshing: status.refreshing,
-    error: status.error,
-    reQuery: () => stockStore.loadPrompt(symbol, { force: true }),
-  };
-};
-
 export const useStockRemarks = (symbol: string, refreshKey = 0) => {
   const stockStore = useStockStore();
 

@@ -16,7 +16,7 @@ import {
 } from '@dtos/meow';
 import { formatMoney, PALETTE } from '@styles/theme';
 import { formatStockQuantity } from '@utils/stock-calculations';
-import { useStockAiPrompt, useStockAiReports, useStockDividends, useStockPortfolio, useStockRemarks } from '@utils/stock';
+import { useStockAiReports, useStockDividends, useStockPortfolio, useStockRemarks } from '@utils/stock';
 import styles from './stock-detail.module.scss';
 
 type HoldingFormValues = {
@@ -332,10 +332,8 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
   const { data, loading: portfolioLoading, reQuery, updateHolding, deleteHolding: deleteStockHolding } = useStockPortfolio();
   const { reports, loading: reportsLoading } = useStockAiReports(0, symbol);
-  const { data: promptData, loading: promptLoading, error: promptError, reQuery: reQueryPrompt } = useStockAiPrompt(symbol);
   const { remarks, loading: remarksLoading, createRemark, updateRemark, deleteRemark: deleteStockRemark } = useStockRemarks(symbol);
   const { events: dividendEvents, loading: dividendLoading, updateMarking: updateDividendMarking } = useStockDividends(symbol);
-  const [promptVisible, setPromptVisible] = useState(false);
   const [remarkVisible, setRemarkVisible] = useState(false);
   const [editingRemark, setEditingRemark] = useState<EditingRemark>(null);
   const [showAllDividends, setShowAllDividends] = useState(false);
@@ -445,16 +443,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
     }
   };
 
-  const copyPrompt = async () => {
-    if (!promptData?.prompt) return;
-    try {
-      await navigator.clipboard.writeText(promptData.prompt);
-      Toast.show({ content: 'Prompt 已复制' });
-    } catch (error) {
-      Toast.show({ content: `复制失败: ${(error as Error).message}` });
-    }
-  };
-
   if (!summary && portfolioLoading) {
     return (
       <main className={styles.page}>
@@ -492,15 +480,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
         <MetricGrid summary={summary} />
 
         <PeValuationBlock summary={summary} />
-
-        <section className={styles.promptBar}>
-          <button type="button" onClick={() => setPromptVisible(true)}>
-            <strong>Prompt</strong>
-            <span>{promptData ? `${promptData.frameworkCards.length} 张方法卡片` : promptLoading ? <InlineLoading label="生成中" /> : '查看'}</span>
-          </button>
-          {promptError && <button type="button" onClick={() => { void reQueryPrompt().catch(() => undefined); }}>重试</button>}
-        </section>
-
       <section className={styles.sectionBlock}>
         <div className={styles.sectionTitle}>AI 研报</div>
         {reports.length > 0 ? (
@@ -607,26 +586,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
         )}
       </section>
       </PullToRefresh>
-
-      <Modal
-        visible={promptVisible}
-        title="AI 财报解读 Prompt"
-        closeOnMaskClick
-        showCloseButton
-        onClose={() => setPromptVisible(false)}
-        content={
-          promptData ? (
-            <div className={styles.promptModal}>
-              <Button size="small" color="primary" onClick={copyPrompt}>复制 Prompt</Button>
-              <pre>{promptData.prompt}</pre>
-            </div>
-          ) : promptLoading ? (
-            <LoadingState label="Prompt 生成中" compact />
-          ) : (
-            <Empty style={{ padding: '32px 0' }} description="暂无 Prompt" />
-          )
-        }
-      />
 
       <RemarkModal
         key={editingRemark?.id ?? 'create'}
