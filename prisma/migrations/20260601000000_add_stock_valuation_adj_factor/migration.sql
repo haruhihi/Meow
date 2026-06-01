@@ -1,0 +1,1 @@
+ALTER TABLE "StockValuationSnapshot" ADD COLUMN "adjFactor" DOUBLE PRECISION;

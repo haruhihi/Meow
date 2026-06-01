@@ -121,7 +121,17 @@ Explain the table in plain decision language: what price range is supported by c
 
 ## 5. 财报交叉验证
 
-Include this section when cash conversion, inventory, dividends, impairments, capex, counterintuitive results, large financial disturbances, or management explanations materially affect the conclusion. Compare multiple recent annual reports instead of only the latest period. Show only the decisive rows and state what the official report notes say.
+Include this section when cash conversion, inventory, dividends, impairments, capex, counterintuitive results, large financial disturbances, unidentified items, or management explanations materially affect the conclusion. Compare multiple recent annual reports instead of only the latest period.
+
+Start with a beginner-friendly checklist. List each important item one by one, including growth, decline, disturbance, counterintuitive result, and unidentified or not-yet-explained item. For each item, explain in plain Chinese:
+- what changed;
+- where it appears in the income statement, balance sheet, and/or cash-flow statement;
+- whether the official report notes explain it;
+- what it means for valuation, dividend safety, or future tracking.
+
+Use simple accounting language. Explain terms when needed: for example, "应收账款增加" means revenue has not yet turned into cash; "合同负债下降" usually means less customer prepayment; "存货增加" means cash may be sitting in goods or raw materials; "经营现金流低于扣非净利润" means accounting profit has not fully become cash yet.
+
+After the checklist, show only the decisive rows and state what the official report notes say. If a point cannot be identified or explained from the three statements and official notes, mark it as `未识别/待跟踪` instead of forcing an explanation.
 
 Examples of useful compact tables:
 

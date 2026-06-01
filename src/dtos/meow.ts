@@ -381,8 +381,42 @@ export interface IStockValuationHistoryPoint {
   date: string;
   pe: number | null;
   pb: number | null;
+  dividendYield: number | null;
   pePercentile: number | null;
   pbPercentile: number | null;
+}
+
+export interface IStockValuationHistoryReq {
+  symbol: string;
+}
+
+export interface IStockValuationHistoryRes {
+  symbol: string;
+  startDate: string | null;
+  endDate: string | null;
+  valuationHistory: IStockValuationHistoryPoint[];
+}
+
+export interface IStockPriceHistoryReq {
+  symbol: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface IStockPriceHistoryPoint {
+  date: string;
+  close: number | null;
+  qfqClose: number | null;
+  indexClose: number | null;
+}
+
+export interface IStockPriceHistoryRes {
+  symbol: string;
+  indexSymbol: string;
+  startDate: string | null;
+  endDate: string | null;
+  latestAdjFactor: number | null;
+  points: IStockPriceHistoryPoint[];
 }
 
 export interface IStockPeValuationSummary {

@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     if (!uid) throw new Error('unauthorized');
 
     const body = (await req.json().catch(() => ({}))) as IStockSearchReq;
-    const portfolio = await buildStockPortfolio(uid, body.keyword, body.detailSymbol);
+    const portfolio = await buildStockPortfolio(uid, body.keyword);
 
     return success<IStockSearchRes>(portfolio);
   } catch (error) {

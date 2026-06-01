@@ -7,11 +7,13 @@ import type {
   IStockPortfolioSectorSummary,
   IStockPortfolioSymbolSummary,
   IStockProfitHistoryPoint,
+  IStockPriceHistoryRes,
   IStockValuationHistoryPoint,
+  IStockValuationHistoryRes,
   StockRemarkListItem,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark, StockValuationSnapshot } from '@prisma/client';
 
 export { marketValueOf, roundStockValue };
 
@@ -19,6 +21,7 @@ const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
 const PE_VALUATION_PERCENTILES = [10, 25, 50, 75, 90];
 const FUNDAMENTAL_CACHE_DOMAIN = 'fundamental_latest';
 const VALUATION_CACHE_DOMAIN = 'valuation_weekly';
+const SHANGHAI_INDEX_SYMBOL = '000001.SH';
 
 type FinancialStatementMetricRow = Pick<StockFinancialStatement, 'statement' | 'reportDate' | 'reportName' | 'fields'>;
 
@@ -49,6 +52,20 @@ export const normalizeRemarkContent = (value: unknown) => {
   const content = value.trim();
   if (!content) throw new Error('content is required');
   return content;
+};
+
+export const normalizeOptionalDate = (value: unknown) => {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('date must be YYYY-MM-DD');
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new Error('date is invalid');
+  }
+
+  return date;
 };
 
 export const readNonNegativeNumber = (value: unknown, label: string) => {
@@ -116,9 +133,8 @@ export const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' 
   event.transferSharesPerTen ?? 0,
 ].join('|');
 
-export const buildStockPortfolio = async (userId: number, keyword?: string, detailSymbol?: string) => {
+export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const trimmedKeyword = keyword?.trim();
-  const valuationDetailSymbol = detailSymbol ? normalizeSymbol(detailSymbol) : null;
   const accounts = await prisma.stockAccount.findMany({
     where: { userId },
     orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
@@ -237,7 +253,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string, deta
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, displayedHoldings, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, fundamentalsBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, metricStatementsBySymbol, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol, valuationDetailSymbol);
+  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, fundamentalsBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, metricStatementsBySymbol, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -306,8 +322,7 @@ const buildSymbolSummaries = (
   fundamentalCacheBySymbol: Map<string, StockMetricCache>,
   valuationCacheBySymbol: Map<string, StockMetricCache>,
   overrideBySymbol: Map<string, StockMetricOverride>,
-  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>,
-  valuationDetailSymbol: string | null
+  markedDividendEventsBySymbol: Map<string, StockDividendEvent[]>
 ): IStockPortfolioSymbolSummary[] => {
   const bySymbol = new Map<string, IStockPortfolioSymbolSummary>();
 
@@ -366,7 +381,7 @@ const buildSymbolSummaries = (
         valuationCacheBySymbol.get(summary.symbol),
         overrideBySymbol.get(summary.symbol),
         markedDividendEventsBySymbol.get(summary.symbol) ?? [],
-        valuationDetailSymbol === summary.symbol
+        false
       ),
     }))
     .sort((left, right) => right.marketValue - left.marketValue || left.symbol.localeCompare(right.symbol));
@@ -487,7 +502,7 @@ const buildPeValuation = (
   valuationCache?: StockMetricCache,
   includeValuationHistory = false
 ): IStockPeValuationSummary | null => {
-  const cachedValuation = readValuationCache(valuationCache);
+  const cachedValuation = readValuationCache(valuationCache, includeValuationHistory);
   const peValues = cachedValuation?.peValues ?? [];
   const pbValues = cachedValuation?.pbValues ?? [];
   if (peValues.length === 0 && pbValues.length === 0) return null;
@@ -519,6 +534,133 @@ const buildPeValuation = (
     targets,
     profitHistory: buildProfitHistory(annualFundamentals),
     valuationHistory: includeValuationHistory ? cachedValuation?.valuationHistory ?? [] : [],
+  };
+};
+
+export const buildStockValuationHistory = async (userId: number, symbol: string): Promise<IStockValuationHistoryRes> => {
+  const normalizedSymbol = normalizeSymbol(symbol);
+  const cache = await prisma.stockMetricCache.findUnique({
+    where: { symbol_domain: { symbol: normalizedSymbol, domain: VALUATION_CACHE_DOMAIN } },
+  });
+  const cachedValuation = readValuationCache(cache, true);
+  const valuationHistory = cachedValuation?.valuationHistory ?? [];
+  const dividendYieldByDate = await buildMarkedDividendYieldByDate(userId, normalizedSymbol, valuationHistory.map((item) => item.date));
+  return {
+    symbol: normalizedSymbol,
+    startDate: cachedValuation?.startDate ?? null,
+    endDate: cachedValuation?.endDate ?? null,
+    valuationHistory: valuationHistory.map((item) => ({
+      ...item,
+      dividendYield: dividendYieldByDate.get(item.date.slice(0, 10)) ?? null,
+    })),
+  };
+};
+
+const buildMarkedDividendYieldByDate = async (userId: number, symbol: string, historyDates: string[]) => {
+  if (historyDates.length === 0) return new Map<string, number>();
+  const [snapshots, markings] = await Promise.all([
+    prisma.stockValuationSnapshot.findMany({
+      where: { symbol, period: 'WEEK' },
+      select: { tradeDate: true, totalMarketCap: true, totalShares: true, close: true },
+      orderBy: { tradeDate: 'asc' },
+    }),
+    prisma.stockDividendMarking.findMany({
+      where: { userId, countTowardNormalizedDividend: true, event: { symbol } },
+      include: { event: true },
+    }),
+  ]);
+  if (snapshots.length === 0 || markings.length === 0) return new Map<string, number>();
+
+  const uniqueEvents = [...new Map(markings.map((marking) => [dividendEventDedupeKey(marking.event), marking.event])).values()];
+  const latestShares = [...snapshots].reverse().find((snapshot) => snapshot.totalShares && snapshot.totalShares > 0)?.totalShares ?? null;
+  const totalDividendCash = uniqueEvents.reduce((sum, event) => {
+    const cashPerTen = event.cashPerTen;
+    if (!cashPerTen || cashPerTen <= 0) return sum;
+    const snapshot = findSnapshotNearDividendDate(snapshots, event.exDividendDate);
+    const stockDividendPerTen = (event.bonusSharesPerTen ?? 0) + (event.transferSharesPerTen ?? 0);
+    const shareMultiplier = stockDividendPerTen > 0 ? 1 + stockDividendPerTen / 10 : 1;
+    const inferredBaseShares = snapshot?.totalShares && snapshot.totalShares > 0
+      ? snapshot.totalShares / shareMultiplier
+      : latestShares;
+    const baseShares = event.dividendBaseShares && event.dividendBaseShares > 0
+      ? event.dividendBaseShares
+      : inferredBaseShares;
+    if (!baseShares || baseShares <= 0) return sum;
+    return sum + (cashPerTen / 10) * baseShares;
+  }, 0);
+  if (totalDividendCash <= 0) return new Map<string, number>();
+
+  const snapshotsByDate = new Map(snapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot]));
+  const dividendYieldByDate = new Map<string, number>();
+  historyDates.forEach((historyDate) => {
+    const date = historyDate.slice(0, 10);
+    const snapshot = snapshotsByDate.get(date);
+    const marketCap = snapshot?.totalMarketCap ?? (snapshot?.close && snapshot.totalShares ? snapshot.close * snapshot.totalShares : null);
+    if (marketCap && marketCap > 0) {
+      dividendYieldByDate.set(date, totalDividendCash / marketCap);
+    }
+  });
+  return dividendYieldByDate;
+};
+
+const findSnapshotNearDividendDate = (
+  snapshots: Array<Pick<StockValuationSnapshot, 'tradeDate' | 'totalShares'>>,
+  dividendDate?: Date | null
+) => {
+  if (snapshots.length === 0) return null;
+  if (!dividendDate) return snapshots.at(-1) ?? null;
+  return snapshots.find((snapshot) => snapshot.tradeDate.getTime() >= dividendDate.getTime()) ?? snapshots.at(-1) ?? null;
+};
+
+export const buildStockPriceHistory = async (symbol: string, startDate: Date | null, endDate: Date | null): Promise<IStockPriceHistoryRes> => {
+  const normalizedSymbol = normalizeSymbol(symbol);
+  const dateWhere = {
+    ...(startDate ? { gte: startDate } : {}),
+    ...(endDate ? { lte: endDate } : {}),
+  };
+  const dateFilter = startDate || endDate ? { tradeDate: dateWhere } : {};
+  const [stockSnapshots, indexSnapshots, latestAdjSnapshot] = await Promise.all([
+    prisma.stockValuationSnapshot.findMany({
+      where: { symbol: normalizedSymbol, period: 'WEEK', ...dateFilter },
+      select: { tradeDate: true, close: true, adjFactor: true },
+      orderBy: { tradeDate: 'asc' },
+    }),
+    prisma.stockValuationSnapshot.findMany({
+      where: { symbol: SHANGHAI_INDEX_SYMBOL, period: 'WEEK', ...dateFilter },
+      select: { tradeDate: true, close: true },
+      orderBy: { tradeDate: 'asc' },
+    }),
+    prisma.stockValuationSnapshot.findFirst({
+      where: { symbol: normalizedSymbol, period: 'WEEK', adjFactor: { not: null } },
+      select: { adjFactor: true },
+      orderBy: { tradeDate: 'desc' },
+    }),
+  ]);
+  const latestAdjFactor = latestAdjSnapshot?.adjFactor && latestAdjSnapshot.adjFactor > 0 ? latestAdjSnapshot.adjFactor : null;
+  const indexByDate = new Map(indexSnapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot.close]));
+  const stockByDate = new Map(stockSnapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot]));
+  const dateKeys = [...new Set([...stockByDate.keys(), ...indexByDate.keys()])].sort();
+  const points = dateKeys.map((date) => {
+    const stock = stockByDate.get(date);
+    const close = stock?.close ?? null;
+    const qfqClose = close != null && stock?.adjFactor != null && latestAdjFactor != null
+      ? roundStockValue(close * stock.adjFactor / latestAdjFactor)
+      : null;
+    return {
+      date: `${date}T00:00:00.000Z`,
+      close,
+      qfqClose,
+      indexClose: indexByDate.get(date) ?? null,
+    };
+  });
+
+  return {
+    symbol: normalizedSymbol,
+    indexSymbol: SHANGHAI_INDEX_SYMBOL,
+    startDate: points[0]?.date ?? null,
+    endDate: points.at(-1)?.date ?? null,
+    latestAdjFactor,
+    points,
   };
 };
 
@@ -712,11 +854,11 @@ const readCacheNumberArray = (record: Record<string, unknown>, key: string) => {
     : [];
 };
 
-const readValuationCache = (cache?: StockMetricCache) => {
+const readValuationCache = (cache?: StockMetricCache | null, includeHistory = true) => {
   if (!cache) return null;
   const metrics = readCacheRecord(cache.metrics);
   const rawHistory = Array.isArray(metrics.valuationHistory) ? metrics.valuationHistory : [];
-  const valuationHistory = rawHistory
+  const valuationHistory = includeHistory ? rawHistory
     .map((item) => {
       const record = readCacheRecord(item);
       const date = readCacheString(record, 'date');
@@ -725,12 +867,12 @@ const readValuationCache = (cache?: StockMetricCache) => {
         date,
         pe: readCacheNumber(record, 'pe'),
         pb: readCacheNumber(record, 'pb'),
+        dividendYield: readCacheNumber(record, 'dividendYield'),
         pePercentile: readCacheNumber(record, 'pePercentile'),
         pbPercentile: readCacheNumber(record, 'pbPercentile'),
       };
     })
-    .filter((item): item is IStockValuationHistoryPoint => item != null);
-  if (valuationHistory.length === 0) return null;
+    .filter((item): item is IStockValuationHistoryPoint => item != null) : [];
 
   const peValues = readCacheNumberArray(metrics, 'peValues')
     .filter((value) => value > 0)

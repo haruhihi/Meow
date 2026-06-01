@@ -14,6 +14,7 @@
     "sync:stock-source-data": "node scripts/sync-stock-source-data.mjs",
     "sync:stock-financial-cache": "node scripts/sync-stock-source-data.mjs",
     "sync:stock-valuations": "node scripts/sync-stock-valuation-snapshots.mjs",
+    "sync:stock-indices": "node scripts/sync-stock-index-snapshots.mjs",
     "refresh:stock-metric-cache": "node scripts/refresh-stock-metric-cache.mjs",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"

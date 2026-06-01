@@ -8,8 +8,13 @@ import { observer } from 'mobx-react-lite';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { InlineLoading, LoadingState } from '@components/loading';
+import { post } from '@libs/fetch';
 import {
   IStockPortfolioSymbolSummary,
+  IStockPriceHistoryReq,
+  IStockPriceHistoryRes,
+  IStockValuationHistoryReq,
+  IStockValuationHistoryRes,
   StockDividendEventWithMarking,
   StockHoldingWithAccount,
   StockRemarkListItem,
@@ -32,8 +37,19 @@ type RemarkFormValues = {
 
 type EditingRemark = StockRemarkListItem | null;
 
-type ValuationMetricMode = 'pe' | 'pb';
+type ValuationMetricMode = 'pe' | 'pb' | 'dividendYield';
 type ValuationRangeMode = '1y' | '3y' | '5y' | '10y' | 'all';
+type PriceChartMode = 'stock' | 'overlay';
+type PriceDatePickerTarget = 'start' | 'end';
+type StockDetailChartSettings = {
+  peHistoryExpanded?: boolean;
+};
+type StockPriceChartSettings = {
+  priceChartExpanded?: boolean;
+  priceChartMode?: string;
+  priceStartDate?: string;
+  priceEndDate?: string;
+};
 
 const VALUATION_RANGE_OPTIONS: { label: string; value: ValuationRangeMode; years?: number }[] = [
   { label: '1年', value: '1y', years: 1 },
@@ -44,6 +60,13 @@ const VALUATION_RANGE_OPTIONS: { label: string; value: ValuationRangeMode; years
 ];
 const PE_TARGET_PERCENTILES = [10, 25, 50, 75, 90];
 const PE_TARGET_LINE_COLORS = [PALETTE.success, PALETTE.info, PALETTE.warning, PALETTE.warm, PALETTE.danger];
+const STOCK_DETAIL_CHART_SETTINGS_PREFIX = 'meow:stock-detail-chart:';
+const STOCK_PRICE_CHART_SETTINGS_KEY = 'meow:stock-detail-price-chart';
+const PRICE_HISTORY_MIN_DATE = new Date(2015, 0, 1);
+const PRICE_CHART_MODE_OPTIONS: { label: string; value: PriceChartMode }[] = [
+  { label: '个股', value: 'stock' },
+  { label: '叠加', value: 'overlay' },
+];
 
 const formatPercent = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(2)}%`);
 const formatPercentile = (value?: number | null) => (value == null ? '—' : `${(value * 100).toFixed(1)}%`);
@@ -62,7 +85,7 @@ const formatNumberWithPercentile = (value?: number | null, percentile?: number |
   value == null ? '—' : `${formatOptionalNumber(value)}（${formatPercentile(percentile)}）`
 );
 const formatValuationLegendNumber = (value: number, metric: ValuationMetricMode) => (
-  metric === 'pe' ? value.toFixed(1) : value.toFixed(2)
+  metric === 'pe' ? value.toFixed(1) : metric === 'dividendYield' ? `${value.toFixed(2)}%` : value.toFixed(2)
 );
 const formatDate = (value?: string | Date | null) => {
   if (!value) return '未知日期';
@@ -78,6 +101,27 @@ const formatChartDate = (value?: string | Date | null) => {
 };
 const toRemarkDate = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const toDateInputValue = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const parseDateInputValue = (value?: string | null) => {
+  if (!value) return null;
+  const parts = value.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return null;
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date;
+};
+const formatDatePickerValue = (value: string, fallback: string) => {
+  const date = parseDateInputValue(value);
+  if (!date) return fallback;
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+};
+const normalizePriceChartMode = (value?: string | null): PriceChartMode | null => {
+  if (value === 'stock' || value === 'stockQfq' || value === 'stockRaw') return 'stock';
+  if (value === 'overlay' || value === 'stockRawWithIndex' || value === 'index') return 'overlay';
+  return null;
+};
 const parseRemarkDate = (value?: string | null) => {
   if (!value) return new Date();
   const parts = value.split('-').map(Number);
@@ -184,31 +228,139 @@ const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
 
 const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => {
   const valuation = summary.peValuation;
+  const chartSettingsKey = `${STOCK_DETAIL_CHART_SETTINGS_PREFIX}${summary.symbol}`;
   const [valuationMetric, setValuationMetric] = useState<ValuationMetricMode>('pe');
   const [valuationRange, setValuationRange] = useState<ValuationRangeMode>('all');
   const [hiddenValuationYears, setHiddenValuationYears] = useState<Set<number>>(() => new Set());
+  const [chartSettingsHydrated, setChartSettingsHydrated] = useState(false);
+  const [peHistoryExpanded, setPeHistoryExpanded] = useState(false);
+  const [priceChartExpanded, setPriceChartExpanded] = useState(false);
+  const [priceChartMode, setPriceChartMode] = useState<PriceChartMode>('overlay');
+  const [priceStartDate, setPriceStartDate] = useState('');
+  const [priceEndDate, setPriceEndDate] = useState('');
+  const [activePriceDatePicker, setActivePriceDatePicker] = useState<PriceDatePickerTarget | null>(null);
+  const [valuationHistory, setValuationHistory] = useState<IStockValuationHistoryRes | null>(null);
+  const [valuationHistoryLoading, setValuationHistoryLoading] = useState(false);
+  const [valuationHistoryError, setValuationHistoryError] = useState<string | null>(null);
+  const [priceHistory, setPriceHistory] = useState<IStockPriceHistoryRes | null>(null);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const [priceHistoryError, setPriceHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     setHiddenValuationYears(new Set());
-  }, [summary.symbol]);
+    setValuationHistory(null);
+    setValuationHistoryError(null);
+    setPriceHistory(null);
+    setPriceHistoryError(null);
+    setChartSettingsHydrated(false);
+    setPeHistoryExpanded(false);
+    setPriceChartExpanded(false);
+    setPriceChartMode('overlay');
+    setPriceStartDate('');
+    setPriceEndDate('');
+    setActivePriceDatePicker(null);
+    try {
+      let stockSettings: StockDetailChartSettings & StockPriceChartSettings = {};
+      const raw = window.localStorage.getItem(chartSettingsKey);
+      if (raw) {
+        stockSettings = JSON.parse(raw) as StockDetailChartSettings & StockPriceChartSettings;
+      }
+      if (typeof stockSettings.peHistoryExpanded === 'boolean') setPeHistoryExpanded(stockSettings.peHistoryExpanded);
+
+      const sharedRaw = window.localStorage.getItem(STOCK_PRICE_CHART_SETTINGS_KEY);
+      const priceSettings = sharedRaw ? JSON.parse(sharedRaw) as StockPriceChartSettings : stockSettings;
+      if (typeof priceSettings.priceChartExpanded === 'boolean') setPriceChartExpanded(priceSettings.priceChartExpanded);
+      const nextPriceChartMode = normalizePriceChartMode(priceSettings.priceChartMode);
+      if (nextPriceChartMode) setPriceChartMode(nextPriceChartMode);
+      if (typeof priceSettings.priceStartDate === 'string') setPriceStartDate(priceSettings.priceStartDate);
+      if (typeof priceSettings.priceEndDate === 'string') setPriceEndDate(priceSettings.priceEndDate);
+    } catch {
+      // Ignore invalid persisted chart settings.
+    } finally {
+      setChartSettingsHydrated(true);
+    }
+  }, [chartSettingsKey, summary.symbol]);
+
+  useEffect(() => {
+    if (!chartSettingsHydrated) return;
+    try {
+      window.localStorage.setItem(chartSettingsKey, JSON.stringify({
+        peHistoryExpanded,
+      }));
+      window.localStorage.setItem(STOCK_PRICE_CHART_SETTINGS_KEY, JSON.stringify({
+        priceChartExpanded,
+        priceChartMode,
+        priceStartDate,
+        priceEndDate,
+      }));
+    } catch {
+      // Ignore unavailable localStorage.
+    }
+  }, [chartSettingsHydrated, chartSettingsKey, peHistoryExpanded, priceChartExpanded, priceChartMode, priceEndDate, priceStartDate]);
+
+  useEffect(() => {
+    if (!peHistoryExpanded || valuationHistory?.symbol === summary.symbol) return;
+    let cancelled = false;
+    setValuationHistoryLoading(true);
+    setValuationHistoryError(null);
+    post<IStockValuationHistoryReq, IStockValuationHistoryRes>('/api/stock/valuation/history', { symbol: summary.symbol })
+      .then((res) => {
+        if (!cancelled) setValuationHistory(res);
+      })
+      .catch((error) => {
+        if (!cancelled) setValuationHistoryError(error?.result ?? error?.message ?? '估值历史加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setValuationHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [peHistoryExpanded, summary.symbol, valuationHistory?.symbol]);
+
+  useEffect(() => {
+    if (!priceChartExpanded) return;
+    let cancelled = false;
+    setPriceHistoryLoading(true);
+    setPriceHistoryError(null);
+    post<IStockPriceHistoryReq, IStockPriceHistoryRes>('/api/stock/price-history', {
+      symbol: summary.symbol,
+      startDate: priceStartDate || null,
+      endDate: priceEndDate || null,
+    })
+      .then((res) => {
+        if (!cancelled) setPriceHistory(res);
+      })
+      .catch((error) => {
+        if (!cancelled) setPriceHistoryError(error?.result ?? error?.message ?? '走势加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setPriceHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [priceChartExpanded, priceEndDate, priceStartDate, summary.symbol]);
 
   const rangeCutoffDate = useMemo(() => {
     if (!valuation) return null;
     const rangeOption = VALUATION_RANGE_OPTIONS.find((option) => option.value === valuationRange);
     if (!rangeOption?.years) return null;
-    const latestDate = new Date(valuation.valuationHistory[valuation.valuationHistory.length - 1]?.date ?? '');
+    const history = valuationHistory?.symbol === summary.symbol ? valuationHistory.valuationHistory : [];
+    const latestDate = new Date(history[history.length - 1]?.date ?? valuation.endDate ?? '');
     if (Number.isNaN(latestDate.getTime())) return null;
     const next = new Date(latestDate);
     next.setFullYear(next.getFullYear() - rangeOption.years);
     return next;
-  }, [valuation, valuationRange]);
+  }, [summary.symbol, valuation, valuationHistory, valuationRange]);
 
   const rangeFilteredValuationHistory = useMemo(() => {
-    if (!valuation) return [];
+    if (!valuation || valuationHistory?.symbol !== summary.symbol) return [];
+    const history = valuationHistory.valuationHistory;
     return rangeCutoffDate
-      ? valuation.valuationHistory.filter((item) => new Date(item.date).getTime() >= rangeCutoffDate.getTime())
-      : valuation.valuationHistory;
-  }, [valuation, rangeCutoffDate]);
+      ? history.filter((item) => new Date(item.date).getTime() >= rangeCutoffDate.getTime())
+      : history;
+  }, [summary.symbol, valuation, valuationHistory, rangeCutoffDate]);
 
   const valuationYears = useMemo(() => Array.from(new Set(rangeFilteredValuationHistory
     .map((item) => readYear(item.date))
@@ -224,14 +376,21 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
 
   const visiblePeValues = useMemo(() => sortedPositiveValues(visibleValuationHistory.map((item) => item.pe)), [visibleValuationHistory]);
   const visiblePbValues = useMemo(() => sortedPositiveValues(visibleValuationHistory.map((item) => item.pb)), [visibleValuationHistory]);
+  const visibleDividendYieldValues = useMemo(() => sortedPositiveValues(
+    visibleValuationHistory.map((item) => item.dividendYield == null ? null : item.dividendYield * 100)
+  ), [visibleValuationHistory]);
   const visiblePercentileLines = useMemo(() => {
-    const metricValuesForRank = valuationMetric === 'pe' ? visiblePeValues : visiblePbValues;
+    const metricValuesForRank = valuationMetric === 'pe'
+      ? visiblePeValues
+      : valuationMetric === 'pb'
+        ? visiblePbValues
+        : visibleDividendYieldValues;
     return PE_TARGET_PERCENTILES
       .flatMap((percentile, index) => {
         const value = percentileOfSortedValues(metricValuesForRank, percentile);
         return value == null ? [] : [{ percentile, value, color: PE_TARGET_LINE_COLORS[index % PE_TARGET_LINE_COLORS.length] }];
       });
-  }, [valuationMetric, visiblePeValues, visiblePbValues]);
+  }, [valuationMetric, visibleDividendYieldValues, visiblePeValues, visiblePbValues]);
 
   const currentPercentile = useMemo(
     () => percentileRankOfSorted(visiblePeValues, valuation?.currentPe),
@@ -330,15 +489,23 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
   }, [valuation, visibleProfitHistory]);
 
   const valuationChartOption = useMemo(() => {
-    if (!valuation || valuation.valuationHistory.length === 0) return null;
-    const metricName = valuationMetric === 'pe' ? '扣非 PE' : 'PB';
-    const metricHistory = visibleValuationHistory.filter((item) => valuationMetric === 'pe' ? item.pe != null : item.pb != null);
+    if (!valuation || visibleValuationHistory.length === 0) return null;
+    const metricName = valuationMetric === 'pe' ? '扣非 PE' : valuationMetric === 'pb' ? 'PB' : '股息率';
+    const metricHistory = visibleValuationHistory.filter((item) => (
+      valuationMetric === 'pe' ? item.pe != null : valuationMetric === 'pb' ? item.pb != null : item.dividendYield != null
+    ));
     const history = metricHistory;
     if (history.length === 0) return null;
     const labels = history.map((item) => formatChartDate(item.date));
-    const metricValues = history.map((item) => valuationMetric === 'pe' ? item.pe : item.pb);
+    const metricValues = history.map((item) => (
+      valuationMetric === 'pe' ? item.pe : valuationMetric === 'pb' ? item.pb : item.dividendYield == null ? null : Number((item.dividendYield * 100).toFixed(2))
+    ));
     const percentileValues = history.map((item) => {
-      const value = valuationMetric === 'pe' ? item.pePercentile : item.pbPercentile;
+      const value = valuationMetric === 'pe'
+        ? item.pePercentile
+        : valuationMetric === 'pb'
+          ? item.pbPercentile
+          : item.dividendYield == null ? null : percentileRankOfSorted(visibleDividendYieldValues, item.dividendYield * 100);
       return value == null ? null : Number((value * 100).toFixed(1));
     });
     const yValues = [...metricValues, ...visiblePercentileLines.map((item) => item.value)]
@@ -372,7 +539,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
           const lines = items.map((item) => {
             const value = Number(item.value);
             const text = Number.isFinite(value)
-              ? item.seriesName === '历史分位' ? `${value.toFixed(1)}%` : value.toFixed(2)
+              ? item.seriesName === '历史分位' || valuationMetric === 'dividendYield' ? `${value.toFixed(1)}%` : value.toFixed(2)
               : '-';
             return `${item.marker}${item.seriesName}: ${text}`;
           });
@@ -397,7 +564,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
           name: metricName,
           min: Math.max(0, Number((yMin - yPadding).toFixed(2))),
           max: Number((yMax + yPadding).toFixed(2)),
-          axisLabel: { color: PALETTE.textMuted, fontSize: 10 },
+          axisLabel: { color: PALETTE.textMuted, fontSize: 10, formatter: (value: number) => valuationMetric === 'dividendYield' ? `${value.toFixed(1)}%` : value },
           splitLine: { lineStyle: { color: PALETTE.border, type: 'dashed' } },
         },
         {
@@ -432,14 +599,106 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
         },
       ],
     };
-  }, [valuation, valuationMetric, visiblePercentileLines, visibleValuationHistory]);
+  }, [valuation, valuationMetric, visibleDividendYieldValues, visiblePercentileLines, visibleValuationHistory]);
+
+  const visiblePricePoints = useMemo(() => {
+    if (!priceHistory) return [];
+    return priceHistory.points.filter((point) => {
+      if (priceChartMode === 'stock') return point.close != null && point.qfqClose != null;
+      return point.close != null && point.indexClose != null;
+    });
+  }, [priceChartMode, priceHistory]);
+
+  const priceChartOption = useMemo(() => {
+    if (visiblePricePoints.length === 0) return null;
+    const points = visiblePricePoints;
+    const labels = points.map((item) => formatChartDate(item.date));
+    const normalize = (values: Array<number | null>) => {
+      const base = values.find((value) => value != null && Number.isFinite(value) && value > 0) ?? null;
+      return values.map((value) => (value != null && base != null ? Number((value / base * 100).toFixed(2)) : null));
+    };
+    const stockQfqSeries = normalize(points.map((item) => item.qfqClose));
+    const stockRawSeries = normalize(points.map((item) => item.close));
+    const indexSeries = normalize(points.map((item) => item.indexClose));
+    const series = [];
+    if (priceChartMode === 'stock') {
+      series.push(
+        { name: '个股前复权', type: 'line', data: stockQfqSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
+        { name: '个股不复权', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.2 } }
+      );
+    } else {
+      series.push(
+        { name: '个股不复权', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
+        { name: '上证指数', type: 'line', data: indexSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.2 } }
+      );
+    }
+
+    return {
+      color: [PALETTE.primary, PALETTE.warning],
+      grid: { left: 44, right: 18, top: 48, bottom: 30 },
+      legend: {
+        top: 4,
+        data: series.map((item) => item.name),
+        textStyle: { color: PALETTE.textSub, fontSize: 11 },
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (items: any[]) => {
+          const first = items[0];
+          const point = points[first?.dataIndex ?? 0];
+          const title = first?.axisValue ?? '';
+          const lines = items.map((item) => {
+            const normalized = Number(item.value);
+            const rawValue = item.seriesName === '个股前复权'
+              ? point?.qfqClose
+              : item.seriesName === '个股不复权'
+                ? point?.close
+                : point?.indexClose;
+            const normalizedText = Number.isFinite(normalized) ? normalized.toFixed(2) : '-';
+            const rawText = rawValue != null ? rawValue.toFixed(2) : '-';
+            return `${item.marker}${item.seriesName}: ${normalizedText} / ${rawText}`;
+          });
+          return [title, ...lines].join('<br/>');
+        },
+      },
+      xAxis: {
+        type: 'category',
+        data: labels,
+        axisLine: { lineStyle: { color: PALETTE.border } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: PALETTE.textMuted,
+          fontSize: 10,
+          interval: 0,
+          formatter: (value: string, index: number) => (index === 0 || index === labels.length - 1 ? value : ''),
+        },
+      },
+      yAxis: {
+        type: 'value',
+        name: '起点=100',
+        axisLabel: { color: PALETTE.textMuted, fontSize: 10 },
+        splitLine: { lineStyle: { color: PALETTE.border, type: 'dashed' } },
+      },
+      series,
+    };
+  }, [priceChartMode, visiblePricePoints]);
 
   if (!valuation) return null;
 
-  const midTarget = visibleTargets.find((target) => target.percentile === 50) ?? readPeTarget(summary, 50);
-  const visibleSampleCount = valuationMetric === 'pe' ? visiblePeValues.length : visiblePbValues.length;
+  const midTarget = visiblePeValues.length > 0 ? visibleTargets.find((target) => target.percentile === 50) : readPeTarget(summary, 50);
+  const valuationMetricLabel = valuationMetric === 'pe' ? 'PE' : valuationMetric === 'pb' ? 'PB' : '股息率';
+  const visibleSampleCount = valuationMetric === 'pe'
+    ? visiblePeValues.length
+    : valuationMetric === 'pb'
+      ? visiblePbValues.length
+      : visibleDividendYieldValues.length;
+  const displayCurrentPercentile = visiblePeValues.length > 0 ? currentPercentile : valuation.currentPercentile;
   const visibleStartDate = visibleValuationHistory[0]?.date ?? valuation.startDate;
   const visibleEndDate = visibleValuationHistory[visibleValuationHistory.length - 1]?.date ?? valuation.endDate;
+  const priceStartDateValue = parseDateInputValue(priceStartDate);
+  const priceEndDateValue = parseDateInputValue(priceEndDate);
+  const priceDatePickerMax = new Date();
+  priceDatePickerMax.setHours(0, 0, 0, 0);
   return (
     <section className={styles.sectionBlock}>
       <div className={styles.sectionTitleRow}>
@@ -461,7 +720,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
       </div>
       <div className={styles.peValuationSummary}>
         <div><span>当前扣非 PE</span><strong>{formatOptionalNumber(valuation.currentPe)}</strong></div>
-        <div><span>历史分位</span><strong>{formatPercentile(currentPercentile)}</strong></div>
+        <div><span>历史分位</span><strong>{formatPercentile(displayCurrentPercentile)}</strong></div>
         <div><span>中位目标</span><strong>{formatOptionalMoney(midTarget?.price)}</strong></div>
         <div><span>中位空间</span><strong>{formatSignedPercent(midTarget?.upside)}</strong></div>
       </div>
@@ -474,53 +733,159 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
         )}
       </div>
       <div className={styles.peChartPanel}>
-        <div className={styles.peChartHeader}>
-          <span>{valuationMetric === 'pe' ? 'PE' : 'PB'} 历史 ({visibleSampleCount} 周)</span>
-          <div className={styles.peChartSwitch}>
-            <button type="button" className={valuationMetric === 'pe' ? styles.peChartSwitchActive : ''} aria-pressed={valuationMetric === 'pe'} onClick={() => setValuationMetric('pe')}>PE</button>
-            <button type="button" className={valuationMetric === 'pb' ? styles.peChartSwitchActive : ''} aria-pressed={valuationMetric === 'pb'} onClick={() => setValuationMetric('pb')}>PB</button>
-          </div>
-        </div>
-        {valuationYears.length > 0 && (
-          <div className={styles.peYearFilter}>
-            <div className={styles.peYearList}>
-              {valuationYears.map((year) => {
-                const hidden = hiddenValuationYears.has(year);
-                return (
-                  <button
-                    key={year}
-                    type="button"
-                    className={hidden ? styles.peYearHidden : ''}
-                    aria-pressed={!hidden}
-                    onClick={() => setHiddenValuationYears((years) => {
-                      const next = new Set(years);
-                      if (next.has(year)) next.delete(year);
-                      else next.add(year);
-                      return next;
-                    })}
-                  >
-                    {year}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {valuationChartOption ? (
+        <button type="button" className={styles.peChartToggle} onClick={() => setPeHistoryExpanded((expanded) => !expanded)}>
+          <span>{valuationMetricLabel} 历史{peHistoryExpanded ? ` (${visibleSampleCount} 周)` : ''}</span>
+          <em>{peHistoryExpanded ? '收起' : '展开'}</em>
+        </button>
+        {peHistoryExpanded && (
           <>
-            <ReactECharts option={valuationChartOption} style={{ width: '100%', height: 250 }} notMerge lazyUpdate />
-            {visiblePercentileLines.length > 0 && (
-              <div className={styles.pePercentileLegend}>
-                {visiblePercentileLines.map((item) => (
-                  <span key={item.percentile} style={{ '--line-color': item.color } as React.CSSProperties}>
-                    {formatValuationLegendNumber(item.value, valuationMetric)}({item.percentile}%)
-                  </span>
-                ))}
+            <div className={styles.peChartHeader}>
+              <span>估值指标</span>
+              <div className={styles.peChartSwitch}>
+                <button type="button" className={valuationMetric === 'pe' ? styles.peChartSwitchActive : ''} aria-pressed={valuationMetric === 'pe'} onClick={() => setValuationMetric('pe')}>PE</button>
+                <button type="button" className={valuationMetric === 'pb' ? styles.peChartSwitchActive : ''} aria-pressed={valuationMetric === 'pb'} onClick={() => setValuationMetric('pb')}>PB</button>
+                <button type="button" className={valuationMetric === 'dividendYield' ? styles.peChartSwitchActive : ''} aria-pressed={valuationMetric === 'dividendYield'} onClick={() => setValuationMetric('dividendYield')}>股息率</button>
+              </div>
+            </div>
+            {valuationYears.length > 0 && (
+              <div className={styles.peYearFilter}>
+                <div className={styles.peYearList}>
+                  {valuationYears.map((year) => {
+                    const hidden = hiddenValuationYears.has(year);
+                    return (
+                      <button
+                        key={year}
+                        type="button"
+                        className={hidden ? styles.peYearHidden : ''}
+                        aria-pressed={!hidden}
+                        onClick={() => setHiddenValuationYears((years) => {
+                          const next = new Set(years);
+                          if (next.has(year)) next.delete(year);
+                          else next.add(year);
+                          return next;
+                        })}
+                      >
+                        {year}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
+            {valuationHistoryLoading ? (
+              <LoadingState label="估值历史加载中" compact className={styles.chartLoading} />
+            ) : valuationHistoryError ? (
+              <Empty description={valuationHistoryError} />
+            ) : valuationChartOption ? (
+              <>
+                <ReactECharts option={valuationChartOption} style={{ width: '100%', height: 250 }} notMerge lazyUpdate />
+                {visiblePercentileLines.length > 0 && (
+                  <div className={styles.pePercentileLegend}>
+                    {visiblePercentileLines.map((item) => (
+                      <span key={item.percentile} style={{ '--line-color': item.color } as React.CSSProperties}>
+                        {formatValuationLegendNumber(item.value, valuationMetric)}({item.percentile}%)
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <Empty description="暂无估值历史" />
+            )}
           </>
-        ) : (
-          <Empty description="暂无估值历史" />
+        )}
+      </div>
+      <div className={styles.peChartPanel}>
+        <button type="button" className={styles.peChartToggle} onClick={() => setPriceChartExpanded((expanded) => !expanded)}>
+          <span>个股 / 上证走势</span>
+          <em>{priceChartExpanded ? '收起' : '展开'}</em>
+        </button>
+        {priceChartExpanded && (
+          <>
+            <div className={styles.priceChartControls}>
+              <div className={styles.priceChartModeSwitch}>
+                {PRICE_CHART_MODE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={priceChartMode === option.value ? styles.peRangeSwitchActive : ''}
+                    aria-pressed={priceChartMode === option.value}
+                    onClick={() => setPriceChartMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.priceDateControls}>
+                <label>
+                  <span>开始</span>
+                  <button type="button" className={styles.priceDateButton} onClick={() => setActivePriceDatePicker('start')}>
+                    <span className={priceStartDate ? styles.priceDateValue : styles.priceDatePlaceholder}>
+                      {formatDatePickerValue(priceStartDate, '全部')}
+                    </span>
+                  </button>
+                </label>
+                <label>
+                  <span>结束</span>
+                  <button type="button" className={styles.priceDateButton} onClick={() => setActivePriceDatePicker('end')}>
+                    <span className={priceEndDate ? styles.priceDateValue : styles.priceDatePlaceholder}>
+                      {formatDatePickerValue(priceEndDate, '最新')}
+                    </span>
+                  </button>
+                </label>
+                <button
+                  type="button"
+                  className={styles.priceDateReset}
+                  onClick={() => {
+                    setPriceStartDate('');
+                    setPriceEndDate('');
+                  }}
+                >
+                  全部
+                </button>
+              </div>
+              <DatePicker
+                visible={activePriceDatePicker === 'start'}
+                title="选择开始日期"
+                precision="day"
+                min={PRICE_HISTORY_MIN_DATE}
+                max={priceEndDateValue ?? priceDatePickerMax}
+                value={priceStartDateValue ?? priceEndDateValue ?? PRICE_HISTORY_MIN_DATE}
+                onClose={() => setActivePriceDatePicker(null)}
+                onConfirm={(date) => {
+                  setPriceStartDate(toDateInputValue(date));
+                  setActivePriceDatePicker(null);
+                }}
+              />
+              <DatePicker
+                visible={activePriceDatePicker === 'end'}
+                title="选择结束日期"
+                precision="day"
+                min={priceStartDateValue ?? PRICE_HISTORY_MIN_DATE}
+                max={priceDatePickerMax}
+                value={priceEndDateValue ?? priceStartDateValue ?? priceDatePickerMax}
+                onClose={() => setActivePriceDatePicker(null)}
+                onConfirm={(date) => {
+                  setPriceEndDate(toDateInputValue(date));
+                  setActivePriceDatePicker(null);
+                }}
+              />
+            </div>
+            {priceHistoryLoading ? (
+              <LoadingState label="走势加载中" compact className={styles.chartLoading} />
+            ) : priceHistoryError ? (
+              <Empty description={priceHistoryError} />
+            ) : priceChartOption ? (
+              <>
+                <ReactECharts option={priceChartOption} style={{ width: '100%', height: 250 }} notMerge lazyUpdate />
+                <div className={styles.priceChartHint}>
+                  {formatDate(visiblePricePoints[0]?.date)} - {formatDate(visiblePricePoints.at(-1)?.date)} · 起点归一为 100，上证为指数点位不复权
+                </div>
+              </>
+            ) : (
+              <Empty description="暂无走势数据" />
+            )}
+          </>
         )}
       </div>
     </section>

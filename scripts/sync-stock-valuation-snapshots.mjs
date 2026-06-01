@@ -177,8 +177,15 @@ const fetchDailyBasicRows = (tsCode, startDate, endDate) => fetchTushare(
   ['ts_code', 'trade_date', 'close', 'pe', 'pe_ttm', 'pb', 'dv_ratio', 'dv_ttm', 'total_share', 'float_share', 'free_share', 'total_mv', 'circ_mv'],
 );
 
-const buildSnapshots = (symbol, weeklyRows, dailyBasicRows) => {
+const fetchAdjFactorRows = (tsCode, startDate, endDate) => fetchTushare(
+  'adj_factor',
+  { ts_code: tsCode, start_date: startDate, end_date: endDate },
+  ['ts_code', 'trade_date', 'adj_factor'],
+);
+
+const buildSnapshots = (symbol, weeklyRows, dailyBasicRows, adjFactorRows) => {
   const basicByDate = new Map(dailyBasicRows.map((row) => [String(row.trade_date), row]));
+  const adjFactorByDate = new Map(adjFactorRows.map((row) => [String(row.trade_date), row]));
 
   return weeklyRows
     .slice()
@@ -200,6 +207,7 @@ const buildSnapshots = (symbol, weeklyRows, dailyBasicRows) => {
         totalShares: multiplyOrNull(basic.total_share, 10000),
         floatShares: multiplyOrNull(basic.float_share, 10000),
         freeShares: multiplyOrNull(basic.free_share, 10000),
+        adjFactor: numberOrNull(adjFactorByDate.get(String(weekly.trade_date))?.adj_factor),
         pe: numberOrNull(basic.pe),
         peTtm: numberOrNull(basic.pe_ttm),
         pb: numberOrNull(basic.pb),
@@ -228,6 +236,7 @@ const upsertSnapshot = async (snapshot) => {
       totalShares: snapshot.totalShares,
       floatShares: snapshot.floatShares,
       freeShares: snapshot.freeShares,
+      adjFactor: snapshot.adjFactor,
       pe: snapshot.pe,
       peTtm: snapshot.peTtm,
       pb: snapshot.pb,
@@ -241,15 +250,16 @@ const upsertSnapshot = async (snapshot) => {
 
 const syncSymbol = async (symbol, args) => {
   const tsCode = toTsCode(symbol);
-  const [weeklyRows, dailyBasicRows] = await Promise.all([
+  const [weeklyRows, dailyBasicRows, adjFactorRows] = await Promise.all([
     fetchWeeklyRows(tsCode, args.startDate, args.endDate),
     fetchDailyBasicRows(tsCode, args.startDate, args.endDate),
+    fetchAdjFactorRows(tsCode, args.startDate, args.endDate),
   ]);
-  const snapshots = buildSnapshots(symbol, weeklyRows, dailyBasicRows);
+  const snapshots = buildSnapshots(symbol, weeklyRows, dailyBasicRows, adjFactorRows);
   if (!args.dryRun) {
     for (const snapshot of snapshots) await upsertSnapshot(snapshot);
   }
-  return { weeklyRows: weeklyRows.length, dailyBasicRows: dailyBasicRows.length, snapshots: snapshots.length };
+  return { weeklyRows: weeklyRows.length, dailyBasicRows: dailyBasicRows.length, adjFactorRows: adjFactorRows.length, snapshots: snapshots.length };
 };
 
 const main = async () => {
@@ -267,7 +277,7 @@ const main = async () => {
       const result = await syncSymbol(symbol, args);
       written += result.snapshots;
       ok += 1;
-      console.log(`[${symbol}] weekly=${result.weeklyRows} dailyBasic=${result.dailyBasicRows} snapshots=${result.snapshots}`);
+      console.log(`[${symbol}] weekly=${result.weeklyRows} dailyBasic=${result.dailyBasicRows} adjFactor=${result.adjFactorRows} snapshots=${result.snapshots}`);
     } catch (error) {
       if (isTushareTokenError(error)) throw error;
       failed.push(symbol);

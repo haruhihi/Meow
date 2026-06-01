@@ -719,52 +719,6 @@ const SummaryStat = ({ label, value, onClick }: { label: string; value: string; 
   </button>
 );
 
-const MetricTagWithHelp = ({
-  children,
-  className,
-  label,
-  formula,
-  align = 'end',
-}: {
-  children: React.ReactNode;
-  className: string;
-  label: string;
-  formula: string;
-  align?: 'start' | 'end';
-}) => {
-  const [open, setOpen] = useState(false);
-  return (
-  <span className={[
-    className,
-    styles.metricHelpWrap,
-    align === 'start' ? styles.metricHelpWrapStart : '',
-    open ? styles.metricHelpWrapActive : '',
-  ].join(' ')}
-    role="button"
-    tabIndex={0}
-    aria-label={`${label}计算方式`}
-    aria-expanded={open}
-    onClick={(event) => {
-      event.stopPropagation();
-    }}
-    onKeyDown={(event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen((value) => !value);
-    }}
-    onPointerDown={(event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen((value) => !value);
-    }}
-  >
-    {children}
-    <span className={styles.metricTooltip} role="tooltip">{formula}</span>
-  </span>
-  );
-};
-
 const StockMetricSummary = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
   <div className={styles.metricLineCompact}>
     <span className={styles.metricTagTtm}>PE扣T <strong>{formatOptionalNumber(summary.deductedPeTtm)}</strong></span>
@@ -782,12 +736,12 @@ const StockMetricDetails = ({ summary }: { summary: IStockPortfolioSymbolSummary
       <span className={styles.metricTagQuality}>ROE扣T <strong>{formatOptionalPercent(summary.deductedRoeTtm)}</strong></span>
     </div>
     <div className={styles.metricGridRow}>
-      <MetricTagWithHelp className={styles.metricTagQuality} label="含金量" formula="经营现金流TTM / 扣非净利润TTM" align="start">
+      <span className={styles.metricTagQuality}>
         含金量: <strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong>(TTM)
-      </MetricTagWithHelp>
-      <MetricTagWithHelp className={styles.metricTagDividend} label="分红覆盖" formula="自由现金流TTM / 常态分红">
+      </span>
+      <span className={styles.metricTagDividend}>
         分红覆盖: <strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong>
-      </MetricTagWithHelp>
+      </span>
       <span className={styles.metricTagAsset}>商誉/净资产: <strong>{formatOptionalPercent(summary.goodwillToNetAsset)}</strong></span>
     </div>
     <div className={styles.metricGridRow}>

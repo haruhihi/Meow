@@ -222,6 +222,7 @@ model StockValuationSnapshot {
   totalShares          Float?
   floatShares          Float?
   freeShares           Float?
+  adjFactor            Float?
   pe                   Float?
   peTtm                Float?
   pb                   Float?
