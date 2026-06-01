@@ -13,7 +13,7 @@ import type {
   StockRemarkListItem,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark, StockValuationSnapshot } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
 
 export { marketValueOf, roundStockValue };
 
@@ -129,6 +129,7 @@ export const stockRemarkToListItem = (remark: StockRemark): StockRemarkListItem 
 export const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' | 'reportPeriod' | 'cashPerTen' | 'bonusSharesPerTen' | 'transferSharesPerTen'>) => [
   event.symbol,
   event.reportPeriod ?? '',
+  event.cashPerTen ?? 0,
   event.bonusSharesPerTen ?? 0,
   event.transferSharesPerTen ?? 0,
 ].join('|');
@@ -537,14 +538,14 @@ const buildPeValuation = (
   };
 };
 
-export const buildStockValuationHistory = async (userId: number, symbol: string): Promise<IStockValuationHistoryRes> => {
+export const buildStockValuationHistory = async (symbol: string): Promise<IStockValuationHistoryRes> => {
   const normalizedSymbol = normalizeSymbol(symbol);
   const cache = await prisma.stockMetricCache.findUnique({
     where: { symbol_domain: { symbol: normalizedSymbol, domain: VALUATION_CACHE_DOMAIN } },
   });
   const cachedValuation = readValuationCache(cache, true);
   const valuationHistory = cachedValuation?.valuationHistory ?? [];
-  const dividendYieldByDate = await buildMarkedDividendYieldByDate(userId, normalizedSymbol, valuationHistory.map((item) => item.date));
+  const dividendYieldByDate = await buildTtmDividendYieldByDate(normalizedSymbol, valuationHistory.map((item) => item.date));
   return {
     symbol: normalizedSymbol,
     startDate: cachedValuation?.startDate ?? null,
@@ -556,60 +557,105 @@ export const buildStockValuationHistory = async (userId: number, symbol: string)
   };
 };
 
-const buildMarkedDividendYieldByDate = async (userId: number, symbol: string, historyDates: string[]) => {
+const buildTtmDividendYieldByDate = async (symbol: string, historyDates: string[]) => {
   if (historyDates.length === 0) return new Map<string, number>();
-  const [snapshots, markings] = await Promise.all([
+  const sortedHistoryDates = historyDates
+    .map((date) => new Date(date))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((left, right) => left.getTime() - right.getTime());
+  const minHistoryDate = sortedHistoryDates[0];
+  const maxHistoryDate = sortedHistoryDates.at(-1);
+  if (!minHistoryDate || !maxHistoryDate) return new Map<string, number>();
+  const dividendStartDate = new Date(minHistoryDate);
+  dividendStartDate.setFullYear(dividendStartDate.getFullYear() - 1);
+
+  const [snapshots, events] = await Promise.all([
     prisma.stockValuationSnapshot.findMany({
       where: { symbol, period: 'WEEK' },
-      select: { tradeDate: true, totalMarketCap: true, totalShares: true, close: true },
+      select: { tradeDate: true, totalMarketCap: true },
       orderBy: { tradeDate: 'asc' },
     }),
-    prisma.stockDividendMarking.findMany({
-      where: { userId, countTowardNormalizedDividend: true, event: { symbol } },
-      include: { event: true },
+    prisma.stockDividendEvent.findMany({
+      where: {
+        symbol,
+        cashPerTen: { gt: 0 },
+        exDividendDate: { not: null, gte: dividendStartDate, lte: maxHistoryDate },
+      },
+      orderBy: { exDividendDate: 'asc' },
     }),
   ]);
-  if (snapshots.length === 0 || markings.length === 0) return new Map<string, number>();
+  if (snapshots.length === 0 || events.length === 0) return new Map<string, number>();
 
-  const uniqueEvents = [...new Map(markings.map((marking) => [dividendEventDedupeKey(marking.event), marking.event])).values()];
-  const latestShares = [...snapshots].reverse().find((snapshot) => snapshot.totalShares && snapshot.totalShares > 0)?.totalShares ?? null;
-  const totalDividendCash = uniqueEvents.reduce((sum, event) => {
-    const cashPerTen = event.cashPerTen;
-    if (!cashPerTen || cashPerTen <= 0) return sum;
-    const snapshot = findSnapshotNearDividendDate(snapshots, event.exDividendDate);
-    const stockDividendPerTen = (event.bonusSharesPerTen ?? 0) + (event.transferSharesPerTen ?? 0);
-    const shareMultiplier = stockDividendPerTen > 0 ? 1 + stockDividendPerTen / 10 : 1;
-    const inferredBaseShares = snapshot?.totalShares && snapshot.totalShares > 0
-      ? snapshot.totalShares / shareMultiplier
-      : latestShares;
-    const baseShares = event.dividendBaseShares && event.dividendBaseShares > 0
-      ? event.dividendBaseShares
-      : inferredBaseShares;
-    if (!baseShares || baseShares <= 0) return sum;
-    return sum + (cashPerTen / 10) * baseShares;
-  }, 0);
-  if (totalDividendCash <= 0) return new Map<string, number>();
+  const uniqueEvents = dedupeDividendEvents(events)
+    .filter(isImplementedDividendEvent)
+    .map((event) => ({
+      exDividendDate: event.exDividendDate,
+      dividendCash: calculateDividendEventCash(event),
+    }))
+    .filter((event): event is { exDividendDate: Date; dividendCash: number } => (
+      event.exDividendDate != null && event.dividendCash != null && event.dividendCash > 0
+    ));
+  if (uniqueEvents.length === 0) return new Map<string, number>();
 
   const snapshotsByDate = new Map(snapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot]));
   const dividendYieldByDate = new Map<string, number>();
   historyDates.forEach((historyDate) => {
     const date = historyDate.slice(0, 10);
     const snapshot = snapshotsByDate.get(date);
-    const marketCap = snapshot?.totalMarketCap ?? (snapshot?.close && snapshot.totalShares ? snapshot.close * snapshot.totalShares : null);
-    if (marketCap && marketCap > 0) {
-      dividendYieldByDate.set(date, totalDividendCash / marketCap);
+    if (!snapshot) return;
+    const marketCap = snapshot.totalMarketCap;
+    if (marketCap == null || marketCap <= 0) return;
+    const tradeDate = new Date(historyDate);
+    if (Number.isNaN(tradeDate.getTime())) return;
+    const startDate = new Date(tradeDate);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const ttmDividendCash = uniqueEvents.reduce((sum, event) => {
+      const exDateTime = event.exDividendDate.getTime();
+      return exDateTime > startDate.getTime() && exDateTime <= tradeDate.getTime()
+        ? sum + event.dividendCash
+        : sum;
+    }, 0);
+    if (ttmDividendCash > 0) {
+      dividendYieldByDate.set(date, ttmDividendCash / marketCap);
     }
   });
   return dividendYieldByDate;
 };
 
-const findSnapshotNearDividendDate = (
-  snapshots: Array<Pick<StockValuationSnapshot, 'tradeDate' | 'totalShares'>>,
-  dividendDate?: Date | null
+const dedupeDividendEvents = (events: StockDividendEvent[]) => {
+  const byKey = new Map<string, StockDividendEvent>();
+  events.forEach((event) => {
+    const key = dividendEventDedupeKey(event);
+    const current = byKey.get(key);
+    if (!current || preferDividendEvent(event, current) === event) {
+      byKey.set(key, event);
+    }
+  });
+  return [...byKey.values()].sort((left, right) => (left.exDividendDate?.getTime() ?? 0) - (right.exDividendDate?.getTime() ?? 0));
+};
+
+const isImplementedDividendEvent = (event: StockDividendEvent) => /实施|派发|已/.test(event.status ?? event.description ?? '');
+
+const preferDividendEvent = (left: StockDividendEvent, right: StockDividendEvent) => {
+  const leftHasExDate = left.exDividendDate ? 1 : 0;
+  const rightHasExDate = right.exDividendDate ? 1 : 0;
+  if (leftHasExDate !== rightHasExDate) return leftHasExDate > rightHasExDate ? left : right;
+  const leftHasBaseShares = left.dividendBaseShares && left.dividendBaseShares > 0 ? 1 : 0;
+  const rightHasBaseShares = right.dividendBaseShares && right.dividendBaseShares > 0 ? 1 : 0;
+  if (leftHasBaseShares !== rightHasBaseShares) return leftHasBaseShares > rightHasBaseShares ? left : right;
+  const leftImplemented = isImplementedDividendEvent(left) ? 1 : 0;
+  const rightImplemented = isImplementedDividendEvent(right) ? 1 : 0;
+  if (leftImplemented !== rightImplemented) return leftImplemented > rightImplemented ? left : right;
+  return left.id > right.id ? left : right;
+};
+
+const calculateDividendEventCash = (
+  event: StockDividendEvent
 ) => {
-  if (snapshots.length === 0) return null;
-  if (!dividendDate) return snapshots.at(-1) ?? null;
-  return snapshots.find((snapshot) => snapshot.tradeDate.getTime() >= dividendDate.getTime()) ?? snapshots.at(-1) ?? null;
+  const cashPerTen = event.cashPerTen;
+  if (!cashPerTen || cashPerTen <= 0) return null;
+  const baseShares = event.dividendBaseShares;
+  return baseShares && baseShares > 0 ? (cashPerTen / 10) * baseShares : null;
 };
 
 export const buildStockPriceHistory = async (symbol: string, startDate: Date | null, endDate: Date | null): Promise<IStockPriceHistoryRes> => {

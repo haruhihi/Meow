@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
     const body = (await req.json().catch(() => ({}))) as IStockValuationHistoryReq;
     await requireOwnedStockSymbol(uid, body.symbol);
-    const result = await buildStockValuationHistory(uid, body.symbol);
+    const result = await buildStockValuationHistory(body.symbol);
 
     return success<IStockValuationHistoryRes>(result);
   } catch (error) {

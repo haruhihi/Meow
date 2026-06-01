@@ -154,6 +154,7 @@ const buildEventKey = (event) => {
 const dividendEventDedupeKey = (event) => [
   event.symbol,
   event.reportPeriod ?? '',
+  event.cashPerTen ?? 0,
   event.bonusSharesPerTen ?? 0,
   event.transferSharesPerTen ?? 0,
 ].join('|');
@@ -175,13 +176,18 @@ const parseDividendItem = (item) => {
   const recordDate = dateFromTushare(item.record_date);
   const exDividendDate = dateFromTushare(item.ex_date);
   const paymentDate = dateFromTushare(item.pay_date);
+  const baseDate = dateFromTushare(item.base_date);
   const status = String(item.div_proc ?? '').trim() || null;
   const cashPerShare = numberOrNull(item.cash_div_tax) ?? numberOrNull(item.cash_div);
   const bonusPerShare = numberOrNull(item.stk_bo_rate) ?? numberOrNull(item.stk_div);
   const transferPerShare = numberOrNull(item.stk_co_rate);
+  const baseShareInTenThousands = numberOrNull(item.base_share);
   const cashPerTen = cashPerShare != null && cashPerShare > 0 ? round(cashPerShare * 10) : null;
   const bonusSharesPerTen = bonusPerShare != null && bonusPerShare > 0 ? round(bonusPerShare * 10) : null;
   const transferSharesPerTen = transferPerShare != null && transferPerShare > 0 ? round(transferPerShare * 10) : null;
+  const dividendBaseShares = baseShareInTenThousands != null && baseShareInTenThousands > 0
+    ? Math.round(baseShareInTenThousands * 10000)
+    : null;
   if (cashPerTen == null && bonusSharesPerTen == null && transferSharesPerTen == null) return null;
 
   const descriptionParts = [];
@@ -197,10 +203,11 @@ const parseDividendItem = (item) => {
     recordDate,
     exDividendDate,
     paymentDate,
+    dividendBaseDate: baseDate,
     cashPerTen,
     bonusSharesPerTen,
     transferSharesPerTen,
-    dividendBaseShares: null,
+    dividendBaseShares,
     status,
     description,
     source: SOURCE,
@@ -210,7 +217,7 @@ const parseDividendItem = (item) => {
 };
 
 const fetchDividendEvents = async (symbol) => {
-  const rows = await fetchTushare('dividend', { ts_code: toTsCode(symbol) }, ['ts_code', 'end_date', 'ann_date', 'div_proc', 'stk_div', 'stk_bo_rate', 'stk_co_rate', 'cash_div', 'cash_div_tax', 'record_date', 'ex_date', 'pay_date', 'div_listdate', 'imp_ann_date']);
+  const rows = await fetchTushare('dividend', { ts_code: toTsCode(symbol) }, ['ts_code', 'end_date', 'ann_date', 'div_proc', 'stk_div', 'stk_bo_rate', 'stk_co_rate', 'cash_div', 'cash_div_tax', 'record_date', 'ex_date', 'pay_date', 'div_listdate', 'imp_ann_date', 'base_date', 'base_share']);
   return rows.map(parseDividendItem).filter(Boolean);
 };
 
@@ -346,6 +353,7 @@ const upsertDividendEvent = async (event) => {
       bonusSharesPerTen: event.bonusSharesPerTen,
       transferSharesPerTen: event.transferSharesPerTen,
       dividendBaseShares: event.dividendBaseShares,
+      dividendBaseDate: event.dividendBaseDate,
       status: event.status,
       description: event.description,
       source: event.source,
@@ -372,7 +380,7 @@ const main = async () => {
         continue;
       }
       for (const event of events) {
-        console.log(`[${symbol}] period=${event.reportPeriod ?? 'N/A'} status=${event.status ?? 'N/A'} ex=${event.exDividendDate?.toISOString().slice(0, 10) ?? 'N/A'} announcement=${event.announcementDate?.toISOString().slice(0, 10) ?? 'N/A'} cash10=${event.cashPerTen} bonus10=${event.bonusSharesPerTen} transfer10=${event.transferSharesPerTen}`);
+        console.log(`[${symbol}] period=${event.reportPeriod ?? 'N/A'} status=${event.status ?? 'N/A'} ex=${event.exDividendDate?.toISOString().slice(0, 10) ?? 'N/A'} announcement=${event.announcementDate?.toISOString().slice(0, 10) ?? 'N/A'} cash10=${event.cashPerTen} bonus10=${event.bonusSharesPerTen} transfer10=${event.transferSharesPerTen} baseDate=${event.dividendBaseDate?.toISOString().slice(0, 10) ?? 'N/A'} baseShares=${event.dividendBaseShares ?? 'N/A'}`);
         if (!args.dryRun) await upsertDividendEvent(event);
         written += 1;
       }

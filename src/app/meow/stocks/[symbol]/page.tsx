@@ -87,6 +87,11 @@ const formatNumberWithPercentile = (value?: number | null, percentile?: number |
 const formatValuationLegendNumber = (value: number, metric: ValuationMetricMode) => (
   metric === 'pe' ? value.toFixed(1) : metric === 'dividendYield' ? `${value.toFixed(2)}%` : value.toFixed(2)
 );
+const readValuationPercentile = (metric: ValuationMetricMode, values: number[], value?: number | null) => {
+  const percentile = percentileRankOfSorted(values, value);
+  if (percentile == null) return null;
+  return metric === 'dividendYield' ? 1 - percentile : percentile;
+};
 const formatDate = (value?: string | Date | null) => {
   if (!value) return '未知日期';
   const date = new Date(value);
@@ -388,7 +393,8 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     return PE_TARGET_PERCENTILES
       .flatMap((percentile, index) => {
         const value = percentileOfSortedValues(metricValuesForRank, percentile);
-        return value == null ? [] : [{ percentile, value, color: PE_TARGET_LINE_COLORS[index % PE_TARGET_LINE_COLORS.length] }];
+        const displayPercentile = valuationMetric === 'dividendYield' ? 100 - percentile : percentile;
+        return value == null ? [] : [{ percentile: displayPercentile, value, color: PE_TARGET_LINE_COLORS[index % PE_TARGET_LINE_COLORS.length] }];
       });
   }, [valuationMetric, visibleDividendYieldValues, visiblePeValues, visiblePbValues]);
 
@@ -505,7 +511,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
         ? item.pePercentile
         : valuationMetric === 'pb'
           ? item.pbPercentile
-          : item.dividendYield == null ? null : percentileRankOfSorted(visibleDividendYieldValues, item.dividendYield * 100);
+          : item.dividendYield == null ? null : readValuationPercentile(valuationMetric, visibleDividendYieldValues, item.dividendYield * 100);
       return value == null ? null : Number((value * 100).toFixed(1));
     });
     const yValues = [...metricValues, ...visiblePercentileLines.map((item) => item.value)]
