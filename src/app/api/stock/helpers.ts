@@ -409,7 +409,9 @@ const buildComputedMetrics = (
   const deductedNetProfitTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'deductedNetProfitTtm') : deductedNetProfitTtmResult.value;
   const deductedNetProfitTtmWarning = fundamentalCache ? cacheWarnings[0] ?? null : deductedNetProfitTtmResult.warning;
   const netProfit = readCacheNumber(cacheMetrics, 'netProfit') ?? fundamental?.netProfit ?? null;
-  const netProfitTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'netProfitTtm') : calculateStatementTtm(metricStatements, 'income', ['n_income_attr_p', 'n_income']) ?? calculateFundamentalTtm(fundamentals, 'netProfit');
+  const rawNetProfitTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'netProfitTtm') : calculateStatementTtm(metricStatements, 'income', ['n_income_attr_p', 'n_income']) ?? calculateFundamentalTtm(fundamentals, 'netProfit');
+  const netProfitTtmQuality = validateNetProfitTtm(rawNetProfitTtm, deductedNetProfitTtm, fundamentalCache?.calculatedThroughReportName ?? fundamental?.reportName ?? null);
+  const netProfitTtm = netProfitTtmQuality.value;
   const revenue = readCacheNumber(cacheMetrics, 'revenue') ?? fundamental?.revenue ?? null;
   const revenueTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'revenueTtm') : calculateStatementTtm(metricStatements, 'income', ['revenue', 'total_revenue']) ?? calculateFundamentalTtm(fundamentals, 'revenue');
   const netAsset = readCacheNumber(cacheMetrics, 'netAsset') ?? fundamental?.netAsset ?? null;
@@ -451,6 +453,7 @@ const buildComputedMetrics = (
     valuationDataSnapshotDate: valuationCache?.calculatedThroughSnapshotDate?.toISOString() ?? null,
     netProfit,
     netProfitTtm,
+    netProfitTtmWarning: netProfitTtmQuality.warning,
     revenue,
     revenueTtm,
     netAsset,
@@ -872,6 +875,16 @@ const readStatementNumber = (fields: unknown, key: string) => {
   const raw = Array.isArray(value) ? value[0] : value;
   const numberValue = typeof raw === 'number' ? raw : Number(raw ?? Number.NaN);
   return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const validateNetProfitTtm = (netProfitTtm: number | null, deductedNetProfitTtm: number | null, reportName?: string | null) => {
+  if (netProfitTtm != null && netProfitTtm > 0 && deductedNetProfitTtm != null && deductedNetProfitTtm > 0 && netProfitTtm < deductedNetProfitTtm * 0.5) {
+    return {
+      value: null,
+      warning: `${reportName ?? '最新报告'} 归母净利润 TTM 与扣非净利润 TTM 冲突，已暂停展示 PE TTM`,
+    };
+  }
+  return { value: netProfitTtm, warning: null };
 };
 
 const readStatementAnyNumber = (fields: unknown, keys: string[]) => {

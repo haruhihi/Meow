@@ -39,7 +39,7 @@ type EditingRemark = StockRemarkListItem | null;
 
 type ValuationMetricMode = 'pe' | 'pb' | 'dividendYield';
 type ValuationRangeMode = '1y' | '3y' | '5y' | '10y' | 'all';
-type PriceChartMode = 'stockQfq' | 'stockRaw' | 'overlay';
+type PriceChartMode = 'stock' | 'overlay';
 type PriceDatePickerTarget = 'start' | 'end';
 type StockDetailChartSettings = {
   peHistoryExpanded?: boolean;
@@ -64,8 +64,7 @@ const STOCK_DETAIL_CHART_SETTINGS_PREFIX = 'meow:stock-detail-chart:';
 const STOCK_PRICE_CHART_SETTINGS_KEY = 'meow:stock-detail-price-chart';
 const PRICE_HISTORY_MIN_DATE = new Date(2015, 0, 1);
 const PRICE_CHART_MODE_OPTIONS: { label: string; value: PriceChartMode }[] = [
-  { label: '前复权', value: 'stockQfq' },
-  { label: '不复权', value: 'stockRaw' },
+  { label: '个股', value: 'stock' },
   { label: '叠加', value: 'overlay' },
 ];
 
@@ -124,8 +123,7 @@ const formatDatePickerValue = (value: string, fallback: string) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 const normalizePriceChartMode = (value?: string | null): PriceChartMode | null => {
-  if (value === 'stockQfq') return 'stockQfq';
-  if (value === 'stock' || value === 'stockRaw') return 'stockRaw';
+  if (value === 'stock' || value === 'stockQfq' || value === 'stockRaw') return 'stock';
   if (value === 'overlay' || value === 'stockRawWithIndex' || value === 'index') return 'overlay';
   return null;
 };
@@ -228,6 +226,9 @@ const MetricGrid = ({ summary }: { summary: IStockPortfolioSymbolSummary }) => (
       <div><span>含金量</span><strong>{formatOptionalNumber(summary.operatingCashFlowToDeductedNetProfit)}</strong><em>OCF TTM / 扣非净利润 TTM</em></div>
       <div><span>分红覆盖率</span><strong>{formatOptionalNumber(summary.fcfDividendCoverage)}</strong><em>自由现金流TTM / 常态分红</em></div>
     </section>
+    {summary.netProfitTtmWarning && (
+      <div className={styles.dataWarning}>{summary.netProfitTtmWarning}</div>
+    )}
     {summary.deductedNetProfitTtmWarning && (
       <div className={styles.dataWarning}>{summary.deductedNetProfitTtmWarning}</div>
     )}
@@ -623,8 +624,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
   const visiblePricePoints = useMemo(() => {
     if (!priceHistory) return [];
     return priceHistory.points.filter((point) => {
-      if (priceChartMode === 'stockQfq') return point.qfqClose != null;
-      if (priceChartMode === 'stockRaw') return point.close != null;
+      if (priceChartMode === 'stock') return point.close != null && point.qfqClose != null;
       return point.close != null && point.indexClose != null;
     });
   }, [priceChartMode, priceHistory]);
@@ -639,15 +639,17 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     };
     const stockQfqSeries = points.map((item) => item.qfqClose);
     const stockRawSeries = points.map((item) => item.close);
+    const normalizedStockRawSeries = normalize(points.map((item) => item.close));
     const indexSeries = normalize(points.map((item) => item.indexClose));
     const series = [];
-    if (priceChartMode === 'stockQfq') {
-      series.push({ name: '前复权价格', type: 'line', data: stockQfqSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } });
-    } else if (priceChartMode === 'stockRaw') {
-      series.push({ name: '不复权价格', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } });
+    if (priceChartMode === 'stock') {
+      series.push(
+        { name: '前复权价格', type: 'line', data: stockQfqSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
+        { name: '不复权价格', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.2 } }
+      );
     } else {
       series.push(
-        { name: '个股不复权', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
+        { name: '个股不复权', type: 'line', data: normalizedStockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
         { name: '上证指数', type: 'line', data: indexSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.2 } }
       );
     }
@@ -818,7 +820,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
       </div>
       <div className={styles.peChartPanel}>
         <button type="button" className={styles.peChartToggle} onClick={() => setPriceChartExpanded((expanded) => !expanded)}>
-          <span>个股 / 上证走势</span>
+          <span>走势</span>
           <em>{priceChartExpanded ? '收起' : '展开'}</em>
         </button>
         {priceChartExpanded && (
@@ -900,7 +902,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
               <>
                 <ReactECharts option={priceChartOption} style={{ width: '100%', height: 250 }} notMerge lazyUpdate />
                 <div className={styles.priceChartHint}>
-                  {formatDate(visiblePricePoints[0]?.date)} - {formatDate(visiblePricePoints.at(-1)?.date)} · 起点归一为 100，上证为指数点位不复权
+                  {formatDate(visiblePricePoints[0]?.date)} - {formatDate(visiblePricePoints.at(-1)?.date)} · {priceChartMode === 'overlay' ? '起点归一为 100，上证为指数点位不复权' : '显示实际价格'}
                 </div>
               </>
             ) : (

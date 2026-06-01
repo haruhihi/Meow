@@ -153,6 +153,17 @@ const collectWarnings = (...results) => [...new Set(results.map((result) => resu
 
 const metricStatus = (warnings) => (warnings.length > 0 ? 'missing_input' : 'fresh');
 
+const validateNetProfitTtmResult = (netProfitTtm, deductedNetProfitTtm, reportName) => {
+  if (netProfitTtm.value != null && netProfitTtm.value > 0 && deductedNetProfitTtm.value != null && deductedNetProfitTtm.value > 0 && netProfitTtm.value < deductedNetProfitTtm.value * 0.5) {
+    return {
+      ...netProfitTtm,
+      value: null,
+      warning: `${reportName ?? '最新报告'} 归母净利润 TTM 与扣非净利润 TTM 冲突，缓存暂不可严格计算 PE TTM`,
+    };
+  }
+  return netProfitTtm;
+};
+
 const toInputJson = (value) => JSON.parse(JSON.stringify(value));
 
 const upsertCache = async ({ symbol, domain, status, calculatedThroughReportDate, calculatedThroughReportName, calculatedThroughSnapshotDate, metrics, warnings }) => {
@@ -192,11 +203,12 @@ const refreshFundamentalCache = async (symbol, statementsByType, fundamentals) =
   const resolvedDeductedNetProfitTtm = deductedNetProfitTtm.value != null
     ? deductedNetProfitTtm
     : calculateFundamentalTtmResult(fundamentals, 'deductedNetProfit', '扣非净利润');
-  const resolvedNetProfitTtm = netProfitTtm.value != null ? netProfitTtm : calculateFundamentalTtmResult(fundamentals, 'netProfit', '归母净利润');
+  const netProfitTtmInput = netProfitTtm.value != null ? netProfitTtm : calculateFundamentalTtmResult(fundamentals, 'netProfit', '归母净利润');
   const resolvedRevenueTtm = revenueTtm.value != null ? revenueTtm : calculateFundamentalTtmResult(fundamentals, 'revenue', '营业收入');
   const resolvedOperatingCashFlowTtm = operatingCashFlowTtm.value != null ? operatingCashFlowTtm : calculateFundamentalTtmResult(fundamentals, 'operatingCashFlow', '经营现金流');
   const resolvedCapitalExpenditureTtm = capitalExpenditureTtm.value != null ? capitalExpenditureTtm : calculateFundamentalTtmResult(fundamentals, 'capitalExpenditure', '资本开支');
   const report = resolvedDeductedNetProfitTtm.report ?? latestFundamental;
+  const resolvedNetProfitTtm = validateNetProfitTtmResult(netProfitTtmInput, resolvedDeductedNetProfitTtm, reportNameOf(report));
   const warnings = collectWarnings(
     resolvedDeductedNetProfitTtm,
     resolvedNetProfitTtm,

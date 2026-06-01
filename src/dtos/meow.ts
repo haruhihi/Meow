@@ -455,6 +455,7 @@ export interface IStockPortfolioSymbolSummary {
   valuationDataSnapshotDate?: string | null;
   netProfit?: number | null;
   netProfitTtm?: number | null;
+  netProfitTtmWarning?: string | null;
   revenue?: number | null;
   revenueTtm?: number | null;
   netAsset?: number | null;
