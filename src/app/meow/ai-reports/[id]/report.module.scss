@@ -6,6 +6,9 @@
 }
 
 .navbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   background: var(--meow-surface);
   border-bottom: 1px solid var(--meow-border);
 }
@@ -88,6 +91,12 @@
     padding-top: 8px;
     border-top: 1px solid color-mix(in srgb, var(--meow-border) 70%, transparent);
     font-size: 21px;
+  }
+
+  > h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
   }
 
   h3 {

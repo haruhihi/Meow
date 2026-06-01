@@ -5,11 +5,13 @@ argument-hint: "Stock symbol/name, optional normal dividend, optional valuation 
 agent: "agent"
 ---
 
-Analyze the stock as a long-term, dividend-aware holding. Use the latest method as the default: value the company from sustainable deducted profit and historical deducted PE percentiles, then use the user-marked normal dividend to infer the dividend yield at each PE-derived price edge.
+Analyze the stock as a long-term, dividend-aware holding. Use the latest method as the default: value the company from sustainable deducted profit and historical deducted PE percentiles, then use the user-marked normal dividend to infer the dividend yield at each PE-derived price edge. Write the final report in Chinese. Keep official Chinese financial-report wording in Chinese unless the user explicitly asks for translation.
 
 Use persisted local project data first. Prefer `StockFinancialStatement`, `StockFundamental`, `StockValuationSnapshot`, `StockDividendEvent`, user `StockDividendMarking`, `StockMetricOverride`, and `StockQuote`. Treat Tushare-backed local DB rows as the canonical data source unless the user explicitly asks to refresh or required rows are missing.
 
 Do not rely on old generated AI reports as evidence. They may contain obsolete methods. If an existing report is useful, use it only as context and re-check every important claim against current DB rows and financial statements.
+
+Do not stop at structured DB rows when the conclusion depends on cash conversion, inventory, capex, dividends, impairments, related transactions, or management explanations. Read the latest official annual/interim report and compare it with at least the prior two annual reports when available. Use the report notes to explain what the structured statement rows cannot show, such as inventory composition, raw-material reserves, aging/expiry risk, impairment provisions, purchase-price changes, management explanations for cash-flow changes, and auditor key audit matters.
 
 ## Core Method
 
@@ -46,7 +48,7 @@ Do not rely on old generated AI reports as evidence. They may contain obsolete m
    - Treat duplicate or repeated rows for the same annual dividend as one normal annual dividend level; do not sum duplicate rows.
    - Compute DPS from `cashPerTen / 10`.
    - For each important price edge, compute `implied dividend yield = normal DPS / PE-derived target price`.
-   - Do not use `K` to derive implied dividend yield. `K` belongs only to payout coverage analysis.
+   - Do not derive dividend yield from profit coverage ratios. Dividend yield must always come from DPS divided by price.
    - Present the main price matrix as `price / implied yield` when that is easier to read.
 
 6. Check dividend coverage separately.
@@ -54,54 +56,80 @@ Do not rely on old generated AI reports as evidence. They may contain obsolete m
    - Deducted-profit coverage: `deducted net profit / normal dividend cash amount`.
    - Operating-cash-flow coverage: normalized operating cash flow divided by normal dividend cash amount.
    - Free-cash-flow coverage: free cash flow divided by normal dividend cash amount, but do not let a clearly one-off distorted year dominate the whole conclusion.
-   - Use historical `K = annual deducted net profit / annual dividend cash amount` only as evidence of coverage quality, not as a valuation shortcut.
+   - Use coverage ratios only as dividend-quality evidence. Never use them as valuation shortcuts or to back into price/yield.
 
-7. Investigate anomalies from financial reports.
-   - When the ratios look odd, go back to the financial statements and, if needed, the official annual/interim report or announcements to find the reason.
-   - Typical triggers: headline PE suddenly much lower than deducted PE, profit jumps without cash flow, dividend payout exceeds recurring earnings, large investment income, asset disposal, equity sale, impairment reversal, consolidation-scope change, tax disturbance, or share-count jump.
+7. Review recent official financial reports together.
+   - Before finalizing the thesis, compare at least three years of annual reports when available, plus the latest interim/quarterly report if it changes TTM profit or cash flow.
+   - Use structured DB rows for the numeric spine, then use official report text and notes for the business explanation.
+   - If a financial result contradicts common business sense or the company's usual pattern, treat it as an investigation trigger even when the headline valuation looks attractive.
+   - Always compare operating cash flow to deducted profit over several years. If the ratio deteriorates, explain whether the cash is going to inventory, receivables, payables, capex, taxes, investment activity, or dividends.
+   - For inventory-heavy companies, inspect the official report's inventory notes rather than relying only on total inventory. Distinguish raw materials, work in process, finished goods, goods shipped but not delivered, turnover days, expiry/aging information, impairment provisions, and management's stated reason for changes.
+   - Compare cash purchases with accounting operating cost. If cash paid for goods is much higher than operating cost, explain whether the difference is consistent with inventory growth or supplier prepayments.
+   - When revenue, gross margin, deducted profit, operating cash flow, inventory, receivables, payables, capex, tax expense, investment income, impairments, dividends, debt, or consolidation scope changes sharply, reconcile the change across the income statement, balance sheet, and cash-flow statement before drawing the valuation conclusion.
+   - Treat management explanations as evidence, not proof. Cross-check them against inventory composition, turnover, margins, cash conversion, impairment provisions, and subsequent quarters.
+   - Add source links to official annual/interim reports or announcements when they materially support the conclusion.
+
+8. Investigate anomalies from financial reports.
+   - When the ratios look odd, a result is counterintuitive, or a large financial disturbance appears, go back to the three financial statements and official annual/interim reports or announcements to find the reason.
+   - Typical triggers: headline PE suddenly much lower than deducted PE, profit jumps without cash flow, dividend payout exceeds recurring earnings, large investment income, asset disposal, equity sale, impairment reversal, consolidation-scope change, tax disturbance, share-count jump, inventory growth far above revenue/cost growth, or operating cash flow/deducted profit deterioration across multiple years.
+   - The explanation must connect the accounting event to the affected statement lines. For example: profit jump -> investment income/non-recurring gain and tax; cash-flow deterioration -> inventory/receivables/prepayments/taxes/capex; margin jump -> price, product mix, cost, impairment, or inventory accounting; dividend stress -> recurring profit, operating cash flow, free cash flow, and cash balance.
+   - If the official report and three statements do not explain the disturbance well enough, say that the issue is unresolved and treat it as a risk instead of smoothing it away.
    - For example, Darentang's headline PE was disturbed by the sale of the Sino-American Tianjin SmithKline equity stake; the right response was to inspect the financial report, identify the one-off disposal gain, and switch the main valuation denominator to deducted profit.
+   - For example, Pien Tze Huang's 2025 deducted profit did not convert to operating cash flow because cash purchases and raw-material inventory reserves increased sharply; the right response was to inspect several annual reports and the 2025 inventory note before judging whether this is strategic raw-material reserve, operating deterioration, or a fraud signal.
    - Apply this habit to every stock: if a number contradicts the business story, do not force the model. Find the accounting or business event first, then decide whether to adjust the valuation base.
 
-8. Optional PEG/mean-reversion check.
+9. Optional PEG/mean-reversion check.
    - Use only after the PE price matrix is built.
    - Formula: `annualized return = (PE2 / PE1)^(1/n) * (1 + g) - 1`, where `PE1` is current deducted PE, `PE2` is a future deducted PE anchor, and `g` is the annualized growth or recovery rate of sustainable deducted profit.
    - Use this as a return sanity check, not as the main valuation table.
 
 ## Required Output
 
-Write a concise method-first report. Do not dump raw data. The report should answer four questions only: what six PE anchors are used, why the five profit tiers are chosen, what price/yield matrix they imply, and how to read that matrix.
+Write a concise Chinese method-first report. Do not dump raw data. The report should answer five questions only: what six PE anchors are used, why the five profit tiers are chosen, what price/yield matrix they imply, what recent financial-report evidence changes the judgment, and how to read that matrix.
 
 Use this structure:
 
 ```markdown
-## Conclusion
+## 结论
 
-One or two short paragraphs. State the current valuation area, whether the price is supported by already visible deducted profit or depends on recovery, and what the marked normal dividend implies at current/target prices.
+One or two short Chinese paragraphs. State the current valuation area, whether the price is supported by already visible deducted profit or depends on recovery, and what the marked normal dividend implies at current/target prices.
 
-## 1. Six Deducted PE Anchors
+## 1. 六个扣非 PE 锚点
 
 Show five historical deducted PE percentiles plus current deducted PE. Include snapshot window, frequency, sample count, and any company-specific reason to prefer deducted PE over headline PE. Keep the explanation short.
 
-| PE anchor | PE | Meaning |
+| PE 锚点 | PE | 含义 |
 |---|---:|---|
 
-## 2. Five Deducted Profit Tiers
+## 2. 五档扣非净利润
 
 Give exactly five deducted-profit tiers and clear reasons. This is the most company-specific part of the report; use financial statements and announcements to explain any unusual profit disturbance.
 
-| Tier | Deducted profit | Basis | Evidence quality |
+| 档位 | 扣非净利润 | 依据 | 证据质量 |
 |---|---:|---|---|
 
-## 3. Price And Implied Dividend Yield
+## 3. 价格和反推股息率
 
 Each cell should show `price / implied yield` when a marked normal dividend exists.
 
-| Deducted profit | P10 | P25 | P50 | Current PE | P75 | P90 |
+| 扣非净利润 | P10 | P25 | P50 | 当前 PE | P75 | P90 |
 |---|---:|---:|---:|---:|---:|---:|
 
-## 4. Reading The Table
+## 4. 怎么读这张表
 
 Explain the table in plain decision language: what price range is supported by current visible profit, what range requires recovery, what range is expensive, and what later financial-report items should be watched. Include dividend coverage only if it changes the conclusion.
+
+## 5. 财报交叉验证
+
+Include this section when cash conversion, inventory, dividends, impairments, capex, counterintuitive results, large financial disturbances, or management explanations materially affect the conclusion. Compare multiple recent annual reports instead of only the latest period. Show only the decisive rows and state what the official report notes say.
+
+Examples of useful compact tables:
+
+| 年份 | 经营现金流 | 扣非净利润 | 经营现金流/扣非 | 主要解释 |
+|---|---:|---:|---:|---|
+
+| 年份 | 存货 | 存货/收入 | 周转天数 | 存货附注 |
+|---|---:|---:|---:|---|
 ```
 
 Rules:
@@ -109,5 +137,7 @@ Rules:
 - Do not treat high dividend yield as automatically safe.
 - Do not mix per-share and total-company units.
 - Do not hide one-off accounting distortions inside a generic PE number.
+- Do not leave counterintuitive results or large financial disturbances unexplained; reconcile them with the three statements and official report notes, or mark them as unresolved risks.
 - Do not reuse old report conclusions without recalculating from current DB data.
+- Do not use old payout-coverage formulas to value the stock or infer dividend yield.
 - Keep the report focused on the valuation method and decision implication.
