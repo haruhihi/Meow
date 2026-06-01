@@ -139,12 +139,12 @@ const readGoodwillToNetAsset = (item: ScoreInput) => {
   return goodwill != null && netAsset && netAsset > 0 ? goodwill / netAsset : null;
 };
 
-const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: number | null) => {
+const sumMarkedDividendEvents = (events: StockDividendEvent[]) => {
   if (events.length === 0) return null;
   const uniqueEvents = [...new Map(events.map((event) => [dividendEventDedupeKey(event), event])).values()];
   const total = uniqueEvents.reduce((sum, event) => {
     const cashPerTen = event.cashPerTen;
-    const baseShares = event.dividendBaseShares ?? totalShares;
+    const baseShares = event.dividendBaseShares;
     if (!cashPerTen || cashPerTen <= 0 || !baseShares || baseShares <= 0) return sum;
     return sum + (cashPerTen / 10) * baseShares;
   }, 0);
@@ -154,13 +154,14 @@ const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: numb
 const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' | 'reportPeriod' | 'cashPerTen' | 'bonusSharesPerTen' | 'transferSharesPerTen'>) => [
   event.symbol,
   event.reportPeriod ?? '',
+  event.cashPerTen ?? 0,
   event.bonusSharesPerTen ?? 0,
   event.transferSharesPerTen ?? 0,
 ].join('|');
 
 const readDividendYield = (item: ScoreInput) => {
   const marketCap = readMarketCap(item);
-  const normalizedDividend = sumMarkedDividendEvents(item.dividendEvents, readFundamentalMetric(item, 'totalShares') ?? item.fundamental?.totalShares ?? null) ?? item.override?.normalizedDividend ?? null;
+  const normalizedDividend = sumMarkedDividendEvents(item.dividendEvents) ?? item.override?.normalizedDividend ?? null;
   return marketCap != null && normalizedDividend != null && normalizedDividend > 0 ? normalizedDividend / marketCap : null;
 };
 

@@ -39,7 +39,7 @@ type EditingRemark = StockRemarkListItem | null;
 
 type ValuationMetricMode = 'pe' | 'pb' | 'dividendYield';
 type ValuationRangeMode = '1y' | '3y' | '5y' | '10y' | 'all';
-type PriceChartMode = 'stock' | 'overlay';
+type PriceChartMode = 'stockQfq' | 'stockRaw' | 'overlay';
 type PriceDatePickerTarget = 'start' | 'end';
 type StockDetailChartSettings = {
   peHistoryExpanded?: boolean;
@@ -64,7 +64,8 @@ const STOCK_DETAIL_CHART_SETTINGS_PREFIX = 'meow:stock-detail-chart:';
 const STOCK_PRICE_CHART_SETTINGS_KEY = 'meow:stock-detail-price-chart';
 const PRICE_HISTORY_MIN_DATE = new Date(2015, 0, 1);
 const PRICE_CHART_MODE_OPTIONS: { label: string; value: PriceChartMode }[] = [
-  { label: '个股', value: 'stock' },
+  { label: '前复权', value: 'stockQfq' },
+  { label: '不复权', value: 'stockRaw' },
   { label: '叠加', value: 'overlay' },
 ];
 
@@ -123,7 +124,8 @@ const formatDatePickerValue = (value: string, fallback: string) => {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
 };
 const normalizePriceChartMode = (value?: string | null): PriceChartMode | null => {
-  if (value === 'stock' || value === 'stockQfq' || value === 'stockRaw') return 'stock';
+  if (value === 'stockQfq') return 'stockQfq';
+  if (value === 'stock' || value === 'stockRaw') return 'stockRaw';
   if (value === 'overlay' || value === 'stockRawWithIndex' || value === 'index') return 'overlay';
   return null;
 };
@@ -202,6 +204,7 @@ const MetricFreshness = ({ summary }: { summary: IStockPortfolioSymbolSummary })
 };
 
 const readCurrentPbPercentile = (summary: IStockPortfolioSymbolSummary) => {
+  if (summary.peValuation?.currentPbPercentile != null) return summary.peValuation.currentPbPercentile;
   const pbValues = sortedPositiveValues(summary.peValuation?.valuationHistory.map((item) => item.pb) ?? []);
   return percentileRankOfSorted(pbValues, summary.pb);
 };
@@ -398,10 +401,20 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
       });
   }, [valuationMetric, visibleDividendYieldValues, visiblePeValues, visiblePbValues]);
 
-  const currentPercentile = useMemo(
-    () => percentileRankOfSorted(visiblePeValues, valuation?.currentPe),
-    [valuation?.currentPe, visiblePeValues]
-  );
+  const currentMetricPercentile = useMemo(() => {
+    if (!valuation) return null;
+    if (valuationMetric === 'pe') {
+      return visiblePeValues.length > 0
+        ? percentileRankOfSorted(visiblePeValues, valuation.currentPe)
+        : valuation.currentPercentile;
+    }
+    if (valuationMetric === 'pb') {
+      return visiblePbValues.length > 0
+        ? percentileRankOfSorted(visiblePbValues, summary.pb)
+        : valuation.currentPbPercentile;
+    }
+    return null;
+  }, [summary.pb, valuation, valuationMetric, visiblePbValues, visiblePeValues]);
 
   const visibleTargets = useMemo(() => {
     const currentEps = valuation?.currentPe != null && valuation.currentPe > 0 && summary.currentPrice > 0
@@ -610,7 +623,8 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
   const visiblePricePoints = useMemo(() => {
     if (!priceHistory) return [];
     return priceHistory.points.filter((point) => {
-      if (priceChartMode === 'stock') return point.close != null && point.qfqClose != null;
+      if (priceChartMode === 'stockQfq') return point.qfqClose != null;
+      if (priceChartMode === 'stockRaw') return point.close != null;
       return point.close != null && point.indexClose != null;
     });
   }, [priceChartMode, priceHistory]);
@@ -619,19 +633,18 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     if (visiblePricePoints.length === 0) return null;
     const points = visiblePricePoints;
     const labels = points.map((item) => formatChartDate(item.date));
-    const normalize = (values: Array<number | null>) => {
+    const normalize = (values: Array<number | null | undefined>) => {
       const base = values.find((value) => value != null && Number.isFinite(value) && value > 0) ?? null;
       return values.map((value) => (value != null && base != null ? Number((value / base * 100).toFixed(2)) : null));
     };
-    const stockQfqSeries = normalize(points.map((item) => item.qfqClose));
-    const stockRawSeries = normalize(points.map((item) => item.close));
+    const stockQfqSeries = points.map((item) => item.qfqClose);
+    const stockRawSeries = points.map((item) => item.close);
     const indexSeries = normalize(points.map((item) => item.indexClose));
     const series = [];
-    if (priceChartMode === 'stock') {
-      series.push(
-        { name: '个股前复权', type: 'line', data: stockQfqSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
-        { name: '个股不复权', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.2 } }
-      );
+    if (priceChartMode === 'stockQfq') {
+      series.push({ name: '前复权价格', type: 'line', data: stockQfqSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } });
+    } else if (priceChartMode === 'stockRaw') {
+      series.push({ name: '不复权价格', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } });
     } else {
       series.push(
         { name: '个股不复权', type: 'line', data: stockRawSeries, smooth: true, symbol: 'none', lineStyle: { width: 2.4 } },
@@ -655,14 +668,16 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
           const title = first?.axisValue ?? '';
           const lines = items.map((item) => {
             const normalized = Number(item.value);
-            const rawValue = item.seriesName === '个股前复权'
+            const rawValue = item.seriesName === '前复权价格'
               ? point?.qfqClose
-              : item.seriesName === '个股不复权'
+              : item.seriesName === '不复权价格' || item.seriesName === '个股不复权'
                 ? point?.close
                 : point?.indexClose;
             const normalizedText = Number.isFinite(normalized) ? normalized.toFixed(2) : '-';
             const rawText = rawValue != null ? rawValue.toFixed(2) : '-';
-            return `${item.marker}${item.seriesName}: ${normalizedText} / ${rawText}`;
+            return priceChartMode === 'overlay'
+              ? `${item.marker}${item.seriesName}: ${normalizedText} / ${rawText}`
+              : `${item.marker}${item.seriesName}: ${rawText}`;
           });
           return [title, ...lines].join('<br/>');
         },
@@ -681,7 +696,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
       },
       yAxis: {
         type: 'value',
-        name: '起点=100',
+        name: priceChartMode === 'overlay' ? '起点=100' : '价格',
         axisLabel: { color: PALETTE.textMuted, fontSize: 10 },
         splitLine: { lineStyle: { color: PALETTE.border, type: 'dashed' } },
       },
@@ -698,7 +713,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
     : valuationMetric === 'pb'
       ? visiblePbValues.length
       : visibleDividendYieldValues.length;
-  const displayCurrentPercentile = visiblePeValues.length > 0 ? currentPercentile : valuation.currentPercentile;
+  const displayCurrentPercentile = currentMetricPercentile;
   const visibleStartDate = visibleValuationHistory[0]?.date ?? valuation.startDate;
   const visibleEndDate = visibleValuationHistory[visibleValuationHistory.length - 1]?.date ?? valuation.endDate;
   const priceStartDateValue = parseDateInputValue(priceStartDate);

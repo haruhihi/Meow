@@ -418,7 +418,7 @@ const buildComputedMetrics = (
   const operatingCashFlowTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'operatingCashFlowTtm') : calculateStatementTtm(metricStatements, 'cash_flow', ['n_cashflow_act']) ?? calculateFundamentalTtm(fundamentals, 'operatingCashFlow');
   const capitalExpenditure = readCacheNumber(cacheMetrics, 'capitalExpenditure') ?? fundamental?.capitalExpenditure ?? null;
   const capitalExpenditureTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'capitalExpenditureTtm') : calculateStatementTtm(metricStatements, 'cash_flow', ['c_pay_acq_const_fiolta']) ?? calculateFundamentalTtm(fundamentals, 'capitalExpenditure');
-  const eventNormalizedDividend = sumMarkedDividendEvents(dividendEvents, totalShares);
+  const eventNormalizedDividend = sumMarkedDividendEvents(dividendEvents);
   const normalizedDividend = eventNormalizedDividend ?? override?.normalizedDividend ?? null;
   const companyMarketCap = totalShares && totalShares > 0 ? summary.currentPrice * totalShares : null;
   const freeCashFlow = operatingCashFlow != null && capitalExpenditure != null
@@ -434,7 +434,8 @@ const buildComputedMetrics = (
   const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
   const deductedPe = companyMarketCap && latestAnnualDeductedNetProfit && latestAnnualDeductedNetProfit > 0 ? roundStockValue(companyMarketCap / latestAnnualDeductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
-  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, annualFundamentals, valuationCache, includeValuationHistory);
+  const pb = companyMarketCap && netAsset && netAsset > 0 ? roundStockValue(companyMarketCap / netAsset) : null;
+  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, pb, annualFundamentals, valuationCache, includeValuationHistory);
 
   return {
     totalShares,
@@ -470,7 +471,7 @@ const buildComputedMetrics = (
     goodwillToTotalAssets: goodwill != null && totalAssets && totalAssets > 0 ? goodwill / totalAssets : null,
     deductedPe,
     deductedPeTtm,
-    pb: companyMarketCap && netAsset && netAsset > 0 ? roundStockValue(companyMarketCap / netAsset) : null,
+    pb,
     deductedRoe: deductedNetProfit && netAsset && netAsset > 0 ? deductedNetProfit / netAsset : null,
     deductedRoeTtm: deductedNetProfitTtm && netAsset && netAsset > 0 ? deductedNetProfitTtm / netAsset : null,
     normalizedDividendYield: companyMarketCap && normalizedDividend && normalizedDividend > 0 ? normalizedDividend / companyMarketCap : null,
@@ -499,6 +500,7 @@ const buildPeValuation = (
   totalShares: number | null,
   deductedNetProfitTtm: number | null,
   currentPe: number | null,
+  currentPb: number | null,
   annualFundamentals: StockFundamental[],
   valuationCache?: StockMetricCache,
   includeValuationHistory = false
@@ -515,6 +517,9 @@ const buildPeValuation = (
   const currentPercentile = resolvedCurrentPe != null && peValues.length > 0
     ? percentileRank(peValues, resolvedCurrentPe)
     : null;
+  const currentPbPercentile = currentPb != null && pbValues.length > 0
+    ? percentileRank(pbValues, currentPb)
+    : null;
   const targets = PE_VALUATION_PERCENTILES.map((percentile) => {
     const pe = percentileOfSorted(peValues, percentile);
     const price = pe != null && deductedEpsTtm != null ? pe * deductedEpsTtm : null;
@@ -529,7 +534,9 @@ const buildPeValuation = (
   return {
     currentPe: resolvedCurrentPe != null ? roundStockValue(resolvedCurrentPe) : null,
     currentPercentile,
+    currentPbPercentile,
     sampleCount: peValues.length,
+    pbSampleCount: pbValues.length,
     startDate: cachedValuation?.startDate ?? null,
     endDate: cachedValuation?.endDate ?? null,
     targets,
@@ -942,12 +949,12 @@ const readValuationCache = (cache?: StockMetricCache | null, includeHistory = tr
   };
 };
 
-const sumMarkedDividendEvents = (events: StockDividendEvent[], totalShares: number | null) => {
+const sumMarkedDividendEvents = (events: StockDividendEvent[]) => {
   if (events.length === 0) return null;
   const uniqueEvents = [...new Map(events.map((event) => [dividendEventDedupeKey(event), event])).values()];
   const total = uniqueEvents.reduce((sum, event) => {
     const cashPerTen = event.cashPerTen;
-    const baseShares = event.dividendBaseShares ?? totalShares;
+    const baseShares = event.dividendBaseShares;
     if (!cashPerTen || cashPerTen <= 0 || !baseShares || baseShares <= 0) return sum;
     return sum + (cashPerTen / 10) * baseShares;
   }, 0);

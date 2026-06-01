@@ -422,7 +422,9 @@ export interface IStockPriceHistoryRes {
 export interface IStockPeValuationSummary {
   currentPe: number | null;
   currentPercentile: number | null;
+  currentPbPercentile: number | null;
   sampleCount: number;
+  pbSampleCount: number;
   startDate: string | null;
   endDate: string | null;
   targets: IStockPeValuationTarget[];
