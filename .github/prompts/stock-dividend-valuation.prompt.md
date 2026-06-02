@@ -11,7 +11,11 @@ Use persisted local project data first. Prefer `StockFinancialStatement`, `Stock
 
 Do not rely on old generated AI reports as evidence. They may contain obsolete methods. If an existing report is useful, use it only as context and re-check every important claim against current DB rows and financial statements.
 
-Do not stop at structured DB rows when the conclusion depends on cash conversion, inventory, capex, dividends, impairments, related transactions, or management explanations. Read the latest official annual/interim report and compare it with at least the prior two annual reports when available. Use the report notes to explain what the structured statement rows cannot show, such as inventory composition, raw-material reserves, aging/expiry risk, impairment provisions, purchase-price changes, management explanations for cash-flow changes, and auditor key audit matters.
+Do not stop at structured DB rows when the conclusion depends on cash conversion, inventory, capex, dividends, impairments, related transactions, or management explanations. Read the latest official annual/interim report and compare it with at least the prior four annual reports when available; use three years only when older reports are unavailable or clearly irrelevant, and say so. Use the report notes to explain what the structured statement rows cannot show, such as inventory composition, raw-material reserves, aging/expiry risk, impairment provisions, purchase-price changes, management explanations for cash-flow changes, and auditor key audit matters.
+
+Use a dynamic evidence workflow. Start from at least five years of local structured data and official annual-report evidence. While analyzing, if deducted profit, operating cash flow, inventory, receivables, contract liabilities, capex, impairments, investment income, tax, share count, consolidation scope, or dividends show a large disturbance or a counterintuitive pattern, do not finalize from the initial evidence pack alone. Fetch and parse the specific official annual report, interim report, quarterly report, or announcement that can explain the event; if the event is older than the current evidence window, rerun or extend evidence gathering, for example with a larger `--annual-count`. If the needed official material cannot be found or does not explain the issue, mark it as `未识别/待跟踪` and treat it as a risk.
+
+Prioritize the latest reporting period before ranking historical disturbances. First explain material changes in the latest annual/interim/quarterly report because they determine whether the current valuation is still valid. Then use the five-year history to identify whether the latest issue is new, recurring, improving, or worsening. Do not default to “the largest disturbance in five years” if the latest report contains a smaller but more decision-relevant deterioration.
 
 ## Core Method
 
@@ -33,7 +37,7 @@ Do not stop at structured DB rows when the conclusion depends on cash conversion
    - Exclude or winsorize invalid samples where deducted profit is negative, near zero, missing, or known to be distorted by one-off items.
    - Calculate five historical PE percentiles: P10, P25, P50, P75, P90.
    - Also calculate the current deducted PE from current price, total shares, and current deducted profit TTM.
-   - Present six PE anchors in total: P10, P25, P50, current deducted PE, P75, P90. If current PE is almost equal to a percentile, keep both and explain what that means.
+   - Present six PE anchors in total in this order: P10, P25, P50, P75, P90, current deducted PE. If current PE is almost equal to a percentile, keep both and explain what that means. Current PE is a live state marker, so place it last rather than between historical percentile anchors.
    - Explain the meaning of the five historical PE tiers: historical low, conservative, median, optimistic, expensive.
    - Avoid opaque vendor headline PE when the thesis is based on deducted profit.
 
@@ -44,7 +48,7 @@ Do not stop at structured DB rows when the conclusion depends on cash conversion
    - Interpret price areas in decision terms: safety area, reasonable area, conditional optimistic area, and expensive area.
 
 5. Infer dividend yield from PE-derived prices.
-   - Use only user-marked normal dividend events or `StockMetricOverride.normalizedDividend` as the normal dividend source.
+   - Use only user-marked normal dividend events or `StockMetricOverride.normalizedDividend` as the normal dividend source. When multiple user-marked normal dividend events exist and they are not duplicates, aggregate them as the user's normalized annual dividend; do not silently pick only the latest event.
    - Treat duplicate or repeated rows for the same annual dividend as one normal annual dividend level; do not sum duplicate rows.
    - Compute DPS from `cashPerTen / 10`.
    - For each important price edge, compute `implied dividend yield = normal DPS / PE-derived target price`.
@@ -56,21 +60,27 @@ Do not stop at structured DB rows when the conclusion depends on cash conversion
    - Deducted-profit coverage: `deducted net profit / normal dividend cash amount`.
    - Operating-cash-flow coverage: normalized operating cash flow divided by normal dividend cash amount.
    - Free-cash-flow coverage: free cash flow divided by normal dividend cash amount, but do not let a clearly one-off distorted year dominate the whole conclusion.
+   - Show recent-year dividend coverage trends when dividend safety matters. Explain both profit coverage and cash coverage: deducted profit tells whether recurring earnings can afford the dividend; operating cash flow tells whether accounting profit turned into cash; free cash flow is stricter because it subtracts maintenance/expansion capex, but it can be temporarily distorted by investment cycles.
    - Use coverage ratios only as dividend-quality evidence. Never use them as valuation shortcuts or to back into price/yield.
 
 7. Review recent official financial reports together.
-   - Before finalizing the thesis, compare at least three years of annual reports when available, plus the latest interim/quarterly report if it changes TTM profit or cash flow.
+   - Before finalizing the thesis, compare at least five years of annual reports when available, plus the latest interim/quarterly report if it changes TTM profit or cash flow. Three years is only a fallback for newer listings or missing official reports, and the limitation must be stated.
+   - Start with the latest report's meaningful changes, then compare against history. If the latest report contains a deterioration in revenue, margin, deducted profit, cash conversion, inventory, receivables, contract liabilities, capex, impairments, investment income, tax, share count, consolidation scope, or dividends, explain that latest disturbance even when an older year had a larger absolute disturbance.
+   - Treat the first evidence pack as the baseline, not the stopping point. When a five-year comparison surfaces a major disturbance, fetch the relevant official report or announcement on demand and use it to explain the affected statement lines before writing the conclusion.
    - Use structured DB rows for the numeric spine, then use official report text and notes for the business explanation.
    - If a financial result contradicts common business sense or the company's usual pattern, treat it as an investigation trigger even when the headline valuation looks attractive.
    - Always compare operating cash flow to deducted profit over several years. If the ratio deteriorates, explain whether the cash is going to inventory, receivables, payables, capex, taxes, investment activity, or dividends.
    - For inventory-heavy companies, inspect the official report's inventory notes rather than relying only on total inventory. Distinguish raw materials, work in process, finished goods, goods shipped but not delivered, turnover days, expiry/aging information, impairment provisions, and management's stated reason for changes.
    - Compare cash purchases with accounting operating cost. If cash paid for goods is much higher than operating cost, explain whether the difference is consistent with inventory growth or supplier prepayments.
+   - Analyze channel power when relevant. Use ratios such as contract liabilities/revenue, accounts payable/operating cost, contract liabilities plus accounts payable/revenue, and their multi-year trend to judge whether the company can occupy downstream customer prepayments and upstream supplier credit.
+   - Analyze operating quality when relevant, especially when operating cash flow looks strong but profit has not recovered. Use revenue growth, gross margin, deducted profit, inventory/revenue, accounts receivable/revenue, operating cash flow/deducted profit, cash paid for goods/operating cost, capex, inventory, and investment cash flows. Distinguish real recurring profit recovery from one-off or finite working-capital release such as inventory reduction.
    - When revenue, gross margin, deducted profit, operating cash flow, inventory, receivables, payables, capex, tax expense, investment income, impairments, dividends, debt, or consolidation scope changes sharply, reconcile the change across the income statement, balance sheet, and cash-flow statement before drawing the valuation conclusion.
    - Treat management explanations as evidence, not proof. Cross-check them against inventory composition, turnover, margins, cash conversion, impairment provisions, and subsequent quarters.
    - Add source links to official annual/interim reports or announcements when they materially support the conclusion.
 
 8. Investigate anomalies from financial reports.
    - When the ratios look odd, a result is counterintuitive, or a large financial disturbance appears, go back to the three financial statements and official annual/interim reports or announcements to find the reason.
+   - If the initial five-year annual-report evidence does not cover the disturbance year or event announcement, dynamically gather the missing official source before deciding. If more history is needed, extend the evidence window rather than guessing from the latest five years.
    - Typical triggers: headline PE suddenly much lower than deducted PE, profit jumps without cash flow, dividend payout exceeds recurring earnings, large investment income, asset disposal, equity sale, impairment reversal, consolidation-scope change, tax disturbance, share-count jump, inventory growth far above revenue/cost growth, or operating cash flow/deducted profit deterioration across multiple years.
    - The explanation must connect the accounting event to the affected statement lines. For example: profit jump -> investment income/non-recurring gain and tax; cash-flow deterioration -> inventory/receivables/prepayments/taxes/capex; margin jump -> price, product mix, cost, impairment, or inventory accounting; dividend stress -> recurring profit, operating cash flow, free cash flow, and cash balance.
    - If the official report and three statements do not explain the disturbance well enough, say that the issue is unresolved and treat it as a risk instead of smoothing it away.
@@ -86,6 +96,8 @@ Do not stop at structured DB rows when the conclusion depends on cash conversion
 ## Required Output
 
 Write a concise Chinese method-first report. Do not dump raw data. The report should answer five questions only: what six PE anchors are used, why the five profit tiers are chosen, what price/yield matrix they imply, what recent financial-report evidence changes the judgment, and how to read that matrix.
+
+Do not mention previous drafts, earlier versions, internal corrections, or the user's feedback process in the final report. Write the final answer as a standalone research note.
 
 Use this structure:
 
@@ -112,7 +124,7 @@ Give exactly five deducted-profit tiers and clear reasons. This is the most comp
 
 Each cell should show `price / implied yield` when a marked normal dividend exists.
 
-| 扣非净利润 | P10 | P25 | P50 | 当前 PE | P75 | P90 |
+| 利润档位（扣非净利润） | P10 | P25 | P50 | P75 | P90 | 当前 PE |
 |---|---:|---:|---:|---:|---:|---:|
 
 ## 4. 怎么读这张表
@@ -121,7 +133,9 @@ Explain the table in plain decision language: what price range is supported by c
 
 ## 5. 财报交叉验证
 
-Include this section when cash conversion, inventory, dividends, impairments, capex, counterintuitive results, large financial disturbances, unidentified items, or management explanations materially affect the conclusion. Compare multiple recent annual reports instead of only the latest period.
+Include this section when cash conversion, inventory, dividends, impairments, capex, counterintuitive results, large financial disturbances, unidentified items, or management explanations materially affect the conclusion. Compare five years of annual reports when available instead of only the latest period; if only three years are available, state the evidence boundary.
+
+If the five-year baseline exposes an unresolved disturbance, briefly state what additional official report or announcement was fetched and what it explains. If the official source still does not explain the issue, label the item `未识别/待跟踪`.
 
 Start with a beginner-friendly checklist. List each important item one by one, including growth, decline, disturbance, counterintuitive result, and unidentified or not-yet-explained item. For each item, explain in plain Chinese:
 - what changed;
@@ -137,6 +151,15 @@ Examples of useful compact tables:
 
 | 年份 | 经营现金流 | 扣非净利润 | 经营现金流/扣非 | 主要解释 |
 |---|---:|---:|---:|---|
+
+| 年份 | 常态分红 | 扣非覆盖 | 经营现金流覆盖 | 自由现金流覆盖 | 趋势判断 |
+|---|---:|---:|---:|---:|---|
+
+| 年份 | 合同负债/收入 | 应付账款/成本 | 合同负债+应付/收入 | 渠道含义 |
+|---|---:|---:|---:|---|
+
+| 年份 | 收入 | 毛利率 | 扣非净利润 | 存货/收入 | 经营现金流/扣非 | 经营质量判断 |
+|---|---:|---:|---:|---:|---:|---|
 
 | 年份 | 存货 | 存货/收入 | 周转天数 | 存货附注 |
 |---|---:|---:|---:|---|

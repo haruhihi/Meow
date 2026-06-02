@@ -9,6 +9,9 @@
 # testing
 /coverage
 
+# generated local evidence/cache files
+/.tmp/
+
 # next.js
 /.next/
 /out/
