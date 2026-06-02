@@ -45,6 +45,15 @@
   }
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .symbolCode {
   display: inline-flex;
   margin: 0;

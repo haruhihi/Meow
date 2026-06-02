@@ -95,7 +95,7 @@ const StocksPage = observer(function StocksPage() {
   const [stockUiHydrated, setStockUiHydrated] = useState(false);
   const pendingSymbolNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSymbolClickRef = useRef<{ symbol: string; time: number } | null>(null);
-  const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance, updateSymbolVisibility } = useStockPortfolio();
+  const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
   const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
@@ -242,29 +242,6 @@ const StocksPage = observer(function StocksPage() {
       return;
     }
     await reQuery();
-  };
-
-  const toggleSymbolHidden = async (symbol: string) => {
-    const wasHidden = hiddenSymbols.has(symbol);
-    const isHidden = !wasHidden;
-    setHiddenSymbols((current) => {
-      const next = new Set(current);
-      if (isHidden) next.add(symbol);
-      else next.delete(symbol);
-      return next;
-    });
-
-    try {
-      await updateSymbolVisibility({ symbol, isHidden });
-    } catch (error) {
-      setHiddenSymbols((current) => {
-        const next = new Set(current);
-        if (wasHidden) next.add(symbol);
-        else next.delete(symbol);
-        return next;
-      });
-      Toast.show({ content: `更新失败: ${(error as any)?.result ?? error}` });
-    }
   };
 
   const changeSnapshot = (value: string) => {
@@ -614,8 +591,7 @@ const StocksPage = observer(function StocksPage() {
               <List className={styles.sectorList}>
                 {sector.symbols.map((summary) => {
                   const isExpanded = expandedSymbols.has(summary.symbol);
-                  const isHidden = hiddenSymbols.has(summary.symbol);
-                  const itemClassName = [isExpanded ? styles.symbolItemExpanded : styles.symbolItem, isHidden ? styles.symbolItemHidden : ''].filter(Boolean).join(' ');
+                  const itemClassName = isExpanded ? styles.symbolItemExpanded : styles.symbolItem;
                   return (
                   <List.Item
                     key={summary.symbol}
@@ -629,16 +605,6 @@ const StocksPage = observer(function StocksPage() {
                         <div className={styles.symbolMain}>
                           <strong>{summary.name}</strong>
                           <span className={styles.symbolPercent}>{formatPercent(summary.percent)}</span>
-                          <button
-                            type="button"
-                            className={isHidden ? styles.symbolVisibilityButtonActive : styles.symbolVisibilityButton}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void toggleSymbolHidden(summary.symbol);
-                            }}
-                          >
-                            {isHidden ? '显示' : '隐藏'}
-                          </button>
                         </div>
                         <div className={styles.symbolRight}>
                           <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
@@ -709,16 +675,6 @@ const StocksPage = observer(function StocksPage() {
                               <div className={styles.symbolMain}>
                                 <strong>{summary.name}</strong>
                                 <span className={styles.symbolPercent}>{formatPercent(summary.percent)}</span>
-                                <button
-                                  type="button"
-                                  className={styles.symbolVisibilityButtonActive}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void toggleSymbolHidden(summary.symbol);
-                                  }}
-                                >
-                                  显示
-                                </button>
                               </div>
                               <div className={styles.symbolRight}>
                                 <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>

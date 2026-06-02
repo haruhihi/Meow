@@ -2,7 +2,7 @@
 
 import { RefObject, useEffect, useMemo, useState } from 'react';
 import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Modal, NavBar, PullToRefresh, TextArea, Toast } from 'antd-mobile';
-import { AddCircleOutline, DeleteOutline, EditSOutline, FileOutline } from 'antd-mobile-icons';
+import { AddCircleOutline, DeleteOutline, EditSOutline, EyeInvisibleOutline, EyeOutline, FileOutline } from 'antd-mobile-icons';
 import ReactECharts from 'echarts-for-react';
 import { observer } from 'mobx-react-lite';
 import Link from 'next/link';
@@ -910,15 +910,17 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
 const StockDetailPage = observer(function StockDetailPage({ params }: { params: { symbol: string } }) {
   const router = useRouter();
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
-  const { data, loading: portfolioLoading, reQuery } = useStockPortfolio(0, symbol);
+  const { data, loading: portfolioLoading, reQuery, updateSymbolVisibility } = useStockPortfolio(0, symbol);
   const { reports, loading: reportsLoading } = useStockAiReports(0, symbol);
   const { remarks, loading: remarksLoading, createRemark, updateRemark, deleteRemark: deleteStockRemark } = useStockRemarks(symbol);
   const { events: dividendEvents, loading: dividendLoading, updateMarking: updateDividendMarking } = useStockDividends(symbol);
   const [remarkVisible, setRemarkVisible] = useState(false);
   const [editingRemark, setEditingRemark] = useState<EditingRemark>(null);
   const [showAllDividends, setShowAllDividends] = useState(false);
+  const [isVisibilitySaving, setIsVisibilitySaving] = useState(false);
 
   const summary = data?.symbolSummaries.find((item) => item.symbol === symbol) ?? null;
+  const isSymbolHidden = data?.hiddenSymbols.includes(symbol) ?? false;
 
   useEffect(() => {
     setShowAllDividends(false);
@@ -928,6 +930,21 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
 
   const refreshActive = async () => {
     await reQuery();
+  };
+
+  const toggleSymbolHidden = async () => {
+    if (isVisibilitySaving) return;
+    const nextHidden = !isSymbolHidden;
+    setIsVisibilitySaving(true);
+    try {
+      await updateSymbolVisibility({ symbol, isHidden: nextHidden });
+      await reQuery();
+      Toast.show({ content: nextHidden ? '已在列表隐藏' : '已在列表显示' });
+    } catch (error) {
+      Toast.show({ content: `更新失败: ${(error as any)?.result ?? error}` });
+    } finally {
+      setIsVisibilitySaving(false);
+    }
   };
 
   const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
@@ -1019,9 +1036,14 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
             <h1>{summary.name}</h1>
             <p>{formatMoney(summary.currentPrice)} · {formatMoney(summary.marketValue)}</p>
           </div>
-          <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
-            <span className={styles.buttonText}><FileOutline /> 财报</span>
-          </Button>
+          <div className={styles.headerActions}>
+            <Button size="small" fill="outline" loading={isVisibilitySaving} onClick={toggleSymbolHidden}>
+              <span className={styles.buttonText}>{isSymbolHidden ? <EyeOutline /> : <EyeInvisibleOutline />} {isSymbolHidden ? '显示' : '隐藏'}</span>
+            </Button>
+            <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
+              <span className={styles.buttonText}><FileOutline /> 财报</span>
+            </Button>
+          </div>
         </header>
 
         <MetricGrid summary={summary} />
