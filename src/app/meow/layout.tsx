@@ -66,6 +66,7 @@ const App: React.FC<{ children: React.ReactNode }> = (props) => {
     pathname === '/meow/me' ||
     pathname === '/meow/stocks' ||
     /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname) ||
+    /^\/meow\/stocks\/(?!snapshots$)[^/]+\/ai-report$/.test(pathname) ||
     pathname === '/meow/articles' ||
     /^\/meow\/articles\/[^/]+$/.test(pathname) ||
     pathname === '/meow/ai-reports' ||

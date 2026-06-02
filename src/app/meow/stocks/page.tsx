@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Toast } from 'antd-mobile';
 import { DownOutline } from 'antd-mobile-icons';
 import { observer } from 'mobx-react-lite';
@@ -43,6 +43,7 @@ type RebalanceAddHoldingFormValues = {
 
 const STOCK_UI_SETTINGS_KEY = 'meow:stocks:ui-settings';
 const EMPTY_SYMBOLS: string[] = [];
+const SYMBOL_DOUBLE_CLICK_INTERVAL = 320;
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
 const formatOptionalNumber = (value?: number | null) => {
@@ -92,6 +93,8 @@ const StocksPage = observer(function StocksPage() {
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(() => new Set());
   const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(() => new Set());
   const [stockUiHydrated, setStockUiHydrated] = useState(false);
+  const pendingSymbolNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSymbolClickRef = useRef<{ symbol: string; time: number } | null>(null);
   const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance, updateSymbolVisibility } = useStockPortfolio();
   const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
@@ -219,6 +222,10 @@ const StocksPage = observer(function StocksPage() {
     if (!expandAllSymbols || visibleSymbols.length === 0) return;
     setExpandedSymbols(new Set(visibleSymbols));
   }, [expandAllSymbols, visibleSymbols]);
+
+  useEffect(() => () => {
+    if (pendingSymbolNavigationRef.current) clearTimeout(pendingSymbolNavigationRef.current);
+  }, []);
 
   useEffect(() => {
     if (!isSnapshotView) return;
@@ -433,6 +440,16 @@ const StocksPage = observer(function StocksPage() {
     router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}`);
   };
 
+  const openSymbolLatestReportPage = (summary: IStockPortfolioSymbolSummary) => {
+    router.push(`/meow/stocks/${encodeURIComponent(summary.symbol)}/ai-report`);
+  };
+
+  const clearPendingSymbolNavigation = () => {
+    if (!pendingSymbolNavigationRef.current) return;
+    clearTimeout(pendingSymbolNavigationRef.current);
+    pendingSymbolNavigationRef.current = null;
+  };
+
   const toggleSymbolExpanded = (symbol: string) => {
     if (expandAllSymbols && expandedSymbols.has(symbol)) setExpandAllSymbols(false);
     setExpandedSymbols((current) => {
@@ -454,7 +471,33 @@ const StocksPage = observer(function StocksPage() {
       toggleSymbolExpanded(summary.symbol);
       return;
     }
-    if (!isSnapshotView && !isRebalanceMode) openSymbolPage(summary);
+    if (!isSnapshotView && !isRebalanceMode) {
+      clearPendingSymbolNavigation();
+      pendingSymbolNavigationRef.current = setTimeout(() => {
+        pendingSymbolNavigationRef.current = null;
+        openSymbolPage(summary);
+      }, SYMBOL_DOUBLE_CLICK_INTERVAL);
+    }
+  };
+
+  const openSymbolLatestReport = (summary: IStockPortfolioSymbolSummary) => {
+    if (isSnapshotView || isRebalanceMode) return;
+    clearPendingSymbolNavigation();
+    openSymbolLatestReportPage(summary);
+  };
+
+  const clickSymbolCard = (summary: IStockPortfolioSymbolSummary, clickCount: number) => {
+    const now = Date.now();
+    const lastClick = lastSymbolClickRef.current;
+    const isDoubleClick = clickCount > 1 || Boolean(lastClick && lastClick.symbol === summary.symbol && now - lastClick.time <= SYMBOL_DOUBLE_CLICK_INTERVAL);
+    lastSymbolClickRef.current = { symbol: summary.symbol, time: now };
+
+    if (isDoubleClick) {
+      openSymbolLatestReport(summary);
+      return;
+    }
+
+    openOrExpandSymbol(summary);
   };
 
   return (
@@ -574,7 +617,13 @@ const StocksPage = observer(function StocksPage() {
                   const isHidden = hiddenSymbols.has(summary.symbol);
                   const itemClassName = [isExpanded ? styles.symbolItemExpanded : styles.symbolItem, isHidden ? styles.symbolItemHidden : ''].filter(Boolean).join(' ');
                   return (
-                  <List.Item key={summary.symbol} className={itemClassName} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
+                  <List.Item
+                    key={summary.symbol}
+                    className={itemClassName}
+                    onClick={(event) => clickSymbolCard(summary, event.detail)}
+                    clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)}
+                    arrow={false}
+                  >
                     <div className={styles.symbolCardContent}>
                       <div className={styles.symbolRow}>
                         <div className={styles.symbolMain}>
@@ -648,7 +697,13 @@ const StocksPage = observer(function StocksPage() {
                       const isExpanded = expandedSymbols.has(summary.symbol);
                       const itemClassName = [isExpanded ? styles.symbolItemExpanded : styles.symbolItem, styles.symbolItemHidden].join(' ');
                       return (
-                        <List.Item key={summary.symbol} className={itemClassName} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
+                        <List.Item
+                          key={summary.symbol}
+                          className={itemClassName}
+                          onClick={(event) => clickSymbolCard(summary, event.detail)}
+                          clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)}
+                          arrow={false}
+                        >
                           <div className={styles.symbolCardContent}>
                             <div className={styles.symbolRow}>
                               <div className={styles.symbolMain}>
