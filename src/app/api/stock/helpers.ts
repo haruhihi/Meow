@@ -675,7 +675,7 @@ export const buildStockPriceHistory = async (symbol: string, startDate: Date | n
     ...(endDate ? { lte: endDate } : {}),
   };
   const dateFilter = startDate || endDate ? { tradeDate: dateWhere } : {};
-  const [stockSnapshots, indexSnapshots, latestAdjSnapshot] = await Promise.all([
+  const [stockSnapshots, indexSnapshots] = await Promise.all([
     prisma.stockValuationSnapshot.findMany({
       where: { symbol: normalizedSymbol, period: 'WEEK', ...dateFilter },
       select: { tradeDate: true, close: true, adjFactor: true },
@@ -686,13 +686,12 @@ export const buildStockPriceHistory = async (symbol: string, startDate: Date | n
       select: { tradeDate: true, close: true },
       orderBy: { tradeDate: 'asc' },
     }),
-    prisma.stockValuationSnapshot.findFirst({
-      where: { symbol: normalizedSymbol, period: 'WEEK', adjFactor: { not: null } },
-      select: { adjFactor: true },
-      orderBy: { tradeDate: 'desc' },
-    }),
   ]);
-  const latestAdjFactor = latestAdjSnapshot?.adjFactor && latestAdjSnapshot.adjFactor > 0 ? latestAdjSnapshot.adjFactor : null;
+  const latestAdjFactor = stockSnapshots
+    .slice()
+    .reverse()
+    .find((snapshot) => snapshot.adjFactor != null && snapshot.adjFactor > 0)
+    ?.adjFactor ?? null;
   const indexByDate = new Map(indexSnapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot.close]));
   const stockByDate = new Map(stockSnapshots.map((snapshot) => [snapshot.tradeDate.toISOString().slice(0, 10), snapshot]));
   const dateKeys = [...new Set([...stockByDate.keys(), ...indexByDate.keys()])].sort();

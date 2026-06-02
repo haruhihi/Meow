@@ -262,5 +262,5 @@
 }
 
 .endSpacer {
-  height: calc(92px + max(env(safe-area-inset-bottom), 0px));
+  height: var(--meow-tabbar-page-space);
 }

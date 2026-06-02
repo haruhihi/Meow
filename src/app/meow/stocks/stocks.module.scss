@@ -1,6 +1,6 @@
 .page {
   min-height: 100dvh;
-  padding-bottom: calc(92px + max(env(safe-area-inset-bottom), 0px));
+  padding-bottom: var(--meow-tabbar-page-space);
   background:
     radial-gradient(circle at 14% 0%, rgba(45, 212, 191, 0.18), transparent 28%),
     radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.18), transparent 30%),
@@ -591,6 +591,39 @@
 .sectorGroupHidden {
   filter: grayscale(0.85);
   opacity: 0.56;
+}
+
+.hiddenItemsBlock {
+  margin: 2px 12px 12px;
+}
+
+.hiddenItemsToggle {
+  border: 0;
+  background: transparent;
+  color: var(--meow-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.hiddenItemsToggleIcon,
+.hiddenItemsToggleIconOpen {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.18s ease;
+}
+
+.hiddenItemsToggleIconOpen {
+  transform: rotate(180deg);
+}
+
+.hiddenItemsGroup {
+  margin: 8px 0 0;
 }
 
 .sectorHeader {

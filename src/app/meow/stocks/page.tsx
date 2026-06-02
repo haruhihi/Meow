@@ -87,6 +87,7 @@ const StocksPage = observer(function StocksPage() {
   const [rebalanceAddVisible, setRebalanceAddVisible] = useState(false);
   const [isRebalanceSaving, setIsRebalanceSaving] = useState(false);
   const [showWatchedSymbols, setShowWatchedSymbols] = useState(true);
+  const [showHiddenStockItems, setShowHiddenStockItems] = useState(false);
   const [expandAllSymbols, setExpandAllSymbols] = useState(false);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(() => new Set());
   const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(() => new Set());
@@ -150,14 +151,28 @@ const StocksPage = observer(function StocksPage() {
         const symbols = showWatchedSymbols
           ? sector.symbols
           : sector.symbols.filter((summary) => summary.holdingCount > 0 || summary.quantity > 0 || summary.marketValue > 0);
-        return { ...sector, symbols, symbolCount: symbols.filter((summary) => !hiddenSymbols.has(summary.symbol)).length };
+        const shownSymbols = symbols.filter((summary) => !hiddenSymbols.has(summary.symbol));
+        return { ...sector, symbols: shownSymbols, symbolCount: shownSymbols.length };
       })
       .filter((sector) => sector.symbols.length > 0),
     [hiddenSymbols, sectorSummaries, showWatchedSymbols]
   );
+  const hiddenSymbolSummaries = useMemo(
+    () => sectorSummaries.flatMap((sector) => {
+      const symbols = showWatchedSymbols
+        ? sector.symbols
+        : sector.symbols.filter((summary) => summary.holdingCount > 0 || summary.quantity > 0 || summary.marketValue > 0);
+      return symbols.filter((summary) => hiddenSymbols.has(summary.symbol));
+    }),
+    [hiddenSymbols, sectorSummaries, showWatchedSymbols]
+  );
+  const hiddenMarketValue = hiddenSymbolSummaries.reduce((sum, summary) => sum + summary.marketValue, 0);
   const visibleSymbols = useMemo(
-    () => visibleSectorSummaries.flatMap((sector) => sector.symbols.map((summary) => summary.symbol)),
-    [visibleSectorSummaries]
+    () => [
+      ...visibleSectorSummaries.flatMap((sector) => sector.symbols.map((summary) => summary.symbol)),
+      ...(showHiddenStockItems ? hiddenSymbolSummaries.map((summary) => summary.symbol) : []),
+    ],
+    [hiddenSymbolSummaries, showHiddenStockItems, visibleSectorSummaries]
   );
 
   useEffect(() => {
@@ -525,7 +540,7 @@ const StocksPage = observer(function StocksPage() {
         />
       )}
 
-      {displayData && visibleSectorSummaries.length > 0 && (
+      {displayData && (visibleSectorSummaries.length > 0 || hiddenSymbolSummaries.length > 0) && (
         <section className={styles.section}>
           <div className={styles.sectionTitleRow}>
             <div className={styles.sectionTitle}>股票占比</div>
@@ -541,10 +556,8 @@ const StocksPage = observer(function StocksPage() {
               </button>
             </div>
           </div>
-          {visibleSectorSummaries.map((sector) => {
-            const isSectorHidden = sector.symbols.length > 0 && sector.symbols.every((summary) => hiddenSymbols.has(summary.symbol));
-            return (
-            <div key={sector.sector} className={isSectorHidden ? `${styles.sectorGroup} ${styles.sectorGroupHidden}` : styles.sectorGroup}>
+          {visibleSectorSummaries.map((sector) => (
+            <div key={sector.sector} className={styles.sectorGroup}>
               <div className={styles.sectorHeader}>
                 <div>
                   <div className={styles.sectorName}>{sector.sector}</div>
@@ -575,7 +588,7 @@ const StocksPage = observer(function StocksPage() {
                               void toggleSymbolHidden(summary.symbol);
                             }}
                           >
-                            {isHidden ? 'show' : 'hide'}
+                            {isHidden ? '显示' : '隐藏'}
                           </button>
                         </div>
                         <div className={styles.symbolRight}>
@@ -608,8 +621,83 @@ const StocksPage = observer(function StocksPage() {
                 })}
               </List>
             </div>
-            );
-          })}
+          ))}
+
+          {hiddenSymbolSummaries.length > 0 && (
+            <div className={styles.hiddenItemsBlock}>
+              <button
+                type="button"
+                className={styles.hiddenItemsToggle}
+                aria-expanded={showHiddenStockItems}
+                onClick={() => setShowHiddenStockItems((value) => !value)}
+              >
+                <DownOutline className={showHiddenStockItems ? styles.hiddenItemsToggleIconOpen : styles.hiddenItemsToggleIcon} />
+                <span>{showHiddenStockItems ? '收起隐藏项目' : `显示隐藏项目 ${hiddenSymbolSummaries.length}`}</span>
+              </button>
+              {showHiddenStockItems && (
+                <div className={`${styles.sectorGroup} ${styles.sectorGroupHidden} ${styles.hiddenItemsGroup}`}>
+                  <div className={styles.sectorHeader}>
+                    <div>
+                      <div className={styles.sectorName}>隐藏项目</div>
+                      <div className={styles.itemMeta}>{hiddenSymbolSummaries.length} 只 · 不计入占比</div>
+                    </div>
+                    <div className={styles.symbolValue}>{formatMoney(hiddenMarketValue)}</div>
+                  </div>
+                  <List className={styles.sectorList}>
+                    {hiddenSymbolSummaries.map((summary) => {
+                      const isExpanded = expandedSymbols.has(summary.symbol);
+                      const itemClassName = [isExpanded ? styles.symbolItemExpanded : styles.symbolItem, styles.symbolItemHidden].join(' ');
+                      return (
+                        <List.Item key={summary.symbol} className={itemClassName} onClick={() => openOrExpandSymbol(summary)} clickable={!isExpanded || (!isSnapshotView && !isRebalanceMode)} arrow={false}>
+                          <div className={styles.symbolCardContent}>
+                            <div className={styles.symbolRow}>
+                              <div className={styles.symbolMain}>
+                                <strong>{summary.name}</strong>
+                                <span className={styles.symbolPercent}>{formatPercent(summary.percent)}</span>
+                                <button
+                                  type="button"
+                                  className={styles.symbolVisibilityButtonActive}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void toggleSymbolHidden(summary.symbol);
+                                  }}
+                                >
+                                  显示
+                                </button>
+                              </div>
+                              <div className={styles.symbolRight}>
+                                <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
+                                <button
+                                  type="button"
+                                  className={isExpanded ? styles.expandButtonOpen : styles.expandButton}
+                                  aria-label={isExpanded ? '收起股票指标' : '展开股票指标'}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleSymbolExpanded(summary.symbol);
+                                  }}
+                                >
+                                  <DownOutline />
+                                </button>
+                              </div>
+                            </div>
+                            <StockMetricSummary summary={summary} />
+                            <div className={isExpanded ? styles.metricDetailsOpen : styles.metricDetails}>
+                              <div className={styles.metricDetailsInner}>
+                                <StockMetricDetails summary={summary} />
+                              </div>
+                            </div>
+                            <div className={styles.barTrack}>
+                              <span style={{ width: `${Math.min(summary.percent * 100, 100)}%` }} />
+                            </div>
+                          </div>
+                        </List.Item>
+                      );
+                    })}
+                  </List>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 

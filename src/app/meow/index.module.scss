@@ -1,4 +1,7 @@
 .app {
+  --meow-tabbar-safe-bottom: max(env(safe-area-inset-bottom), 0px);
+  --meow-tabbar-height: 56px;
+  --meow-tabbar-page-space: calc(var(--meow-tabbar-height) + 36px + var(--meow-tabbar-safe-bottom));
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -30,7 +33,11 @@
     flex: 0;
     border-top: solid 1px var(--adm-color-border);
     background: var(--meow-surface);
-    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+    padding-bottom: var(--meow-tabbar-safe-bottom);
+  }
+
+  .tabBarWrap {
+    min-height: var(--meow-tabbar-height);
   }
 
   .documentScrollApp .bottom {

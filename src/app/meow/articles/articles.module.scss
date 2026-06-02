@@ -3,7 +3,7 @@
   min-height: 100%;
   background: var(--meow-bg);
   color: var(--meow-text);
-  padding-bottom: 96px;
+  padding-bottom: var(--meow-tabbar-page-space);
 }
 
 .header {

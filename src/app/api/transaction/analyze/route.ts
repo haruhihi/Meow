@@ -30,7 +30,9 @@ export async function POST(req: Request) {
       userId: Number(userId),
       date: { gte: startDate, lte: endDate },
     };
-    if (categoryId) whereClause.categoryId = Number(categoryId);
+    if (categoryId) {
+      whereClause.categoryId = { in: await getDescendantCategoryIds(Number(categoryId)) };
+    }
 
     const transactions = await prisma.transaction.findMany({
       where: whereClause,
@@ -75,4 +77,24 @@ export async function POST(req: Request) {
     console.error('Analyze error:', error);
     return fail(error);
   }
+}
+
+async function getDescendantCategoryIds(categoryId: number) {
+  const categories = await prisma.category.findMany({
+    select: { id: true, parentId: true },
+  });
+  const ids = new Set<number>([categoryId]);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    categories.forEach((category) => {
+      if (category.parentId != null && ids.has(category.parentId) && !ids.has(category.id)) {
+        ids.add(category.id);
+        changed = true;
+      }
+    });
+  }
+
+  return [...ids];
 }

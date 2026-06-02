@@ -3,7 +3,7 @@
 import { FC, useMemo } from 'react';
 import { Switch } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { LeftOutline, RightOutline } from 'antd-mobile-icons';
+import { LeftOutline, PieOutline, RightOutline } from 'antd-mobile-icons';
 import { formatMoney, PALETTE } from '@styles/theme';
 import type { ITransactionSearchRes } from '@dtos/meow';
 import styles from './summary-card.module.scss';
@@ -16,6 +16,7 @@ interface Props {
   couponDiscountTotal?: number;
   includeCouponDiscount?: boolean;
   onIncludeCouponDiscountChange?: (checked: boolean) => void;
+  onAnalyzeClick?: () => void;
 }
 
 export const SummaryCard: FC<Props> = ({
@@ -26,6 +27,7 @@ export const SummaryCard: FC<Props> = ({
   couponDiscountTotal = 0,
   includeCouponDiscount = false,
   onIncludeCouponDiscountChange,
+  onAnalyzeClick,
 }) => {
   const stats = useMemo(() => {
     const start = month.startOf('month');
@@ -63,21 +65,39 @@ export const SummaryCard: FC<Props> = ({
           {month.format('YYYY 年 M 月')}
           {isCurrentMonth && <span className={styles.monthTag}>本月</span>}
         </div>
-        <button
-          type="button"
-          aria-label="下个月"
-          className={styles.navBtn}
-          disabled={isCurrentMonth}
-          onClick={() => onMonthChange(month.add(1, 'month'))}
-        >
-          <RightOutline />
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            aria-label="下个月"
+            className={styles.navBtn}
+            disabled={isCurrentMonth}
+            onClick={() => onMonthChange(month.add(1, 'month'))}
+          >
+            <RightOutline />
+          </button>
+          {onAnalyzeClick && (
+            <button type="button" className={styles.analyzeBtn} onClick={onAnalyzeClick}>
+              <span>统计分析</span>
+              <PieOutline />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={styles.amountRow}>
         <div className={styles.amountLabel}>本月支出</div>
         <div className={styles.amountLine}>
-          <div className={styles.amount}>{formatMoney(stats.total)}</div>
+          <div className={styles.amountWrap}>
+            <div className={styles.amount}>{formatMoney(stats.total)}</div>
+            {delta != null && (
+              <div
+                className={styles.delta}
+                style={{ color: delta > 0 ? PALETTE.danger : PALETTE.success }}
+              >
+                {delta > 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% 环比
+              </div>
+            )}
+          </div>
           <label className={styles.couponToggle}>
             <span>统计券</span>
             <Switch
@@ -86,14 +106,6 @@ export const SummaryCard: FC<Props> = ({
             />
           </label>
         </div>
-        {delta != null && (
-          <div
-            className={styles.delta}
-            style={{ color: delta > 0 ? PALETTE.danger : PALETTE.success }}
-          >
-            {delta > 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}% 环比
-          </div>
-        )}
       </div>
 
       <div className={styles.statsRow}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { RefObject, useEffect, useMemo, useState } from 'react';
-import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Input, Modal, NavBar, PullToRefresh, TextArea, Toast } from 'antd-mobile';
+import { Button, DatePicker, DatePickerRef, Dialog, Empty, Form, Modal, NavBar, PullToRefresh, TextArea, Toast } from 'antd-mobile';
 import { AddCircleOutline, DeleteOutline, EditSOutline, FileOutline } from 'antd-mobile-icons';
 import ReactECharts from 'echarts-for-react';
 import { observer } from 'mobx-react-lite';
@@ -16,19 +16,11 @@ import {
   IStockValuationHistoryReq,
   IStockValuationHistoryRes,
   StockDividendEventWithMarking,
-  StockHoldingWithAccount,
   StockRemarkListItem,
 } from '@dtos/meow';
 import { formatMoney, PALETTE } from '@styles/theme';
-import { formatStockQuantity } from '@utils/stock-calculations';
 import { useStockAiReports, useStockDividends, useStockPortfolio, useStockRemarks } from '@utils/stock';
 import styles from './stock-detail.module.scss';
-
-type HoldingFormValues = {
-  name: string;
-  currentPrice: string;
-  quantities: Record<string, string>;
-};
 
 type RemarkFormValues = {
   remarkDate: Date;
@@ -918,7 +910,7 @@ const PeValuationBlock = ({ summary }: { summary: IStockPortfolioSymbolSummary }
 const StockDetailPage = observer(function StockDetailPage({ params }: { params: { symbol: string } }) {
   const router = useRouter();
   const symbol = decodeURIComponent(params.symbol).toUpperCase();
-  const { data, loading: portfolioLoading, reQuery, updateHolding, deleteHolding: deleteStockHolding } = useStockPortfolio(0, symbol);
+  const { data, loading: portfolioLoading, reQuery } = useStockPortfolio(0, symbol);
   const { reports, loading: reportsLoading } = useStockAiReports(0, symbol);
   const { remarks, loading: remarksLoading, createRemark, updateRemark, deleteRemark: deleteStockRemark } = useStockRemarks(symbol);
   const { events: dividendEvents, loading: dividendLoading, updateMarking: updateDividendMarking } = useStockDividends(symbol);
@@ -927,10 +919,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
   const [showAllDividends, setShowAllDividends] = useState(false);
 
   const summary = data?.symbolSummaries.find((item) => item.symbol === symbol) ?? null;
-  const holdings = useMemo(
-    () => (data?.holdings ?? []).filter((holding) => holding.symbol === symbol),
-    [data?.holdings, symbol]
-  );
 
   useEffect(() => {
     setShowAllDividends(false);
@@ -940,35 +928,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
 
   const refreshActive = async () => {
     await reQuery();
-  };
-
-  const saveHolding = async (values: HoldingFormValues) => {
-    if (!summary) return;
-    try {
-      await Promise.all(holdings.map((holding) =>
-        updateHolding({
-          id: holding.id,
-          name: values.name,
-          currentPrice: Number(values.currentPrice),
-          quantity: Number(values.quantities[String(holding.id)]),
-        })
-      ));
-      await refreshActive();
-      Toast.show({ content: '股票持仓已保存' });
-    } catch (error) {
-      Toast.show({ content: `保存失败: ${(error as any)?.result ?? error}` });
-    }
-  };
-
-  const deleteHolding = async (holding: StockHoldingWithAccount) => {
-    const ok = await Dialog.confirm({ title: '删除持仓', content: `确认删除「${holding.symbol} ${holding.name}」吗？` });
-    if (!ok) return;
-    try {
-      await deleteStockHolding({ id: holding.id });
-      Toast.show({ content: '持仓已删除' });
-    } catch (error) {
-      Toast.show({ content: `删除失败: ${(error as any)?.result ?? error}` });
-    }
   };
 
   const toggleDividendEvent = async (event: StockDividendEventWithMarking, checked: boolean) => {
@@ -1058,7 +1017,7 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
           <div>
             <span className={styles.symbolCode}>{summary.symbol}</span>
             <h1>{summary.name}</h1>
-            <p>{formatMoney(summary.currentPrice)} · {formatStockQuantity(summary.quantity)} 股 · {formatMoney(summary.marketValue)}</p>
+            <p>{formatMoney(summary.currentPrice)} · {formatMoney(summary.marketValue)}</p>
           </div>
           <Button size="small" color="primary" onClick={() => router.push(`/meow/stocks/${encodeURIComponent(symbol)}/financials`)}>
             <span className={styles.buttonText}><FileOutline /> 财报</span>
@@ -1114,35 +1073,6 @@ const StockDetailPage = observer(function StockDetailPage({ params }: { params: 
         ) : (
           <Empty style={{ padding: '28px 0' }} description="暂无评语" />
         )}
-      </section>
-
-      <section className={styles.sectionBlock}>
-        <div className={styles.sectionTitle}>账户股数</div>
-        <Form
-          layout="horizontal"
-          initialValues={{
-            name: summary.name,
-            currentPrice: String(summary.currentPrice),
-            quantities: Object.fromEntries(holdings.map((holding) => [String(holding.id), String(holding.quantity)])),
-          }}
-          footer={<Button block type="submit" color="primary">保存持仓</Button>}
-          onFinish={saveHolding}
-        >
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入股票名称' }]}> 
-            <Input placeholder="股票名称" />
-          </Form.Item>
-          <Form.Item name="currentPrice" label="现价" rules={[{ required: true, message: '请输入当前价' }]}> 
-            <Input placeholder="人民币价格" type="number" />
-          </Form.Item>
-          {holdings.map((holding) => (
-            <div key={holding.id} className={styles.holdingRow}>
-              <Form.Item name={['quantities', String(holding.id)]} label={holding.account.name} rules={[{ required: true, message: '请输入股数' }]}> 
-                <Input placeholder="股数" type="number" />
-              </Form.Item>
-              <Button size="mini" color="danger" fill="outline" onClick={() => deleteHolding(holding)}>删除</Button>
-            </div>
-          ))}
-        </Form>
       </section>
 
       <section className={styles.sectionBlock}>

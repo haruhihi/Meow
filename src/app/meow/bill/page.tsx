@@ -16,9 +16,9 @@ import {
   Selector,
 } from 'antd-mobile';
 import dayjs from 'dayjs';
-import { PayCircleOutline, PieOutline } from 'antd-mobile-icons';
+import { PayCircleOutline } from 'antd-mobile-icons';
 import { observer } from 'mobx-react-lite';
-import { RefObject, useMemo, useState } from 'react';
+import { RefObject, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import { useActivityTypes } from '@utils/time-entry';
@@ -48,6 +48,8 @@ import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
 import styles from './bill.module.scss';
 
+const BILL_TREND_STORAGE_KEY = 'meow.bill.showTrend';
+
 const App = observer(function App() {
   const router = useRouter();
   const [form] = Form.useForm();
@@ -74,6 +76,36 @@ const App = observer(function App() {
   const categories = categoryRes?.categories ?? [];
   const recentTransactions = transactions ?? [];
   const initialLoading = !categoryRes || transactions === undefined || monthData === null;
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(BILL_TREND_STORAGE_KEY);
+    if (saved === 'expanded' || saved === 'collapsed') {
+      setShowTrend(saved === 'expanded');
+    }
+  }, []);
+
+  const toggleTrend = () => {
+    setShowTrend((current) => {
+      const next = !current;
+      window.localStorage.setItem(BILL_TREND_STORAGE_KEY, next ? 'expanded' : 'collapsed');
+      return next;
+    });
+  };
+
+  const openAnalyze = () => {
+    const params = new URLSearchParams({
+      year: String(month.year()),
+      month: String(month.month() + 1),
+      coupon: includeCouponDiscount ? '1' : '0',
+    });
+    const selectedCategoryId = selectedTop
+      ? categories.find((category) => category.parentId == null && category.name === selectedTop)?.id
+      : undefined;
+    if (selectedCategoryId) {
+      params.set('categoryId', String(selectedCategoryId));
+    }
+    router.push(`/meow/analyze?${params.toString()}`);
+  };
 
   // Resolver: category id -> top-level category name. Built from the current
   // categories payload (or a no-op while loading). Must live BEFORE any early
@@ -283,6 +315,7 @@ const App = observer(function App() {
           couponDiscountTotal={monthData?.couponDiscountTotal}
           includeCouponDiscount={includeCouponDiscount}
           onIncludeCouponDiscountChange={setIncludeCouponDiscount}
+          onAnalyzeClick={openAnalyze}
         />
 
         {initialLoading ? (
@@ -301,7 +334,7 @@ const App = observer(function App() {
 
                 <div className={styles.sectionHeader}>
                   <span>本月趋势</span>
-                  <button type="button" className={styles.linkBtn} onClick={() => setShowTrend((v) => !v)}>
+                  <button type="button" className={styles.linkBtn} onClick={toggleTrend}>
                     {showTrend ? '收起' : '展开'}
                   </button>
                 </div>
@@ -315,13 +348,6 @@ const App = observer(function App() {
 
             <div className={[styles.sectionHeader, styles.recentHeader].join(' ')}>
               <span>最近记录{selectedTop ? ` · ${selectedTop}` : ''}</span>
-              <button
-                type="button"
-                className={styles.linkBtn}
-                onClick={() => router.push('/meow/analyze')}
-              >
-                统计分析 <PieOutline />
-              </button>
             </div>
 
             {filteredRecent.length > 0 ? (
