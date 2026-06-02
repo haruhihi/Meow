@@ -16,6 +16,7 @@
     "sync:stock-valuations": "node scripts/sync-stock-valuation-snapshots.mjs",
     "sync:stock-indices": "node scripts/sync-stock-index-snapshots.mjs",
     "refresh:stock-metric-cache": "node scripts/refresh-stock-metric-cache.mjs",
+    "generate:stock-ai-reports": "node scripts/generate-stock-ai-reports.mjs",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"
   },
