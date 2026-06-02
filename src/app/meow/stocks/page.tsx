@@ -2,17 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, Form, Input, List, Modal, Picker, PullToRefresh, Selector, Toast } from 'antd-mobile';
-import { DownOutline } from 'antd-mobile-icons';
+import { DownOutline, FileOutline } from 'antd-mobile-icons';
 import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { StockAccount } from '@prisma/client';
 import { InlineLoading, LoadingState } from '@components/loading';
 import {
+  IStockAiReportListReq,
+  IStockAiReportListRes,
   IStockPortfolioSymbolSummary,
   IStockRebalanceSaveReq,
   IStockSnapshotCreateReq,
   IStockSnapshotCreateRes,
 } from '@dtos/meow';
+import { post } from '@libs/fetch';
 import { formatMoney } from '@styles/theme';
 import { calculateExpectedDividend, calculatePortfolioDividendYield, formatStockQuantity, percentOf } from '@utils/stock-calculations';
 import {
@@ -41,6 +46,16 @@ type RebalanceAddHoldingFormValues = {
   currentPrice: string;
 };
 
+type ValuationTableModalState = {
+  symbol: string;
+  name: string;
+  reportDate?: string;
+  reportTitle?: string;
+  markdown?: string | null;
+  loading: boolean;
+  error?: string | null;
+};
+
 const STOCK_UI_SETTINGS_KEY = 'meow:stocks:ui-settings';
 const EMPTY_SYMBOLS: string[] = [];
 const SYMBOL_DOUBLE_CLICK_INTERVAL = 320;
@@ -65,6 +80,21 @@ const formatDate = (value?: string | Date | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '未知日期';
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const extractPriceDividendTable = (content: string) => {
+  const sectionHeading = content.match(/^##\s*3\.\s*价格和反推股息率.*$/m);
+  if (!sectionHeading || sectionHeading.index == null) return null;
+  const sectionBody = content.slice(sectionHeading.index + sectionHeading[0].length);
+  const nextSectionIndex = sectionBody.search(/\n##\s+\d+\./);
+  const section = nextSectionIndex >= 0 ? sectionBody.slice(0, nextSectionIndex) : sectionBody;
+  const lines = section.split('\n');
+  const tableStart = lines.findIndex((line) => line.trim().startsWith('|'));
+  if (tableStart < 0) return null;
+  let tableEnd = tableStart;
+  while (tableEnd < lines.length && lines[tableEnd].trim().startsWith('|')) tableEnd += 1;
+  const table = lines.slice(tableStart, tableEnd).join('\n').trim();
+  return table || null;
 };
 
 const readPeTtm = (summary: IStockPortfolioSymbolSummary) => {
@@ -92,9 +122,11 @@ const StocksPage = observer(function StocksPage() {
   const [expandAllSymbols, setExpandAllSymbols] = useState(false);
   const [expandedSymbols, setExpandedSymbols] = useState<Set<string>>(() => new Set());
   const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(() => new Set());
+  const [valuationTableModal, setValuationTableModal] = useState<ValuationTableModalState | null>(null);
   const [stockUiHydrated, setStockUiHydrated] = useState(false);
   const pendingSymbolNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSymbolClickRef = useRef<{ symbol: string; time: number } | null>(null);
+  const valuationTableRequestRef = useRef(0);
   const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
   const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
@@ -463,6 +495,40 @@ const StocksPage = observer(function StocksPage() {
     openSymbolLatestReportPage(summary);
   };
 
+  const openValuationTable = async (summary: IStockPortfolioSymbolSummary) => {
+    clearPendingSymbolNavigation();
+    const requestId = valuationTableRequestRef.current + 1;
+    valuationTableRequestRef.current = requestId;
+    setValuationTableModal({ symbol: summary.symbol, name: summary.name, loading: true });
+    try {
+      const res = await post<IStockAiReportListReq, IStockAiReportListRes>('/api/stock/ai-report/list', { symbol: summary.symbol });
+      if (valuationTableRequestRef.current !== requestId) return;
+      const latestReport = res.reports[0] ?? null;
+      if (!latestReport) {
+        setValuationTableModal({ symbol: summary.symbol, name: summary.name, loading: false, markdown: null, error: '暂无该股票研报' });
+        return;
+      }
+      const markdown = extractPriceDividendTable(latestReport.content);
+      setValuationTableModal({
+        symbol: summary.symbol,
+        name: summary.name,
+        reportDate: latestReport.reportDate,
+        reportTitle: latestReport.title,
+        markdown,
+        loading: false,
+        error: markdown ? null : '最新研报里没有找到价格和反推股息率表格',
+      });
+    } catch (error) {
+      if (valuationTableRequestRef.current !== requestId) return;
+      setValuationTableModal({ symbol: summary.symbol, name: summary.name, loading: false, markdown: null, error: `加载失败: ${(error as any)?.result ?? error}` });
+    }
+  };
+
+  const closeValuationTable = () => {
+    valuationTableRequestRef.current += 1;
+    setValuationTableModal(null);
+  };
+
   const clickSymbolCard = (summary: IStockPortfolioSymbolSummary, clickCount: number) => {
     const now = Date.now();
     const lastClick = lastSymbolClickRef.current;
@@ -610,6 +676,17 @@ const StocksPage = observer(function StocksPage() {
                           <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
                           <button
                             type="button"
+                            className={styles.valuationTableButton}
+                            aria-label={`查看${summary.name}价格和反推股息率表格`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void openValuationTable(summary);
+                            }}
+                          >
+                            <span className={styles.buttonText}><FileOutline /> 估值表</span>
+                          </button>
+                          <button
+                            type="button"
                             className={isExpanded ? styles.expandButtonOpen : styles.expandButton}
                             aria-label={isExpanded ? '收起股票指标' : '展开股票指标'}
                             onClick={(event) => {
@@ -680,6 +757,17 @@ const StocksPage = observer(function StocksPage() {
                                 <div className={styles.symbolValue}>{formatMoney(summary.marketValue)}</div>
                                 <button
                                   type="button"
+                                  className={styles.valuationTableButton}
+                                  aria-label={`查看${summary.name}价格和反推股息率表格`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void openValuationTable(summary);
+                                  }}
+                                >
+                                  <span className={styles.buttonText}><FileOutline /> 估值表</span>
+                                </button>
+                                <button
+                                  type="button"
                                   className={isExpanded ? styles.expandButtonOpen : styles.expandButton}
                                   aria-label={isExpanded ? '收起股票指标' : '展开股票指标'}
                                   onClick={(event) => {
@@ -728,6 +816,35 @@ const StocksPage = observer(function StocksPage() {
         accountOptions={accountOptions}
         onClose={() => setRebalanceAddVisible(false)}
         onSave={addNewRebalanceHolding}
+      />
+
+      <Modal
+        visible={Boolean(valuationTableModal)}
+        title={valuationTableModal ? `${valuationTableModal.name} 估值表` : '估值表'}
+        closeOnMaskClick
+        showCloseButton
+        onClose={closeValuationTable}
+        content={
+          valuationTableModal && (
+            <div className={styles.valuationTableModal}>
+              <div className={styles.valuationTableMeta}>
+                <strong>{valuationTableModal.symbol}</strong>
+                {valuationTableModal.reportDate && <span>{formatDate(valuationTableModal.reportDate)}</span>}
+                {valuationTableModal.reportTitle && <em>{valuationTableModal.reportTitle}</em>}
+                <em>直接截取自最新研报第 3 节，未单独计算</em>
+              </div>
+              {valuationTableModal.loading ? (
+                <LoadingState label="估值表加载中" />
+              ) : valuationTableModal.markdown ? (
+                <div className={styles.valuationTableContent}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{valuationTableModal.markdown}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className={styles.emptyGroup}>{valuationTableModal.error ?? '暂无估值表'}</div>
+              )}
+            </div>
+          )
+        }
       />
 
       <Modal
