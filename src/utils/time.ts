@@ -14,6 +14,11 @@ export interface SplitTimeSegment {
   endedAt: Date;
 }
 
+export interface EvenTimeSegment {
+  startedAt: Date;
+  endedAt: Date;
+}
+
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
@@ -34,6 +39,28 @@ export const formatDuration = (minutes: number) => {
 export const formatHours = (minutes: number) => {
   const hours = minutes / 60;
   return `${Number(hours.toFixed(hours >= 10 ? 1 : 2))}h`;
+};
+
+export const splitTimeRangeEvenly = (
+  startedAt: Date | string | number,
+  endedAt: Date | string | number,
+  count: number
+): EvenTimeSegment[] => {
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(endedAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs || count <= 0) return [];
+
+  const totalMs = endMs - startMs;
+  return Array.from({ length: count }, (_, index) => {
+    const segmentStartMs = startMs + Math.round((totalMs * index) / count);
+    const segmentEndMs = index === count - 1
+      ? endMs
+      : startMs + Math.round((totalMs * (index + 1)) / count);
+    return {
+      startedAt: new Date(segmentStartMs),
+      endedAt: new Date(segmentEndMs),
+    };
+  });
 };
 
 export const getMonthRange = (year: number, month: number, timezoneOffsetMinutes?: number) => {

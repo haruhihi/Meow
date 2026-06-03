@@ -36,6 +36,7 @@ type TimeEntryModalProps = {
   title: string;
   submitText: string;
   activityTypes: ActivityTypeOption[];
+  multiple?: boolean;
   onClose: () => void;
   onFinish: (values: TimeEntryFormValues) => void | Promise<void>;
 };
@@ -71,6 +72,7 @@ export const TimeEntryModal = ({
   title,
   submitText,
   activityTypes,
+  multiple = true,
   onClose,
   onFinish,
 }: TimeEntryModalProps) => {
@@ -118,7 +120,18 @@ export const TimeEntryModal = ({
           {sortedActivityTypes.length > 0 && (
             <Form.Item noStyle shouldUpdate={(prev, next) => prev.activityTypeId !== next.activityTypeId}>
               {({ getFieldValue }) => {
-                const selectedId = getFieldValue('activityTypeId')?.[0];
+                const selectedIds = getFieldValue('activityTypeId') ?? [];
+                const toggleActivityType = (activityTypeId: string) => {
+                  if (!multiple) {
+                    form.setFieldsValue({ activityTypeId: [activityTypeId] });
+                    return;
+                  }
+
+                  const nextSelectedIds = selectedIds.includes(activityTypeId)
+                    ? selectedIds.filter((selectedId: string) => selectedId !== activityTypeId)
+                    : [...selectedIds, activityTypeId];
+                  form.setFieldsValue({ activityTypeId: nextSelectedIds.length > 0 ? nextSelectedIds : undefined });
+                };
                 const shortActivityTypes = sortedActivityTypes.filter((activityType) => getNameLength(activityType.name) <= 2);
                 const longActivityTypes = sortedActivityTypes.filter((activityType) => getNameLength(activityType.name) > 2);
 
@@ -130,8 +143,9 @@ export const TimeEntryModal = ({
                           <button
                             key={activityType.id}
                             type="button"
-                            className={selectedId === String(activityType.id) ? styles.activityButtonActive : styles.activityButton}
-                            onClick={() => form.setFieldsValue({ activityTypeId: [String(activityType.id)] })}
+                            className={selectedIds.includes(String(activityType.id)) ? styles.activityButtonActive : styles.activityButton}
+                            aria-pressed={selectedIds.includes(String(activityType.id))}
+                            onClick={() => toggleActivityType(String(activityType.id))}
                           >
                             <span className={styles.activitySwatch} style={{ background: activityType.color }} />
                             <span>{activityType.name}</span>
@@ -145,8 +159,9 @@ export const TimeEntryModal = ({
                           <button
                             key={activityType.id}
                             type="button"
-                            className={selectedId === String(activityType.id) ? styles.activityButtonActive : styles.activityButton}
-                            onClick={() => form.setFieldsValue({ activityTypeId: [String(activityType.id)] })}
+                            className={selectedIds.includes(String(activityType.id)) ? styles.activityButtonActive : styles.activityButton}
+                            aria-pressed={selectedIds.includes(String(activityType.id))}
+                            onClick={() => toggleActivityType(String(activityType.id))}
                           >
                             <span className={styles.activitySwatch} style={{ background: activityType.color }} />
                             <span>{activityType.name}</span>

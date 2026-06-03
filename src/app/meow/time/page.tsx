@@ -34,7 +34,7 @@ import {
   TimeEntryWithActivityType,
 } from '@dtos/meow';
 import { PALETTE } from '@styles/theme';
-import { formatDuration, formatHours, minutesBetween } from '@utils/time';
+import { formatDuration, formatHours, minutesBetween, splitTimeRangeEvenly } from '@utils/time';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
 import styles from './time.module.scss';
 
@@ -261,7 +261,7 @@ export default function TimePage() {
   };
 
   const submitEntry = async (values: TimeEntryFormValues) => {
-    let activityTypeId = Number(values.activityTypeId?.[0]);
+    let activityTypeIds = values.activityTypeId?.map((activityTypeId) => Number(activityTypeId)).filter(Boolean) ?? [];
     const customActivityName = values.customActivityName?.trim();
     if (!values.startedAt || !values.endedAt) {
       Toast.show({ content: '请选择起止时间' });
@@ -276,28 +276,32 @@ export default function TimePage() {
       const res = await post<IActivityTypeCreateReq, IActivityTypeCreateRes>('/api/time/activity-type/create', {
         name: customActivityName,
       });
-      activityTypeId = res.activityType.id;
+      activityTypeIds = [res.activityType.id];
     }
 
-    if (!activityTypeId) {
+    if (activityTypeIds.length <= 0) {
       Toast.show({ content: '请选择活动或输入新项目' });
       return;
     }
 
-    const payload = {
-      activityTypeId,
-      startedAt: dayjs(values.startedAt).valueOf(),
-      endedAt: dayjs(values.endedAt).valueOf(),
-      note: values.note,
-    };
-
     if (editingEntry) {
       await post<ITimeEntryUpdateReq, ITimeEntryUpdateRes>('/api/time-entry/update', {
         id: editingEntry.id,
-        ...payload,
+        activityTypeId: activityTypeIds[0],
+        startedAt: dayjs(values.startedAt).valueOf(),
+        endedAt: dayjs(values.endedAt).valueOf(),
+        note: values.note,
       });
     } else {
-      await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', payload);
+      const segments = splitTimeRangeEvenly(values.startedAt, values.endedAt, activityTypeIds.length);
+      for (const [index, segment] of segments.entries()) {
+        await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
+          activityTypeId: activityTypeIds[index],
+          startedAt: segment.startedAt.getTime(),
+          endedAt: segment.endedAt.getTime(),
+          note: values.note,
+        });
+      }
     }
 
     await new Promise<void>((resolve) => {
@@ -411,6 +415,7 @@ export default function TimePage() {
         title={editingEntry ? '编辑时间记录' : '新增时间记录'}
         submitText={editingEntry ? '保存' : '提交'}
         activityTypes={activityTypes}
+        multiple={!editingEntry}
         onClose={() => setVisible(false)}
         onFinish={submitEntry}
       />
