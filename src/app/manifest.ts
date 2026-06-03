@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Meow',
     short_name: 'Meow',
     description: 'Meow meow meow',
-    start_url: '/meow/bill',
+    start_url: '/meow',
     display: 'standalone',
     icons: [
       {

@@ -3,6 +3,9 @@
 import { useRouter } from 'next/navigation';
 import { post } from '@libs/fetch';
 import { Form, Input, Button, Toast } from 'antd-mobile';
+import { IUserInfoRes } from '@dtos/meow';
+
+const ACCOUNT_KEY = 'account';
 
 export default function App() {
   const router = useRouter();
@@ -11,7 +14,8 @@ export default function App() {
     <div>
       <Form
         onFinish={async (values) => {
-          await post('/api/user/sign', values);
+          const res = await post<typeof values, IUserInfoRes>('/api/user/sign', values);
+          window.localStorage.setItem(ACCOUNT_KEY, res.user.account);
           Toast.show({
             content: '登录成功',
             afterClose: () => router.push('/meow'),
