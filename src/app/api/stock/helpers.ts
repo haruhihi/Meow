@@ -13,22 +13,15 @@ import type {
   StockRemarkListItem,
   StockHoldingWithAccount,
 } from '@dtos/meow';
-import type { StockAccount, StockDividendEvent, StockFinancialStatement, StockFundamental, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
+import type { StockAccount, StockDividendEvent, StockHolding, StockMetricCache, StockMetricOverride, StockQuote, StockRemark } from '@prisma/client';
 
 export { marketValueOf, roundStockValue };
 
-const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
 const PE_VALUATION_PERCENTILES = [10, 25, 50, 75, 90];
 const FUNDAMENTAL_CACHE_DOMAIN = 'fundamental_latest';
 const VALUATION_CACHE_DOMAIN = 'valuation_weekly';
+const VALUATION_SUMMARY_CACHE_DOMAIN = 'valuation_weekly_summary';
 const SHANGHAI_INDEX_SYMBOL = '000001.SH';
-
-type FinancialStatementMetricRow = Pick<StockFinancialStatement, 'statement' | 'reportDate' | 'reportName' | 'fields'>;
-
-type TtmCalculationResult = {
-  value: number | null;
-  warning: string | null;
-};
 
 export const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
 
@@ -136,89 +129,52 @@ export const dividendEventDedupeKey = (event: Pick<StockDividendEvent, 'symbol' 
 
 export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const trimmedKeyword = keyword?.trim();
-  const accounts = await prisma.stockAccount.findMany({
-    where: { userId },
-    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-  });
-
-  const holdings = await prisma.stockHolding.findMany({
-    where: { userId },
-    include: { account: true },
-    orderBy: [{ account: { sortOrder: 'asc' } }, { accountId: 'asc' }, { symbol: 'asc' }],
-  });
-  const quotes = await prisma.stockQuote.findMany({
-    where: { userId },
-  });
-  const cash = await prisma.stockCash.findUnique({
-    where: { userId },
-  });
+  const [accounts, holdings, quotes, cash] = await Promise.all([
+    prisma.stockAccount.findMany({
+      where: { userId },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    }),
+    prisma.stockHolding.findMany({
+      where: { userId },
+      include: { account: true },
+      orderBy: [{ account: { sortOrder: 'asc' } }, { accountId: 'asc' }, { symbol: 'asc' }],
+    }),
+    prisma.stockQuote.findMany({
+      where: { userId },
+    }),
+    prisma.stockCash.findUnique({
+      where: { userId },
+    }),
+  ]);
   const symbols = [...new Set([...holdings.map((holding) => holding.symbol), ...stockUniverse.map((item) => item.symbol)])];
-  const fundamentals = await prisma.stockFundamental.findMany({
-    where: { symbol: { in: symbols } },
-    orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
-  });
-  const balanceStatements = await prisma.stockFinancialStatement.findMany({
-    where: { symbol: { in: symbols }, statement: 'balance', reportName: { contains: '年报' } },
-    orderBy: [{ symbol: 'asc' }, { reportDate: 'desc' }],
-  });
-  const metricStatements = await prisma.stockFinancialStatement.findMany({
-    where: { symbol: { in: symbols }, statement: { in: ['income', 'cash_flow'] } },
-    orderBy: [{ symbol: 'asc' }, { statement: 'asc' }, { reportDate: 'desc' }],
-  });
-  const metricCaches = await prisma.stockMetricCache.findMany({
-    where: { symbol: { in: symbols }, domain: { in: [FUNDAMENTAL_CACHE_DOMAIN, VALUATION_CACHE_DOMAIN] } },
-  });
-  const overrides = await prisma.stockMetricOverride.findMany({
-    where: { userId, symbol: { in: symbols } },
-  });
-  const markedDividends = await prisma.stockDividendMarking.findMany({
-    where: {
-      userId,
-      countTowardNormalizedDividend: true,
-      event: { symbol: { in: symbols } },
-    },
-    include: { event: true },
-  });
-  const hiddenPreferences = await prisma.stockSymbolPreference.findMany({
-    where: { userId, isHidden: true },
-    select: { symbol: true },
-  });
+  const [metricCaches, overrides, markedDividends, hiddenPreferences] = await Promise.all([
+    prisma.stockMetricCache.findMany({
+      where: { symbol: { in: symbols }, domain: { in: [FUNDAMENTAL_CACHE_DOMAIN, VALUATION_SUMMARY_CACHE_DOMAIN] } },
+    }),
+    prisma.stockMetricOverride.findMany({
+      where: { userId, symbol: { in: symbols } },
+    }),
+    prisma.stockDividendMarking.findMany({
+      where: {
+        userId,
+        countTowardNormalizedDividend: true,
+        event: { symbol: { in: symbols } },
+      },
+      include: { event: true },
+    }),
+    prisma.stockSymbolPreference.findMany({
+      where: { userId, isHidden: true },
+      select: { symbol: true },
+    }),
+  ]);
   const hiddenSymbols = hiddenPreferences.map((preference) => preference.symbol);
   const quoteBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
-  const latestFundamentalBySymbol = new Map<string, StockFundamental>();
-  const fundamentalsBySymbol = new Map<string, StockFundamental[]>();
-  const annualFundamentalsBySymbol = new Map<string, StockFundamental[]>();
-  fundamentals.forEach((fundamental) => {
-    const symbolFundamentals = fundamentalsBySymbol.get(fundamental.symbol) ?? [];
-    symbolFundamentals.push(fundamental);
-    fundamentalsBySymbol.set(fundamental.symbol, symbolFundamentals);
-    if (!latestFundamentalBySymbol.has(fundamental.symbol)) {
-      latestFundamentalBySymbol.set(fundamental.symbol, fundamental);
-    }
-    if (fundamental.reportName?.includes('年报')) {
-      const annuals = annualFundamentalsBySymbol.get(fundamental.symbol) ?? [];
-      annuals.push(fundamental);
-      annualFundamentalsBySymbol.set(fundamental.symbol, annuals);
-    }
-  });
-  const latestAnnualBalanceBySymbol = new Map<string, { fields: unknown }>();
-  balanceStatements.forEach((statement) => {
-    if (!latestAnnualBalanceBySymbol.has(statement.symbol)) {
-      latestAnnualBalanceBySymbol.set(statement.symbol, { fields: statement.fields });
-    }
-  });
-  const metricStatementsBySymbol = new Map<string, FinancialStatementMetricRow[]>();
-  metricStatements.forEach((statement) => {
-    const current = metricStatementsBySymbol.get(statement.symbol) ?? [];
-    current.push(statement);
-    metricStatementsBySymbol.set(statement.symbol, current);
-  });
   const overrideBySymbol = new Map(overrides.map((override) => [override.symbol, override]));
   const fundamentalCacheBySymbol = new Map<string, StockMetricCache>();
   const valuationCacheBySymbol = new Map<string, StockMetricCache>();
   metricCaches.forEach((cache) => {
     if (cache.domain === FUNDAMENTAL_CACHE_DOMAIN) fundamentalCacheBySymbol.set(cache.symbol, cache);
-    if (cache.domain === VALUATION_CACHE_DOMAIN) valuationCacheBySymbol.set(cache.symbol, cache);
+    if (cache.domain === VALUATION_SUMMARY_CACHE_DOMAIN) valuationCacheBySymbol.set(cache.symbol, cache);
   });
   const markedDividendEventsBySymbol = new Map<string, StockDividendEvent[]>();
   markedDividends.forEach((marking) => {
@@ -254,7 +210,7 @@ export const buildStockPortfolio = async (userId: number, keyword?: string) => {
   const cashAmount = roundStockValue(cash?.amount ?? 0);
   const totalAssetValue = roundStockValue(totalMarketValue + cashAmount);
   const accountSummaries = buildAccountSummaries(accounts, displayedHoldings, totalAssetValue);
-  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, latestFundamentalBySymbol, fundamentalsBySymbol, annualFundamentalsBySymbol, latestAnnualBalanceBySymbol, metricStatementsBySymbol, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
+  const symbolSummaries = buildSymbolSummaries(displayedHoldings, displaySymbols, quoteBySymbol, totalAssetValue, fundamentalCacheBySymbol, valuationCacheBySymbol, overrideBySymbol, markedDividendEventsBySymbol);
   const sectorSummaries = buildSectorSummaries(symbolSummaries, totalAssetValue);
 
   return {
@@ -315,11 +271,6 @@ const buildSymbolSummaries = (
   symbols: string[],
   quoteBySymbol: Map<string, StockQuote>,
   totalMarketValue: number,
-  fundamentalBySymbol: Map<string, StockFundamental>,
-  fundamentalsBySymbol: Map<string, StockFundamental[]>,
-  annualFundamentalsBySymbol: Map<string, StockFundamental[]>,
-  annualBalanceBySymbol: Map<string, { fields: unknown }>,
-  metricStatementsBySymbol: Map<string, FinancialStatementMetricRow[]>,
   fundamentalCacheBySymbol: Map<string, StockMetricCache>,
   valuationCacheBySymbol: Map<string, StockMetricCache>,
   overrideBySymbol: Map<string, StockMetricOverride>,
@@ -373,11 +324,6 @@ const buildSymbolSummaries = (
       percent: percentOf(summary.marketValue, totalMarketValue),
       ...buildComputedMetrics(
         summary,
-        fundamentalBySymbol.get(summary.symbol),
-        fundamentalsBySymbol.get(summary.symbol) ?? [],
-        annualFundamentalsBySymbol.get(summary.symbol) ?? [],
-        annualBalanceBySymbol.get(summary.symbol),
-        metricStatementsBySymbol.get(summary.symbol) ?? [],
         fundamentalCacheBySymbol.get(summary.symbol),
         valuationCacheBySymbol.get(summary.symbol),
         overrideBySymbol.get(summary.symbol),
@@ -390,11 +336,6 @@ const buildSymbolSummaries = (
 
 const buildComputedMetrics = (
   summary: IStockPortfolioSymbolSummary,
-  fundamental?: StockFundamental,
-  fundamentals: StockFundamental[] = [],
-  annualFundamentals: StockFundamental[] = [],
-  annualBalance?: { fields: unknown },
-  metricStatements: FinancialStatementMetricRow[] = [],
   fundamentalCache?: StockMetricCache,
   valuationCache?: StockMetricCache,
   override?: StockMetricOverride,
@@ -403,23 +344,22 @@ const buildComputedMetrics = (
 ) => {
   const cacheMetrics = readCacheRecord(fundamentalCache?.metrics);
   const cacheWarnings = readCacheWarnings(fundamentalCache?.warnings);
-  const totalShares = readCacheNumber(cacheMetrics, 'totalShares') ?? fundamental?.totalShares ?? null;
-  const deductedNetProfit = readCacheNumber(cacheMetrics, 'deductedNetProfit') ?? fundamental?.deductedNetProfit ?? null;
-  const deductedNetProfitTtmResult = calculateDeductedNetProfitTtm(metricStatements, fundamentals);
-  const deductedNetProfitTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'deductedNetProfitTtm') : deductedNetProfitTtmResult.value;
-  const deductedNetProfitTtmWarning = fundamentalCache ? cacheWarnings[0] ?? null : deductedNetProfitTtmResult.warning;
-  const netProfit = readCacheNumber(cacheMetrics, 'netProfit') ?? fundamental?.netProfit ?? null;
-  const rawNetProfitTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'netProfitTtm') : calculateStatementTtm(metricStatements, 'income', ['n_income_attr_p', 'n_income']) ?? calculateFundamentalTtm(fundamentals, 'netProfit');
-  const netProfitTtmQuality = validateNetProfitTtm(rawNetProfitTtm, deductedNetProfitTtm, fundamentalCache?.calculatedThroughReportName ?? fundamental?.reportName ?? null);
+  const totalShares = readCacheNumber(cacheMetrics, 'totalShares');
+  const deductedNetProfit = readCacheNumber(cacheMetrics, 'deductedNetProfit');
+  const deductedNetProfitTtm = readCacheNumber(cacheMetrics, 'deductedNetProfitTtm');
+  const deductedNetProfitTtmWarning = cacheWarnings[0] ?? null;
+  const netProfit = readCacheNumber(cacheMetrics, 'netProfit');
+  const rawNetProfitTtm = readCacheNumber(cacheMetrics, 'netProfitTtm');
+  const netProfitTtmQuality = validateNetProfitTtm(rawNetProfitTtm, deductedNetProfitTtm, fundamentalCache?.calculatedThroughReportName ?? null);
   const netProfitTtm = netProfitTtmQuality.value;
-  const revenue = readCacheNumber(cacheMetrics, 'revenue') ?? fundamental?.revenue ?? null;
-  const revenueTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'revenueTtm') : calculateStatementTtm(metricStatements, 'income', ['revenue', 'total_revenue']) ?? calculateFundamentalTtm(fundamentals, 'revenue');
-  const netAsset = readCacheNumber(cacheMetrics, 'netAsset') ?? fundamental?.netAsset ?? null;
-  const totalAssets = readCacheNumber(cacheMetrics, 'totalAssets') ?? fundamental?.totalAssets ?? null;
-  const operatingCashFlow = readCacheNumber(cacheMetrics, 'operatingCashFlow') ?? fundamental?.operatingCashFlow ?? null;
-  const operatingCashFlowTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'operatingCashFlowTtm') : calculateStatementTtm(metricStatements, 'cash_flow', ['n_cashflow_act']) ?? calculateFundamentalTtm(fundamentals, 'operatingCashFlow');
-  const capitalExpenditure = readCacheNumber(cacheMetrics, 'capitalExpenditure') ?? fundamental?.capitalExpenditure ?? null;
-  const capitalExpenditureTtm = fundamentalCache ? readCacheNumber(cacheMetrics, 'capitalExpenditureTtm') : calculateStatementTtm(metricStatements, 'cash_flow', ['c_pay_acq_const_fiolta']) ?? calculateFundamentalTtm(fundamentals, 'capitalExpenditure');
+  const revenue = readCacheNumber(cacheMetrics, 'revenue');
+  const revenueTtm = readCacheNumber(cacheMetrics, 'revenueTtm');
+  const netAsset = readCacheNumber(cacheMetrics, 'netAsset');
+  const totalAssets = readCacheNumber(cacheMetrics, 'totalAssets');
+  const operatingCashFlow = readCacheNumber(cacheMetrics, 'operatingCashFlow');
+  const operatingCashFlowTtm = readCacheNumber(cacheMetrics, 'operatingCashFlowTtm');
+  const capitalExpenditure = readCacheNumber(cacheMetrics, 'capitalExpenditure');
+  const capitalExpenditureTtm = readCacheNumber(cacheMetrics, 'capitalExpenditureTtm');
   const eventNormalizedDividend = sumMarkedDividendEvents(dividendEvents);
   const normalizedDividend = eventNormalizedDividend ?? override?.normalizedDividend ?? null;
   const companyMarketCap = totalShares && totalShares > 0 ? summary.currentPrice * totalShares : null;
@@ -429,15 +369,16 @@ const buildComputedMetrics = (
   const freeCashFlowTtm = operatingCashFlowTtm != null && capitalExpenditureTtm != null
     ? operatingCashFlowTtm - capitalExpenditureTtm
     : null;
-  const annualsByYear = new Map(annualFundamentals.map((item) => [item.reportDate.getFullYear(), item]));
-  const latestAnnual = annualFundamentals[0];
-  const latestAnnualDeductedNetProfit = latestAnnual?.deductedNetProfit ?? null;
-  const deductedNetProfitCagr = readDeductedNetProfitCagr(latestAnnual, annualsByYear);
-  const goodwill = annualBalance ? readStatementNumber(annualBalance.fields, 'goodwill') ?? 0 : null;
+  const reportDate = readCacheString(cacheMetrics, 'reportDate') ?? fundamentalCache?.calculatedThroughReportDate?.toISOString() ?? null;
+  const latestAnnualDeductedNetProfit = readCacheNumber(cacheMetrics, 'latestAnnualDeductedNetProfit');
+  const deductedNetProfitCagr = readCacheNumber(cacheMetrics, 'deductedNetProfitCagr5');
+  const deductedNetProfitCagrYears = readCacheNumber(cacheMetrics, 'deductedNetProfitCagrYears');
+  const profitHistory = readCacheProfitHistory(cacheMetrics, 'profitHistory');
+  const goodwill = readCacheNumber(cacheMetrics, 'goodwill');
   const deductedPe = companyMarketCap && latestAnnualDeductedNetProfit && latestAnnualDeductedNetProfit > 0 ? roundStockValue(companyMarketCap / latestAnnualDeductedNetProfit) : null;
   const deductedPeTtm = companyMarketCap && deductedNetProfitTtm && deductedNetProfitTtm > 0 ? roundStockValue(companyMarketCap / deductedNetProfitTtm) : null;
   const pb = companyMarketCap && netAsset && netAsset > 0 ? roundStockValue(companyMarketCap / netAsset) : null;
-  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, pb, annualFundamentals, valuationCache, includeValuationHistory);
+  const peValuation = buildPeValuation(summary.currentPrice, totalShares, deductedNetProfitTtm, deductedPeTtm, pb, profitHistory, valuationCache, includeValuationHistory);
 
   return {
     totalShares,
@@ -445,8 +386,8 @@ const buildComputedMetrics = (
     deductedNetProfitTtm,
     deductedNetProfitTtmWarning,
     financialCacheStatus: fundamentalCache?.status ?? null,
-    financialDataReportDate: fundamentalCache?.calculatedThroughReportDate?.toISOString() ?? fundamental?.reportDate.toISOString() ?? null,
-    financialDataReportName: fundamentalCache?.calculatedThroughReportName ?? fundamental?.reportName ?? null,
+    financialDataReportDate: fundamentalCache?.calculatedThroughReportDate?.toISOString() ?? reportDate,
+    financialDataReportName: fundamentalCache?.calculatedThroughReportName ?? null,
     valuationCacheStatus: valuationCache?.status ?? null,
     valuationDataReportDate: valuationCache?.calculatedThroughReportDate?.toISOString() ?? null,
     valuationDataReportName: valuationCache?.calculatedThroughReportName ?? null,
@@ -463,11 +404,11 @@ const buildComputedMetrics = (
     capitalExpenditure,
     capitalExpenditureTtm,
     normalizedDividend,
-    reportDate: fundamental?.reportDate.toISOString() ?? null,
-    deductedNetProfitCagr5: deductedNetProfitCagr.value,
-    deductedNetProfitCagrYears: deductedNetProfitCagr.years,
-    deductedPeg: deductedPe != null && deductedNetProfitCagr.value != null && deductedNetProfitCagr.value !== 0
-      ? roundStockValue(deductedPe / (deductedNetProfitCagr.value * 100))
+    reportDate,
+    deductedNetProfitCagr5: deductedNetProfitCagr,
+    deductedNetProfitCagrYears,
+    deductedPeg: deductedPe != null && deductedNetProfitCagr != null && deductedNetProfitCagr !== 0
+      ? roundStockValue(deductedPe / (deductedNetProfitCagr * 100))
       : null,
     goodwill,
     goodwillToNetAsset: goodwill != null && netAsset && netAsset > 0 ? goodwill / netAsset : null,
@@ -504,7 +445,7 @@ const buildPeValuation = (
   deductedNetProfitTtm: number | null,
   currentPe: number | null,
   currentPb: number | null,
-  annualFundamentals: StockFundamental[],
+  profitHistory: IStockProfitHistoryPoint[],
   valuationCache?: StockMetricCache,
   includeValuationHistory = false
 ): IStockPeValuationSummary | null => {
@@ -543,7 +484,7 @@ const buildPeValuation = (
     startDate: cachedValuation?.startDate ?? null,
     endDate: cachedValuation?.endDate ?? null,
     targets,
-    profitHistory: buildProfitHistory(annualFundamentals),
+    profitHistory,
     valuationHistory: includeValuationHistory ? cachedValuation?.valuationHistory ?? [] : [],
   };
 };
@@ -724,158 +665,6 @@ const percentileRank = (sortedValues: number[], value: number) => {
   return sortedValues.filter((item) => item <= value).length / sortedValues.length;
 };
 
-const buildProfitHistory = (annualFundamentals: StockFundamental[]): IStockProfitHistoryPoint[] => {
-  const rows = annualFundamentals
-    .filter((item) => item.deductedNetProfit != null)
-    .slice()
-    .sort((left, right) => left.reportDate.getTime() - right.reportDate.getTime());
-
-  return rows.map((item, index) => {
-    const deductedNetProfit = item.deductedNetProfit ?? null;
-    const previous = index > 0 ? rows[index - 1].deductedNetProfit : null;
-    const yoy = deductedNetProfit != null && previous != null && previous > 0
-      ? deductedNetProfit / previous - 1
-      : null;
-    return {
-      reportDate: item.reportDate.toISOString(),
-      year: item.reportDate.getFullYear(),
-      deductedNetProfit: deductedNetProfit != null ? roundStockValue(deductedNetProfit) : null,
-      yoy,
-    };
-  });
-};
-
-const statementMonth = (date: Date) => date.getFullYear() * 100 + date.getMonth() + 1;
-
-const reportNameFromDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  if (month === 3) return `${year}一季报`;
-  if (month === 6) return `${year}中报`;
-  if (month === 9) return `${year}三季报`;
-  if (month === 12) return `${year}年报`;
-  return `${year}/${String(month).padStart(2, '0')}`;
-};
-
-const reportNameOf = (row: Pick<FinancialStatementMetricRow, 'reportDate' | 'reportName'> | Pick<StockFundamental, 'reportDate' | 'reportName'>) =>
-  row.reportName ?? reportNameFromDate(row.reportDate);
-
-const missingDeductedWarning = (reportName: string) => `缺少 ${reportName} 扣非净利润，扣非 TTM 暂不可严格计算`;
-
-const calculateDeductedNetProfitTtm = (
-  metricStatements: FinancialStatementMetricRow[],
-  fundamentals: StockFundamental[]
-): TtmCalculationResult => {
-  const statementResult = calculateStatementTtmResult(metricStatements, 'income', ['net_profit_after_nrgal_atsolc', 'profit_dedt']);
-  if (statementResult.value != null) return statementResult;
-
-  const fundamentalResult = calculateFundamentalTtmResult(fundamentals, 'deductedNetProfit');
-  if (fundamentalResult.value != null) return fundamentalResult;
-
-  return {
-    value: null,
-    warning: statementResult.warning ?? fundamentalResult.warning,
-  };
-};
-
-const calculateStatementTtmResult = (
-  rows: FinancialStatementMetricRow[],
-  statement: string,
-  keys: string[]
-): TtmCalculationResult => {
-  const statementRows = rows
-    .filter((row) => row.statement === statement)
-    .slice()
-    .sort((left, right) => right.reportDate.getTime() - left.reportDate.getTime());
-  const latest = statementRows[0];
-  if (!latest) return { value: null, warning: null };
-
-  const current = readStatementAnyNumber(latest.fields, keys);
-  if (current == null) return { value: null, warning: missingDeductedWarning(reportNameOf(latest)) };
-
-  const month = latest.reportDate.getMonth() + 1;
-  if (month === 12) return { value: current, warning: null };
-
-  const year = latest.reportDate.getFullYear();
-  const rowsByMonth = new Map(statementRows.map((row) => [statementMonth(row.reportDate), row]));
-  const previousAnnual = rowsByMonth.get((year - 1) * 100 + 12);
-  const previousSamePeriod = rowsByMonth.get((year - 1) * 100 + month);
-  const previousAnnualValue = previousAnnual ? readStatementAnyNumber(previousAnnual.fields, keys) : null;
-  const previousSamePeriodValue = previousSamePeriod ? readStatementAnyNumber(previousSamePeriod.fields, keys) : null;
-  if (!previousAnnual || previousAnnualValue == null) return { value: null, warning: missingDeductedWarning(reportNameFromDate(new Date(year - 1, 11, 31))) };
-  if (!previousSamePeriod || previousSamePeriodValue == null) return { value: null, warning: missingDeductedWarning(reportNameFromDate(new Date(year - 1, month - 1, 1))) };
-
-  return { value: current + previousAnnualValue - previousSamePeriodValue, warning: null };
-};
-
-const calculateStatementTtm = (
-  rows: FinancialStatementMetricRow[],
-  statement: string,
-  keys: string[]
-) => calculateStatementTtmResult(rows, statement, keys).value;
-
-const calculateFundamentalTtm = (
-  rows: StockFundamental[],
-  field: 'deductedNetProfit' | 'netProfit' | 'revenue' | 'operatingCashFlow' | 'capitalExpenditure'
-) => calculateFundamentalTtmResult(rows, field).value;
-
-const calculateFundamentalTtmResult = (
-  rows: StockFundamental[],
-  field: 'deductedNetProfit' | 'netProfit' | 'revenue' | 'operatingCashFlow' | 'capitalExpenditure'
-): TtmCalculationResult => {
-  const sortedRows = rows.slice().sort((left, right) => right.reportDate.getTime() - left.reportDate.getTime());
-  const latest = sortedRows[0];
-  const current = latest?.[field] ?? null;
-  if (current == null) return { value: null, warning: latest ? missingDeductedWarning(reportNameOf(latest)) : null };
-
-  const month = latest.reportDate.getMonth() + 1;
-  if (month === 12) return { value: current, warning: null };
-
-  const year = latest.reportDate.getFullYear();
-  const rowsByMonth = new Map(sortedRows.map((row) => [statementMonth(row.reportDate), row]));
-  const previousAnnual = rowsByMonth.get((year - 1) * 100 + 12);
-  const previousSamePeriod = rowsByMonth.get((year - 1) * 100 + month);
-  const previousAnnualValue = previousAnnual?.[field] ?? null;
-  const previousSamePeriodValue = previousSamePeriod?.[field] ?? null;
-  if (!previousAnnual || previousAnnualValue == null) return { value: null, warning: missingDeductedWarning(reportNameFromDate(new Date(year - 1, 11, 31))) };
-  if (!previousSamePeriod || previousSamePeriodValue == null) return { value: null, warning: missingDeductedWarning(reportNameFromDate(new Date(year - 1, month - 1, 1))) };
-
-  return { value: current + previousAnnualValue - previousSamePeriodValue, warning: null };
-};
-
-const readDeductedNetProfitCagr = (
-  latestAnnual: StockFundamental | undefined,
-  annualsByYear: Map<number, StockFundamental>
-): { value: number | null; years: number | null } => {
-  if (!latestAnnual?.deductedNetProfit || latestAnnual.deductedNetProfit <= 0) {
-    return { value: null, years: null };
-  }
-
-  const latestYear = latestAnnual.reportDate.getFullYear();
-  for (let years = DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS; years >= 1; years -= 1) {
-    const baseYear = latestYear - years;
-    const baseAnnual = annualsByYear.get(latestYear - years);
-    const previousBaseAnnual = annualsByYear.get(baseYear - 1);
-    const isRecoveryBase = previousBaseAnnual && (!previousBaseAnnual.deductedNetProfit || previousBaseAnnual.deductedNetProfit <= 0);
-    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0 && !isRecoveryBase) {
-      return {
-        value: (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / years) - 1,
-        years,
-      };
-    }
-  }
-
-  return { value: null, years: null };
-};
-
-const readStatementNumber = (fields: unknown, key: string) => {
-  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
-  const value = (fields as Record<string, unknown>)[key];
-  const raw = Array.isArray(value) ? value[0] : value;
-  const numberValue = typeof raw === 'number' ? raw : Number(raw ?? Number.NaN);
-  return Number.isFinite(numberValue) ? numberValue : null;
-};
-
 const validateNetProfitTtm = (netProfitTtm: number | null, deductedNetProfitTtm: number | null, reportName?: string | null) => {
   if (netProfitTtm != null && netProfitTtm > 0 && deductedNetProfitTtm != null && deductedNetProfitTtm > 0 && netProfitTtm < deductedNetProfitTtm * 0.5) {
     return {
@@ -884,14 +673,6 @@ const validateNetProfitTtm = (netProfitTtm: number | null, deductedNetProfitTtm:
     };
   }
   return { value: netProfitTtm, warning: null };
-};
-
-const readStatementAnyNumber = (fields: unknown, keys: string[]) => {
-  for (const key of keys) {
-    const value = readStatementNumber(fields, key);
-    if (value != null) return value;
-  }
-  return null;
 };
 
 const readCacheRecord = (value: unknown): Record<string, unknown> =>
@@ -917,6 +698,25 @@ const readCacheNumberArray = (record: Record<string, unknown>, key: string) => {
   return Array.isArray(value)
     ? value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
     : [];
+};
+
+const readCacheProfitHistory = (record: Record<string, unknown>, key: string): IStockProfitHistoryPoint[] => {
+  const value = record[key];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const row = readCacheRecord(item);
+      const reportDate = readCacheString(row, 'reportDate');
+      const year = readCacheNumber(row, 'year');
+      if (!reportDate || year == null) return null;
+      return {
+        reportDate,
+        year,
+        deductedNetProfit: readCacheNumber(row, 'deductedNetProfit'),
+        yoy: readCacheNumber(row, 'yoy'),
+      };
+    })
+    .filter((item): item is IStockProfitHistoryPoint => item != null);
 };
 
 const readValuationCache = (cache?: StockMetricCache | null, includeHistory = true) => {

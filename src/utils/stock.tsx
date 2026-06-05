@@ -119,12 +119,14 @@ export const useStockFinancialStatements = (symbol: string, refreshKey = 0, limi
   };
 };
 
-export const useStockSnapshots = (refreshKey = 0, limit = 120) => {
+export const useStockSnapshots = (refreshKey = 0, limit = 120, options: { enabled?: boolean } = {}) => {
   const stockStore = useStockStore();
+  const enabled = options.enabled ?? true;
 
   useEffect(() => {
+    if (!enabled) return;
     void stockStore.loadSnapshots(limit, { force: refreshKey > 0 });
-  }, [refreshKey, stockStore, limit]);
+  }, [enabled, refreshKey, stockStore, limit]);
 
   return {
     snapshots: stockStore.snapshots,

@@ -6,8 +6,10 @@ import { setAppDatabaseUrl } from './database-url.mjs';
 
 const STOCK_UNIVERSE_PATH = new URL('../src/config/stock-universe.json', import.meta.url);
 const CALCULATION_VERSION = 1;
+const DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS = 5;
 const DOMAIN_FUNDAMENTAL_LATEST = 'fundamental_latest';
 const DOMAIN_VALUATION_WEEKLY = 'valuation_weekly';
+const DOMAIN_VALUATION_WEEKLY_SUMMARY = 'valuation_weekly_summary';
 
 setAppDatabaseUrl();
 
@@ -190,10 +192,69 @@ const latestAnnualDeductedNetProfit = (fundamentals) => fundamentals
   .filter((row) => row.reportName?.includes('年报'))
   .sort((left, right) => right.reportDate.getTime() - left.reportDate.getTime())[0]?.deductedNetProfit ?? null;
 
+const annualFundamentalsOf = (fundamentals) => fundamentals
+  .filter((row) => row.reportName?.includes('年报'))
+  .sort((left, right) => right.reportDate.getTime() - left.reportDate.getTime());
+
+const buildProfitHistory = (annualFundamentals) => {
+  const rows = annualFundamentals
+    .filter((row) => row.deductedNetProfit != null)
+    .slice()
+    .sort((left, right) => left.reportDate.getTime() - right.reportDate.getTime());
+
+  return rows.map((row, index) => {
+    const deductedNetProfit = row.deductedNetProfit ?? null;
+    const previous = index > 0 ? rows[index - 1].deductedNetProfit : null;
+    const yoy = deductedNetProfit != null && previous != null && previous > 0
+      ? deductedNetProfit / previous - 1
+      : null;
+    return {
+      reportDate: row.reportDate.toISOString(),
+      year: row.reportDate.getUTCFullYear(),
+      deductedNetProfit: deductedNetProfit != null ? Math.round(deductedNetProfit * 100) / 100 : null,
+      yoy,
+    };
+  });
+};
+
+const readDeductedNetProfitCagr = (annualFundamentals) => {
+  const latestAnnual = annualFundamentals[0];
+  if (!latestAnnual?.deductedNetProfit || latestAnnual.deductedNetProfit <= 0) {
+    return { value: null, years: null };
+  }
+
+  const latestYear = latestAnnual.reportDate.getUTCFullYear();
+  const annualsByYear = new Map(annualFundamentals.map((row) => [row.reportDate.getUTCFullYear(), row]));
+  for (let years = DEDUCTED_NET_PROFIT_CAGR_MAX_YEARS; years >= 1; years -= 1) {
+    const baseYear = latestYear - years;
+    const baseAnnual = annualsByYear.get(baseYear);
+    const previousBaseAnnual = annualsByYear.get(baseYear - 1);
+    const isRecoveryBase = previousBaseAnnual && (!previousBaseAnnual.deductedNetProfit || previousBaseAnnual.deductedNetProfit <= 0);
+    if (baseAnnual?.deductedNetProfit && baseAnnual.deductedNetProfit > 0 && !isRecoveryBase) {
+      return {
+        value: (latestAnnual.deductedNetProfit / baseAnnual.deductedNetProfit) ** (1 / years) - 1,
+        years,
+      };
+    }
+  }
+
+  return { value: null, years: null };
+};
+
+const latestAnnualGoodwill = (balanceRows) => {
+  const latestAnnualBalance = balanceRows
+    .filter((row) => row.reportName?.includes('年报'))
+    .sort((left, right) => right.reportDate.getTime() - left.reportDate.getTime())[0];
+  return latestAnnualBalance ? readStatementNumber(latestAnnualBalance.fields, 'goodwill') ?? 0 : null;
+};
+
 const refreshFundamentalCache = async (symbol, statementsByType, fundamentals) => {
   const incomeRows = statementsByType.get('income') ?? [];
   const cashFlowRows = statementsByType.get('cash_flow') ?? [];
+  const balanceRows = statementsByType.get('balance') ?? [];
   const latestFundamental = fundamentals[0] ?? null;
+  const annualFundamentals = annualFundamentalsOf(fundamentals);
+  const deductedNetProfitCagr = readDeductedNetProfitCagr(annualFundamentals);
   const deductedNetProfitTtm = calculateStatementTtmResult(incomeRows, ['net_profit_after_nrgal_atsolc', 'profit_dedt'], '扣非净利润');
   const netProfitTtm = calculateStatementTtmResult(incomeRows, ['n_income_attr_p', 'n_income'], '归母净利润');
   const revenueTtm = calculateStatementTtmResult(incomeRows, ['revenue', 'total_revenue'], '营业收入');
@@ -228,6 +289,9 @@ const refreshFundamentalCache = async (symbol, statementsByType, fundamentals) =
       totalShares: latestFundamental?.totalShares ?? null,
       deductedNetProfit: latestFundamental?.deductedNetProfit ?? null,
       latestAnnualDeductedNetProfit: latestAnnualDeductedNetProfit(fundamentals),
+      deductedNetProfitCagr5: deductedNetProfitCagr.value,
+      deductedNetProfitCagrYears: deductedNetProfitCagr.years,
+      profitHistory: buildProfitHistory(annualFundamentals),
       deductedNetProfitTtm: resolvedDeductedNetProfitTtm.value,
       netProfit: latestFundamental?.netProfit ?? null,
       netProfitTtm: resolvedNetProfitTtm.value,
@@ -239,6 +303,7 @@ const refreshFundamentalCache = async (symbol, statementsByType, fundamentals) =
       operatingCashFlowTtm: resolvedOperatingCashFlowTtm.value,
       capitalExpenditure: latestFundamental?.capitalExpenditure ?? null,
       capitalExpenditureTtm: resolvedCapitalExpenditureTtm.value,
+      goodwill: latestAnnualGoodwill(balanceRows),
       reportDate: latestFundamental?.reportDate?.toISOString() ?? null,
     },
     warnings,
@@ -317,32 +382,51 @@ const refreshValuationCache = async (symbol, statementsByType) => {
   const lastSnapshot = snapshots.at(-1) ?? null;
   const lastHistoryWithReport = [...history].reverse().find((row) => row.sourceReportDate);
   const warnings = latestTtmInput.warning ? [latestTtmInput.warning] : [];
+  const status = peValues.length > 0 ? metricStatus(warnings) : 'missing_input';
+  const calculatedThroughReportDate = lastHistoryWithReport?.sourceReportDate ? new Date(lastHistoryWithReport.sourceReportDate) : null;
+  const calculatedThroughReportName = lastHistoryWithReport?.sourceReportName ?? null;
+  const calculatedThroughSnapshotDate = lastSnapshot?.tradeDate ?? null;
+  const summaryMetrics = {
+    peValues,
+    pbValues,
+    sampleCount: peValues.length,
+    pbSampleCount: pbValues.length,
+    startDate: snapshots[0]?.tradeDate?.toISOString() ?? null,
+    endDate: lastSnapshot?.tradeDate?.toISOString() ?? null,
+  };
 
   await upsertCache({
     symbol,
     domain: DOMAIN_VALUATION_WEEKLY,
-    status: peValues.length > 0 ? metricStatus(warnings) : 'missing_input',
-    calculatedThroughReportDate: lastHistoryWithReport?.sourceReportDate ? new Date(lastHistoryWithReport.sourceReportDate) : null,
-    calculatedThroughReportName: lastHistoryWithReport?.sourceReportName ?? null,
-    calculatedThroughSnapshotDate: lastSnapshot?.tradeDate ?? null,
+    status,
+    calculatedThroughReportDate,
+    calculatedThroughReportName,
+    calculatedThroughSnapshotDate,
     metrics: {
-      peValues,
-      pbValues,
-      sampleCount: peValues.length,
-      startDate: snapshots[0]?.tradeDate?.toISOString() ?? null,
-      endDate: lastSnapshot?.tradeDate?.toISOString() ?? null,
+      ...summaryMetrics,
       valuationHistory,
     },
     warnings,
   });
 
-  return { status: peValues.length > 0 ? metricStatus(warnings) : 'missing_input', warnings, sampleCount: peValues.length };
+  await upsertCache({
+    symbol,
+    domain: DOMAIN_VALUATION_WEEKLY_SUMMARY,
+    status,
+    calculatedThroughReportDate,
+    calculatedThroughReportName,
+    calculatedThroughSnapshotDate,
+    metrics: summaryMetrics,
+    warnings,
+  });
+
+  return { status, warnings, sampleCount: peValues.length };
 };
 
 const refreshSymbol = async (symbol) => {
   const [statements, fundamentals] = await Promise.all([
     prisma.stockFinancialStatement.findMany({
-      where: { symbol, statement: { in: ['income', 'cash_flow'] } },
+      where: { symbol, statement: { in: ['income', 'cash_flow', 'balance'] } },
       select: { statement: true, reportDate: true, reportName: true, fields: true },
       orderBy: [{ statement: 'asc' }, { reportDate: 'desc' }],
     }),

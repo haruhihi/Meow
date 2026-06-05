@@ -128,7 +128,7 @@ const StocksPage = observer(function StocksPage() {
   const lastSymbolClickRef = useRef<{ symbol: string; time: number } | null>(null);
   const valuationTableRequestRef = useRef(0);
   const { data, loading: portfolioLoading, reQuery, refreshQuotes, updateCash, saveRebalance: saveStockRebalance } = useStockPortfolio();
-  const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots();
+  const { snapshots, reQuery: reQuerySnapshots, createSnapshot } = useStockSnapshots(0, 120, { enabled: snapshotPickerVisible });
   const { snapshot: selectedSnapshot, loading: snapshotLoading, reQuery: reQuerySnapshot } = useStockSnapshotDetail(selectedSnapshotId);
 
   const isSnapshotView = selectedSnapshotId != null;
