@@ -44,6 +44,7 @@ import { FormCascader } from '@components/form-cascader';
 import { formatMoney, getCategoryColorByName } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
 import { splitTimeRangeEvenly } from '@utils/time';
+import { getDefaultTimeEntryActivityTypeIds } from '@utils/time-activity';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
 import { DailyTrendChart } from './components/daily-trend-chart';
@@ -248,7 +249,7 @@ const App = observer(function App() {
     const startedAt = dayjs(endedAt).subtract(1, 'hour').toDate();
     timeForm.resetFields();
     timeForm.setFieldsValue({
-      activityTypeId: activityTypes[0] ? [String(activityTypes[0].id)] : undefined,
+      activityTypeId: getDefaultTimeEntryActivityTypeIds(activityTypes),
       customActivityName: undefined,
       startedAt,
       endedAt,

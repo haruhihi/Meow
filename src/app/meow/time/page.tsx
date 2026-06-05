@@ -35,6 +35,7 @@ import {
 } from '@dtos/meow';
 import { PALETTE } from '@styles/theme';
 import { formatDuration, formatHours, minutesBetween, splitTimeRangeEvenly } from '@utils/time';
+import { getDefaultTimeEntryActivityTypeIds } from '@utils/time-activity';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
 import styles from './time.module.scss';
 
@@ -233,7 +234,7 @@ export default function TimePage() {
     setEditingEntry(null);
     form.resetFields();
     form.setFieldsValue({
-      activityTypeId: activityTypes[0] ? [String(activityTypes[0].id)] : undefined,
+      activityTypeId: getDefaultTimeEntryActivityTypeIds(activityTypes),
       customActivityName: undefined,
       startedAt,
       endedAt,

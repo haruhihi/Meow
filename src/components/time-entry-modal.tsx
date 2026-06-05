@@ -11,6 +11,7 @@ import type { DatePickerRef } from 'antd-mobile';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
+import { PLACEHOLDER_ACTIVITY_NAME } from '@utils/time-activity';
 import { formatDuration, minutesBetween } from '@utils/time';
 import styles from './time-entry-modal.module.scss';
 
@@ -53,16 +54,10 @@ const END_TIME_SHORTCUTS = [
   { label: '1h', minutesAgo: 60 },
 ];
 
-const getNameLength = (name: string) => Array.from(name.trim()).length;
-
 const sortActivityTypes = (activityTypes: ActivityTypeOption[]) => [...activityTypes].sort((left, right) => {
-  const leftLength = getNameLength(left.name);
-  const rightLength = getNameLength(right.name);
-  const leftGroup = leftLength <= 2 ? 0 : 1;
-  const rightGroup = rightLength <= 2 ? 0 : 1;
-  if (leftGroup !== rightGroup) return leftGroup - rightGroup;
-  if (leftLength !== rightLength) return leftLength - rightLength;
-  return left.id - right.id;
+  if (left.name === PLACEHOLDER_ACTIVITY_NAME && right.name !== PLACEHOLDER_ACTIVITY_NAME) return -1;
+  if (right.name === PLACEHOLDER_ACTIVITY_NAME && left.name !== PLACEHOLDER_ACTIVITY_NAME) return 1;
+  return 0;
 });
 
 export const TimeEntryModal = ({
@@ -119,49 +114,45 @@ export const TimeEntryModal = ({
             <Form.Item noStyle shouldUpdate={(prev, next) => prev.activityTypeId !== next.activityTypeId}>
               {({ getFieldValue }) => {
                 const selectedIds = getFieldValue('activityTypeId') ?? [];
+                const placeholderActivityType = sortedActivityTypes.find((activityType) => activityType.name === PLACEHOLDER_ACTIVITY_NAME);
+                const placeholderActivityTypeId = placeholderActivityType ? String(placeholderActivityType.id) : undefined;
                 const toggleActivityType = (activityTypeId: string) => {
-                  const nextSelectedIds = selectedIds.includes(activityTypeId)
-                    ? selectedIds.filter((selectedId: string) => selectedId !== activityTypeId)
-                    : [...selectedIds, activityTypeId];
+                  const isSelected = selectedIds.includes(activityTypeId);
+                  const onlyPlaceholderSelected = placeholderActivityTypeId != null
+                    && selectedIds.length === 1
+                    && selectedIds[0] === placeholderActivityTypeId;
+                  let nextSelectedIds: string[];
+
+                  if (activityTypeId === placeholderActivityTypeId) {
+                    nextSelectedIds = isSelected
+                      ? selectedIds.filter((selectedId: string) => selectedId !== activityTypeId)
+                      : [activityTypeId];
+                  } else if (onlyPlaceholderSelected) {
+                    nextSelectedIds = [activityTypeId];
+                  } else {
+                    nextSelectedIds = isSelected
+                      ? selectedIds.filter((selectedId: string) => selectedId !== activityTypeId)
+                      : [...selectedIds.filter((selectedId: string) => selectedId !== placeholderActivityTypeId), activityTypeId];
+                  }
                   form.setFieldsValue({ activityTypeId: nextSelectedIds.length > 0 ? nextSelectedIds : undefined });
                 };
-                const shortActivityTypes = sortedActivityTypes.filter((activityType) => getNameLength(activityType.name) <= 2);
-                const longActivityTypes = sortedActivityTypes.filter((activityType) => getNameLength(activityType.name) > 2);
 
                 return (
                   <div className={styles.activityField}>
-                    {shortActivityTypes.length > 0 && (
-                      <div className={styles.activityGrid}>
-                        {shortActivityTypes.map((activityType) => (
-                          <button
-                            key={activityType.id}
-                            type="button"
-                            className={selectedIds.includes(String(activityType.id)) ? styles.activityButtonActive : styles.activityButton}
-                            aria-pressed={selectedIds.includes(String(activityType.id))}
-                            onClick={() => toggleActivityType(String(activityType.id))}
-                          >
-                            <span className={styles.activitySwatch} style={{ background: activityType.color }} />
-                            <span>{activityType.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {longActivityTypes.length > 0 && (
-                      <div className={styles.activityWrap}>
-                        {longActivityTypes.map((activityType) => (
-                          <button
-                            key={activityType.id}
-                            type="button"
-                            className={selectedIds.includes(String(activityType.id)) ? styles.activityButtonActive : styles.activityButton}
-                            aria-pressed={selectedIds.includes(String(activityType.id))}
-                            onClick={() => toggleActivityType(String(activityType.id))}
-                          >
-                            <span className={styles.activitySwatch} style={{ background: activityType.color }} />
-                            <span>{activityType.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className={styles.activityGrid}>
+                      {sortedActivityTypes.map((activityType) => (
+                        <button
+                          key={activityType.id}
+                          type="button"
+                          className={selectedIds.includes(String(activityType.id)) ? styles.activityButtonActive : styles.activityButton}
+                          aria-pressed={selectedIds.includes(String(activityType.id))}
+                          onClick={() => toggleActivityType(String(activityType.id))}
+                        >
+                          <span className={styles.activitySwatch} style={{ background: activityType.color }} />
+                          <span>{activityType.name}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 );
               }}
