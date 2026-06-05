@@ -1,0 +1,1 @@
+export const PLACEHOLDER_ACTIVITY_NAME = '占位';

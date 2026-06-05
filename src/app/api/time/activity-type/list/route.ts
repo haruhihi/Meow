@@ -3,9 +3,9 @@ import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getSession } from '@libs/session';
 import { TIME_ACTIVITY_COLOR_BY_NAME } from '@styles/theme';
+import { PLACEHOLDER_ACTIVITY_NAME } from '@utils/time-activity';
 
 const DEPRECATED_ACTIVITY_NAMES = ['吃饭', '通勤', '其他'];
-const PLACEHOLDER_ACTIVITY_NAME = '占位';
 
 const RENAMED_ACTIVITY_TYPES = [
   { from: '短视频', to: '手机', color: TIME_ACTIVITY_COLOR_BY_NAME['手机'], icon: 'phone' },

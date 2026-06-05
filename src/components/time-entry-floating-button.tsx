@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { post } from '@libs/fetch';
 import { TimeEntryIcon } from '@components/action-icons';
-import { PLACEHOLDER_ACTIVITY_NAME } from '@components/time-entry-modal';
+import { PLACEHOLDER_ACTIVITY_NAME } from '@utils/time-activity';
 import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,

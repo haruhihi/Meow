@@ -7,6 +7,8 @@ agent: "agent"
 
 Analyze the stock as a long-term, dividend-aware holding. Use the latest method as the default: value the company from sustainable deducted profit and historical deducted PE percentiles, then use the user-marked normal dividend to infer the dividend yield at each PE-derived price edge. Write the final report in Chinese. Keep official Chinese financial-report wording in Chinese unless the user explicitly asks for translation.
 
+Before writing conclusions, follow the project `stock-evidence-research` skill: prepare the evidence pack, use persisted local DB rows as the numeric spine, read official filings for material claims, and dynamically fetch missing reports or announcements when the baseline evidence cannot explain a disturbance.
+
 Use persisted local project data first. Prefer `StockFinancialStatement`, `StockFundamental`, `StockValuationSnapshot`, `StockDividendEvent`, user `StockDividendMarking`, `StockMetricOverride`, and `StockQuote`. Treat Tushare-backed local DB rows as the canonical data source unless the user explicitly asks to refresh or required rows are missing.
 
 Do not rely on old generated AI reports as evidence. They may contain obsolete methods. If an existing report is useful, use it only as context and re-check every important claim against current DB rows and financial statements.
