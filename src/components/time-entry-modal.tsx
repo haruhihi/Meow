@@ -36,7 +36,6 @@ type TimeEntryModalProps = {
   title: string;
   submitText: string;
   activityTypes: ActivityTypeOption[];
-  multiple?: boolean;
   onClose: () => void;
   onFinish: (values: TimeEntryFormValues) => void | Promise<void>;
 };
@@ -72,7 +71,6 @@ export const TimeEntryModal = ({
   title,
   submitText,
   activityTypes,
-  multiple = true,
   onClose,
   onFinish,
 }: TimeEntryModalProps) => {
@@ -122,11 +120,6 @@ export const TimeEntryModal = ({
               {({ getFieldValue }) => {
                 const selectedIds = getFieldValue('activityTypeId') ?? [];
                 const toggleActivityType = (activityTypeId: string) => {
-                  if (!multiple) {
-                    form.setFieldsValue({ activityTypeId: [activityTypeId] });
-                    return;
-                  }
-
                   const nextSelectedIds = selectedIds.includes(activityTypeId)
                     ? selectedIds.filter((selectedId: string) => selectedId !== activityTypeId)
                     : [...selectedIds, activityTypeId];

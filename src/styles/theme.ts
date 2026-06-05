@@ -36,9 +36,11 @@ export const CHART_COLORS = [
 ];
 
 export const TIME_ACTIVITY_COLOR_BY_NAME: Record<string, string> = {
+  '占位': '#8A93A8',
   '睡眠': '#6D5DF6',
   '工作': '#008FF5',
-  '短视频': '#FF3D71',
+  '手机': '#FF3D71',
+  '电视': '#38BDF8',
   '钢琴': '#9C27B0',
   '运动': '#00B86B',
   '阅读': '#FF8A00',

@@ -284,16 +284,27 @@ export default function TimePage() {
       return;
     }
 
+    const segments = splitTimeRangeEvenly(values.startedAt, values.endedAt, activityTypeIds.length);
+
     if (editingEntry) {
+      const [firstSegment, ...extraSegments] = segments;
       await post<ITimeEntryUpdateReq, ITimeEntryUpdateRes>('/api/time-entry/update', {
         id: editingEntry.id,
         activityTypeId: activityTypeIds[0],
-        startedAt: dayjs(values.startedAt).valueOf(),
-        endedAt: dayjs(values.endedAt).valueOf(),
+        startedAt: firstSegment.startedAt.getTime(),
+        endedAt: firstSegment.endedAt.getTime(),
         note: values.note,
       });
+
+      for (const [index, segment] of extraSegments.entries()) {
+        await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
+          activityTypeId: activityTypeIds[index + 1],
+          startedAt: segment.startedAt.getTime(),
+          endedAt: segment.endedAt.getTime(),
+          note: values.note,
+        });
+      }
     } else {
-      const segments = splitTimeRangeEvenly(values.startedAt, values.endedAt, activityTypeIds.length);
       for (const [index, segment] of segments.entries()) {
         await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
           activityTypeId: activityTypeIds[index],
@@ -415,7 +426,6 @@ export default function TimePage() {
         title={editingEntry ? '编辑时间记录' : '新增时间记录'}
         submitText={editingEntry ? '保存' : '提交'}
         activityTypes={activityTypes}
-        multiple={!editingEntry}
         onClose={() => setVisible(false)}
         onFinish={submitEntry}
       />
