@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { StockAccount } from '@prisma/client';
 import type { IStockPortfolioSymbolSummary } from '@dtos/meow';
 import { formatMoney } from '@styles/theme';
@@ -7,6 +7,17 @@ import { REBALANCE_QUANTITY_STEP, StockRebalanceHolding } from '@utils/stock-reb
 import styles from './stocks.module.scss';
 
 const formatSignedMoney = (value: number) => `${value >= 0 ? '+' : ''}${formatMoney(value)}`;
+
+type RebalanceSortState = {
+  accountId: number;
+  direction: 'desc' | 'asc';
+} | null;
+
+const getAccountMarketValue = (holdings: StockRebalanceHolding[], accountId: number, symbol: string) => roundStockValue(
+  holdings
+    .filter((holding) => holding.accountId === accountId && holding.symbol === symbol)
+    .reduce((sum, holding) => sum + holding.quantity * holding.currentPrice, 0)
+);
 
 export const RebalancePanel = ({
   accounts,
@@ -31,6 +42,7 @@ export const RebalancePanel = ({
   onSave: () => void;
   saveDisabled?: boolean;
 }) => {
+  const [sortState, setSortState] = useState<RebalanceSortState>(null);
   const visibleSummaries = useMemo(() => {
     const bySymbol = new Map(symbolSummaries.map((summary) => [summary.symbol, summary]));
     holdings.forEach((holding) => {
@@ -47,14 +59,31 @@ export const RebalancePanel = ({
         accounts: [],
       });
     });
-    return [...bySymbol.values()].sort((left, right) => {
+    const sortByOriginalOrder = (left: IStockPortfolioSymbolSummary, right: IStockPortfolioSymbolSummary) => {
       const leftIndex = symbolOrder.indexOf(left.symbol);
       const rightIndex = symbolOrder.indexOf(right.symbol);
       const resolvedLeftIndex = leftIndex === -1 ? symbolOrder.length : leftIndex;
       const resolvedRightIndex = rightIndex === -1 ? symbolOrder.length : rightIndex;
       return resolvedLeftIndex - resolvedRightIndex || left.symbol.localeCompare(right.symbol);
+    };
+    const summaries = [...bySymbol.values()];
+    if (!sortState) return summaries.sort(sortByOriginalOrder);
+
+    return summaries.sort((left, right) => {
+      const leftMarketValue = getAccountMarketValue(holdings, sortState.accountId, left.symbol);
+      const rightMarketValue = getAccountMarketValue(holdings, sortState.accountId, right.symbol);
+      const direction = sortState.direction === 'desc' ? -1 : 1;
+      return (leftMarketValue - rightMarketValue) * direction || sortByOriginalOrder(left, right);
     });
-  }, [holdings, symbolOrder, symbolSummaries]);
+  }, [holdings, sortState, symbolOrder, symbolSummaries]);
+
+  const toggleAccountSort = (accountId: number) => {
+    setSortState((current) => {
+      if (!current || current.accountId !== accountId) return { accountId, direction: 'desc' };
+      if (current.direction === 'desc') return { accountId, direction: 'asc' };
+      return null;
+    });
+  };
 
   return (
     <section className={styles.rebalancePanel}>
@@ -72,7 +101,17 @@ export const RebalancePanel = ({
       <div className={styles.rebalanceGrid} style={{ '--account-count': accounts.length } as CSSProperties}>
         <div className={styles.rebalanceGridHeader}>股票</div>
         {accounts.map((account) => (
-          <div key={account.id} className={styles.rebalanceGridHeader}>{account.name}</div>
+          <div key={account.id} className={styles.rebalanceGridHeader}>
+            <button
+              type="button"
+              className={sortState?.accountId === account.id ? styles.rebalanceSortButtonActive : styles.rebalanceSortButton}
+              onClick={() => toggleAccountSort(account.id)}
+              aria-label={`${account.name} 按持股市值排序`}
+            >
+              <span>{account.name}</span>
+              <em>{sortState?.accountId === account.id ? (sortState.direction === 'desc' ? '↓' : '↑') : '↕'}</em>
+            </button>
+          </div>
         ))}
 
         {visibleSummaries.map((summary) => (

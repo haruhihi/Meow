@@ -2,14 +2,19 @@
 
 import {
   Button,
+  DatePicker,
   Empty,
   Form,
+  Input,
   List,
+  Modal,
   PullToRefresh,
   Selector,
   SwipeAction,
+  Switch,
   Toast,
 } from 'antd-mobile';
+import type { DatePickerRef } from 'antd-mobile';
 import {
   ClockCircleOutline,
   LeftOutline,
@@ -18,10 +23,16 @@ import {
 import dayjs from 'dayjs';
 import ReactECharts from 'echarts-for-react';
 import { useMemo, useState } from 'react';
+import type { RefObject } from 'react';
 import { post } from '@libs/fetch';
+import { BillEntryFloatingButton } from '@components/bill-entry-floating-button';
+import { FormCascader } from '@components/form-cascader';
 import { LoadingState } from '@components/loading';
 import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
 import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
+import { useCategories, getCategoryOptions, flattenCategoryOptions } from '@utils/category';
+import { isMoneyGreater, roundMoney } from '@utils/money';
+import { usePaymentCoupons, useTransactions } from '@utils/transaction';
 import {
   IActivityTypeCreateReq,
   IActivityTypeCreateRes,
@@ -33,7 +44,7 @@ import {
   ITimeEntryUpdateRes,
   TimeEntryWithActivityType,
 } from '@dtos/meow';
-import { PALETTE } from '@styles/theme';
+import { formatMoney, PALETTE } from '@styles/theme';
 import { formatDuration, formatHours, minutesBetween } from '@utils/time';
 import { getDefaultTimeEntryActivityTypeIds } from '@utils/time-activity';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
@@ -118,20 +129,30 @@ const getEntryActivities = (entry: TimeEntryWithActivityType) => {
 
 export default function TimePage() {
   const [form] = Form.useForm();
+  const [billForm] = Form.useForm();
   const [visible, setVisible] = useState(false);
+  const [billVisible, setBillVisible] = useState(false);
+  const [categoryVisible, setCategoryVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntryWithActivityType | null>(null);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [viewMode, setViewMode] = useState<TimeViewMode>('day');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [transactionRefreshKey, setTransactionRefreshKey] = useState(0);
+  const [payTime, setPayTime] = useState(dayjs());
+  const [transactionSubmitting, setTransactionSubmitting] = useState(false);
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null);
   const [showAllRhythm, setShowAllRhythm] = useState(false);
 
+  const categoryRes = useCategories();
+  const { createTransaction } = useTransactions();
+  const paymentCoupons = usePaymentCoupons(payTime, transactionRefreshKey);
   const activityRes = useActivityTypes(refreshKey);
   const { timeEntries, reQuery, loadMore, hasMore } = useTimeEntries();
   const analyzeRange = useMemo(() => getAnalyzeRange(selectedDate, viewMode), [selectedDate, viewMode]);
   const { data: analyzeData } = useTimeRangeAnalyze(analyzeRange.start, analyzeRange.end, refreshKey);
 
   const activityTypes = activityRes.activityTypes ?? [];
+  const categories = categoryRes?.categories ?? [];
   const initialLoading = activityRes.activityTypes === undefined || timeEntries === undefined || analyzeData === null;
   const selectedActivity = selectedActivityId
     ? activityTypes.find((activityType) => activityType.id === selectedActivityId)
@@ -148,6 +169,17 @@ export default function TimePage() {
     if (list.length === 0) return null;
     return new Date(Math.max(...list.map((entry) => new Date(entry.endedAt).getTime())));
   }, [timeEntries]);
+
+  const cascaderOptions = useMemo(() => getCategoryOptions(categories), [categories]);
+  const flatCategoryOptions = useMemo(() => flattenCategoryOptions(cascaderOptions), [cascaderOptions]);
+  const frequentCategoryOptions = useMemo(() => flatCategoryOptions.slice(0, 6), [flatCategoryOptions]);
+  const couponOptions = useMemo(
+    () => paymentCoupons.map((coupon) => ({
+      label: `${coupon.name} · 剩余 ${formatMoney(coupon.remainingAmount)}`,
+      value: String(coupon.id),
+    })),
+    [paymentCoupons]
+  );
 
   const viewData = useMemo<TimeViewData | null>(() => {
     if (!analyzeData) return null;
@@ -250,6 +282,23 @@ export default function TimePage() {
       note: undefined,
     });
     setVisible(true);
+  };
+
+  const openCreateTransaction = () => {
+    const now = new Date();
+    setPayTime(dayjs(now));
+    billForm.resetFields();
+    billForm.setFieldsValue({
+      time: now,
+      useCoupon: false,
+      couponId: undefined,
+      couponDiscount: undefined,
+      amount: undefined,
+      category: undefined,
+      description: undefined,
+    });
+    setBillVisible(true);
+    setCategoryVisible(true);
   };
 
   const openEdit = (entry: TimeEntryWithActivityType) => {
@@ -409,11 +458,188 @@ export default function TimePage() {
         <div className={styles.endSpacer} />
       </PullToRefresh>
 
-      <TimeEntryFloatingButton
+      <BillEntryFloatingButton
         initialPositionBottom="calc(100px + max(env(safe-area-inset-bottom), 0px))"
+        onClick={openCreateTransaction}
+      />
+
+      <TimeEntryFloatingButton
+        initialPositionBottom="calc(168px + max(env(safe-area-inset-bottom), 0px))"
         activityTypes={activityTypes}
         onClick={openCreate}
         onQuickCreateSuccess={refreshAll}
+      />
+
+      <Modal
+        visible={billVisible}
+        title="新增账单"
+        closeOnMaskClick
+        showCloseButton
+        onClose={() => setBillVisible(false)}
+        content={
+          <Form
+            form={billForm}
+            layout="horizontal"
+            footer={
+              <Button block type="submit" color="primary" size="large" loading={transactionSubmitting} disabled={transactionSubmitting}>
+                提交
+              </Button>
+            }
+            initialValues={{ time: new Date(), useCoupon: false }}
+            style={{ marginTop: '20px' }}
+            onValuesChange={(_, values) => {
+              if (values.time) setPayTime(dayjs(values.time));
+              if (!values.useCoupon) {
+                billForm.setFieldsValue({ couponId: undefined, couponDiscount: undefined });
+                billForm.setFields([
+                  { name: ['couponId'], errors: [] },
+                  { name: ['couponDiscount'], errors: [] },
+                ]);
+              }
+              const couponId = values.couponId?.[0];
+              const hasValidCoupon = Boolean(
+                couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+              );
+              if (!hasValidCoupon) {
+                billForm.setFields([{ name: ['couponDiscount'], errors: [] }]);
+              }
+            }}
+            onFinish={async (values: {
+              amount: string;
+              category: string[];
+              time: Date;
+              useCoupon?: boolean;
+              description?: string;
+              couponId?: string[];
+              couponDiscount?: string;
+            }) => {
+              if (transactionSubmitting) return;
+
+              try {
+                setTransactionSubmitting(true);
+                const { amount, category, time, useCoupon, description, couponId, couponDiscount } = values;
+                if (!category?.length) {
+                  Toast.show({ content: '请选择分类' });
+                  return;
+                }
+                const selectedCouponId = useCoupon && couponId?.[0] ? Number(couponId[0]) : undefined;
+                const amountValue = roundMoney(amount);
+                const discount = useCoupon ? roundMoney(couponDiscount || 0) : 0;
+                const selectedCoupon = selectedCouponId
+                  ? paymentCoupons.find((coupon) => coupon.id === selectedCouponId)
+                  : undefined;
+                const availableCouponAmount = selectedCoupon ? roundMoney(selectedCoupon.remainingAmount) : 0;
+                if (discount < 0) {
+                  Toast.show({ content: '抵扣金额不能小于 0' });
+                  return;
+                }
+                if (isMoneyGreater(discount, amountValue)) {
+                  Toast.show({ content: '抵扣金额不能超过消费金额' });
+                  return;
+                }
+                if (discount > 0 && !selectedCoupon) {
+                  Toast.show({ content: '请选择要使用的券' });
+                  return;
+                }
+                if (selectedCoupon && isMoneyGreater(discount, availableCouponAmount)) {
+                  Toast.show({ content: '抵扣金额不能超过券余额' });
+                  return;
+                }
+                await createTransaction({
+                  amount: amountValue,
+                  categoryId: Number(category[category.length - 1]),
+                  date: dayjs(time).unix() * 1000,
+                  description,
+                  couponId: selectedCouponId,
+                  couponDiscount: discount,
+                });
+                await new Promise<void>((resolve) => {
+                  Toast.show({
+                    content: '记录成功',
+                    afterClose: () => {
+                      setBillVisible(false);
+                      setTransactionRefreshKey((value) => value + 1);
+                      resolve();
+                    },
+                  });
+                });
+              } finally {
+                setTransactionSubmitting(false);
+              }
+            }}
+          >
+            <Form.Item name="category" label="分类" rules={[{ required: true, message: '请选择分类' }]}>
+              <FormCascader
+                options={cascaderOptions ?? []}
+                categoryVisible={categoryVisible}
+                setCategoryVisible={(value: boolean) => setCategoryVisible(value)}
+                frequentOptions={frequentCategoryOptions}
+                loading={!categoryRes}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="time"
+              label="时间"
+              trigger="onConfirm"
+              onClick={(_, datePickerRef: RefObject<DatePickerRef>) => datePickerRef.current?.open()}
+            >
+              <DatePicker precision="minute">
+                {(value) => (value ? dayjs(value).format('YYYY/MM/DD HH:mm') : '请选择日期')}
+              </DatePicker>
+            </Form.Item>
+
+            <Form.Item name="amount" label="金额" rules={[{ required: true, message: '金额不能为空' }]}>
+              <Input placeholder="请输入金额" type="number" />
+            </Form.Item>
+
+            <Form.Item name="useCoupon" label="使用券" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+
+            <Form.Item noStyle shouldUpdate={(prev, next) => prev.useCoupon !== next.useCoupon}>
+              {({ getFieldValue }) => {
+                const useCoupon = Boolean(getFieldValue('useCoupon'));
+                if (!useCoupon) return null;
+
+                return (
+                  <>
+                    {couponOptions.length > 0 && (
+                      <Form.Item name="couponId">
+                        <Selector columns={1} options={couponOptions} />
+                      </Form.Item>
+                    )}
+
+                    <Form.Item noStyle shouldUpdate={(prev, next) => prev.couponId !== next.couponId}>
+                      {({ getFieldValue: getNestedFieldValue }) => {
+                        const couponId = getNestedFieldValue('couponId')?.[0];
+                        const hasValidCoupon = Boolean(
+                          couponId && paymentCoupons.some((coupon) => String(coupon.id) === String(couponId))
+                        );
+
+                        return (
+                          <Form.Item
+                            key={hasValidCoupon ? 'coupon-discount-required' : 'coupon-discount-optional'}
+                            name="couponDiscount"
+                            label="抵扣"
+                            required={hasValidCoupon}
+                            rules={hasValidCoupon ? [{ required: true, message: '已选券时请填写抵扣金额' }] : []}
+                          >
+                            <Input placeholder="本次券抵扣金额" type="number" />
+                          </Form.Item>
+                        );
+                      }}
+                    </Form.Item>
+                  </>
+                );
+              }}
+            </Form.Item>
+
+            <Form.Item name="description" label="备注">
+              <Input placeholder="请输入备注" type="string" />
+            </Form.Item>
+          </Form>
+        }
       />
 
       <TimeEntryModal

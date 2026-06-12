@@ -868,6 +868,7 @@ const StocksPage = observer(function StocksPage() {
                       <strong>{item.accountName} · {item.symbol} {item.name}</strong>
                       <span>
                         {formatStockQuantity(item.fromQuantity)} → {formatStockQuantity(item.toQuantity)} 股
+                        {item.quantityDelta !== 0 ? ` ${item.quantityDelta > 0 ? '+' : ''}${formatStockQuantity(item.quantityDelta)}` : ''}
                         {item.type === 'create' ? ' · 新增' : item.type === 'delete' ? ' · 清仓' : ''}
                       </span>
                     </div>

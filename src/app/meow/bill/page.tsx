@@ -1,6 +1,5 @@
 'use client';
 import {
-  FloatingBubble,
   Modal,
   Form,
   Button,
@@ -22,7 +21,7 @@ import { RefObject, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactions, useMonthAnalyze, usePaymentCoupons } from '@utils/transaction';
 import { useActivityTypes } from '@utils/time-entry';
-import { BillEntryIcon } from '@components/action-icons';
+import { BillEntryFloatingButton } from '@components/bill-entry-floating-button';
 import { LoadingState } from '@components/loading';
 import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
 import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
@@ -377,17 +376,10 @@ const App = observer(function App() {
         <div className={styles.endSpacer} />
       </PullToRefresh>
 
-      <FloatingBubble
-        style={{
-          '--initial-position-bottom': 'calc(100px + max(env(safe-area-inset-bottom), 0px))',
-          '--initial-position-right': '24px',
-          '--edge-distance': '44px',
-          '--background': 'var(--meow-accent-gradient)',
-        }}
+      <BillEntryFloatingButton
+        initialPositionBottom="calc(100px + max(env(safe-area-inset-bottom), 0px))"
         onClick={openCreateTransaction}
-      >
-        <span className={styles.actionIconWrap}><BillEntryIcon className={styles.actionIcon} /></span>
-      </FloatingBubble>
+      />
 
       <TimeEntryFloatingButton
         initialPositionBottom="calc(168px + max(env(safe-area-inset-bottom), 0px))"
