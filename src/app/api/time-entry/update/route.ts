@@ -17,6 +17,11 @@ const validateRange = (startedAt: Date, endedAt: Date) => {
   }
 };
 
+const normalizeActivityTypeIds = (activityTypeIds?: number[], activityTypeId?: number) => {
+  const ids = activityTypeIds && activityTypeIds.length > 0 ? activityTypeIds : activityTypeId != null ? [activityTypeId] : [];
+  return [...new Set(ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+};
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ITimeEntryUpdateReq;
@@ -34,22 +39,38 @@ export async function POST(req: Request) {
     validateRange(startedAt, endedAt);
 
     let activityTypeId = current.activityTypeId;
-    if (body.activityTypeId != null) {
-      const activityType = await prisma.activityType.findFirst({
-        where: { id: Number(body.activityTypeId), userId: Number(userId) },
+    const shouldUpdateActivities = body.activityTypeIds !== undefined || body.activityTypeId != null;
+    let activityTypeIds: number[] | undefined;
+    if (shouldUpdateActivities) {
+      activityTypeIds = normalizeActivityTypeIds(body.activityTypeIds, body.activityTypeId);
+      if (activityTypeIds.length === 0) throw new Error('activityTypeId is required');
+
+      const activityTypes = await prisma.activityType.findMany({
+        where: { id: { in: activityTypeIds }, userId: Number(userId) },
       });
-      if (!activityType) throw new Error('activity type not found');
-      activityTypeId = activityType.id;
+      if (activityTypes.length !== activityTypeIds.length) throw new Error('activity type not found');
+      activityTypeId = activityTypeIds[0];
     }
 
-    const timeEntry = await prisma.timeEntry.update({
-      where: { id: current.id },
-      data: {
-        activityTypeId,
-        startedAt,
-        endedAt,
-        note: body.note,
-      },
+    const timeEntry = await prisma.$transaction(async (tx) => {
+      const updated = await tx.timeEntry.update({
+        where: { id: current.id },
+        data: {
+          activityTypeId,
+          startedAt,
+          endedAt,
+          note: body.note,
+        },
+      });
+
+      if (activityTypeIds) {
+        await tx.timeEntryActivity.deleteMany({ where: { timeEntryId: current.id } });
+        await tx.timeEntryActivity.createMany({
+          data: activityTypeIds.map((id) => ({ timeEntryId: current.id, activityTypeId: id })),
+        });
+      }
+
+      return updated;
     });
 
     return success<ITimeEntryUpdateRes>({ timeEntry });

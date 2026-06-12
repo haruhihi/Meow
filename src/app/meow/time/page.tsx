@@ -34,7 +34,7 @@ import {
   TimeEntryWithActivityType,
 } from '@dtos/meow';
 import { PALETTE } from '@styles/theme';
-import { formatDuration, formatHours, minutesBetween, splitTimeRangeEvenly } from '@utils/time';
+import { formatDuration, formatHours, minutesBetween } from '@utils/time';
 import { getDefaultTimeEntryActivityTypeIds } from '@utils/time-activity';
 import { useActivityTypes, useTimeEntries, useTimeRangeAnalyze } from '@utils/time-entry';
 import styles from './time.module.scss';
@@ -109,6 +109,13 @@ const getViewStepDays = (viewMode: TimeViewMode) => {
   return 1;
 };
 
+const getEntryActivities = (entry: TimeEntryWithActivityType) => {
+  const activities = entry.activities.length > 0
+    ? entry.activities.map((item) => item.activityType)
+    : [entry.activityType];
+  return activities;
+};
+
 export default function TimePage() {
   const [form] = Form.useForm();
   const [visible, setVisible] = useState(false);
@@ -133,7 +140,7 @@ export default function TimePage() {
   const filteredRecent = useMemo(() => {
     const list = timeEntries ?? [];
     if (!selectedActivityId) return list;
-    return list.filter((entry) => entry.activityTypeId === selectedActivityId);
+    return list.filter((entry) => getEntryActivities(entry).some((activity) => activity.id === selectedActivityId));
   }, [timeEntries, selectedActivityId]);
 
   const latestEndedAt = useMemo(() => {
@@ -156,7 +163,9 @@ export default function TimePage() {
     analyzeData.timeEntries.forEach((entry) => {
       const endedAt = dayjs(entry.endedAt);
       if (endedAt.isSame(selectedDayStart, 'day')) {
-        selectedDayEntryCounts.set(entry.activityTypeId, (selectedDayEntryCounts.get(entry.activityTypeId) ?? 0) + 1);
+        getEntryActivities(entry).forEach((activity) => {
+          selectedDayEntryCounts.set(activity.id, (selectedDayEntryCounts.get(activity.id) ?? 0) + 1);
+        });
       }
     });
 
@@ -247,7 +256,7 @@ export default function TimePage() {
     setEditingEntry(entry);
     form.resetFields();
     form.setFieldsValue({
-      activityTypeId: [String(entry.activityTypeId)],
+      activityTypeId: getEntryActivities(entry).map((activity) => String(activity.id)),
       customActivityName: undefined,
       startedAt: new Date(entry.startedAt),
       endedAt: new Date(entry.endedAt),
@@ -262,7 +271,7 @@ export default function TimePage() {
   };
 
   const submitEntry = async (values: TimeEntryFormValues) => {
-    let activityTypeIds = values.activityTypeId?.map((activityTypeId) => Number(activityTypeId)).filter(Boolean) ?? [];
+    let activityTypeIds = [...new Set(values.activityTypeId?.map((activityTypeId) => Number(activityTypeId)).filter(Boolean) ?? [])];
     const customActivityName = values.customActivityName?.trim();
     if (!values.startedAt || !values.endedAt) {
       Toast.show({ content: '请选择起止时间' });
@@ -285,35 +294,21 @@ export default function TimePage() {
       return;
     }
 
-    const segments = splitTimeRangeEvenly(values.startedAt, values.endedAt, activityTypeIds.length);
-
     if (editingEntry) {
-      const [firstSegment, ...extraSegments] = segments;
       await post<ITimeEntryUpdateReq, ITimeEntryUpdateRes>('/api/time-entry/update', {
         id: editingEntry.id,
-        activityTypeId: activityTypeIds[0],
-        startedAt: firstSegment.startedAt.getTime(),
-        endedAt: firstSegment.endedAt.getTime(),
+        activityTypeIds,
+        startedAt: values.startedAt.getTime(),
+        endedAt: values.endedAt.getTime(),
         note: values.note,
       });
-
-      for (const [index, segment] of extraSegments.entries()) {
-        await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
-          activityTypeId: activityTypeIds[index + 1],
-          startedAt: segment.startedAt.getTime(),
-          endedAt: segment.endedAt.getTime(),
-          note: values.note,
-        });
-      }
     } else {
-      for (const [index, segment] of segments.entries()) {
-        await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
-          activityTypeId: activityTypeIds[index],
-          startedAt: segment.startedAt.getTime(),
-          endedAt: segment.endedAt.getTime(),
-          note: values.note,
-        });
-      }
+      await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
+        activityTypeIds,
+        startedAt: values.startedAt.getTime(),
+        endedAt: values.endedAt.getTime(),
+        note: values.note,
+      });
     }
 
     await new Promise<void>((resolve) => {
@@ -714,43 +709,56 @@ const GroupedList = ({
             <span className={styles.groupTotal}>{formatDuration(group.total)}</span>
           </div>
           <List>
-            {group.items.map((entry) => (
-              <SwipeAction
-                key={entry.id}
-                rightActions={[
-                  {
-                    key: 'edit',
-                    text: '编辑',
-                    color: 'primary',
-                    onClick: () => onEdit(entry),
-                  },
-                  {
-                    key: 'delete',
-                    text: '删除',
-                    color: 'danger',
-                    onClick: () => onDelete(entry.id),
-                  },
-                ]}
-              >
-                <List.Item
-                  prefix={
-                    <div className={styles.iconWrap} style={{ background: entry.activityType.color + '22', color: entry.activityType.color }}>
-                      <ClockCircleOutline />
-                    </div>
-                  }
-                  description={
-                    <span className={styles.itemDesc}>
-                      {dayjs(entry.startedAt).format('HH:mm')} - {dayjs(entry.endedAt).format('HH:mm')}
-                      {entry.note ? ` · ${entry.note}` : ''}
-                    </span>
-                  }
-                  extra={<span className={styles.itemAmount}>{formatDuration(minutesBetween(entry.startedAt, entry.endedAt))}</span>}
-                  onClick={() => onEdit(entry)}
+            {group.items.map((entry) => {
+              const activities = getEntryActivities(entry);
+              const primaryActivity = activities[0] ?? entry.activityType;
+              const entryMinutes = minutesBetween(entry.startedAt, entry.endedAt);
+              return (
+                <SwipeAction
+                  key={entry.id}
+                  rightActions={[
+                    {
+                      key: 'edit',
+                      text: '编辑',
+                      color: 'primary',
+                      onClick: () => onEdit(entry),
+                    },
+                    {
+                      key: 'delete',
+                      text: '删除',
+                      color: 'danger',
+                      onClick: () => onDelete(entry.id),
+                    },
+                  ]}
                 >
-                  <span className={styles.itemTitle}>{entry.activityType.name}</span>
-                </List.Item>
-              </SwipeAction>
-            ))}
+                  <List.Item
+                    prefix={
+                      <div className={styles.iconWrap} style={{ background: primaryActivity.color + '22', color: primaryActivity.color }}>
+                        <ClockCircleOutline />
+                      </div>
+                    }
+                    description={
+                      <span className={styles.itemDesc}>
+                        {dayjs(entry.startedAt).format('HH:mm')} - {dayjs(entry.endedAt).format('HH:mm')}
+                        {activities.length > 1 ? ` · 每项 ${formatDuration(entryMinutes / activities.length)}` : ''}
+                        {entry.note ? ` · ${entry.note}` : ''}
+                      </span>
+                    }
+                    extra={<span className={styles.itemAmount}>{formatDuration(entryMinutes)}</span>}
+                    onClick={() => onEdit(entry)}
+                  >
+                    <span className={styles.itemTitle}>
+                      {activities.map((activity) => (
+                        <span key={activity.id} className={styles.activityChip}>
+                          <span className={styles.activityChipDot} style={{ background: activity.color }} />
+                          <span>{activity.name}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </List.Item>
+                </SwipeAction>
+              );
+            })}
           </List>
         </div>
       ))}

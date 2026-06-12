@@ -87,6 +87,11 @@ export interface ITransactionDeleteReq {
 export type TimeEntryWithActivityType = Prisma.TimeEntryGetPayload<{
   include: {
     activityType: true;
+    activities: {
+      include: {
+        activityType: true;
+      };
+    };
   };
 }>;
 
@@ -103,7 +108,8 @@ export interface IActivityTypeCreateRes {
 }
 
 export interface ITimeEntryCreateReq {
-  activityTypeId: TimeEntry['activityTypeId'];
+  activityTypeId?: TimeEntry['activityTypeId'];
+  activityTypeIds?: ActivityType['id'][];
   startedAt: number;
   endedAt: number;
   note?: TimeEntry['note'];

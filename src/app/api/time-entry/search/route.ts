@@ -16,7 +16,13 @@ export async function POST(req: Request) {
       orderBy: { endedAt: 'desc' },
       skip: page * pageSize,
       take: pageSize,
-      include: { activityType: true },
+      include: {
+        activityType: true,
+        activities: {
+          include: { activityType: true },
+          orderBy: { id: 'asc' },
+        },
+      },
     });
 
     return success<ITimeEntrySearchRes>({ timeEntries });

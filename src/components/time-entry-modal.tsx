@@ -211,12 +211,15 @@ export const TimeEntryModal = ({
               </button>
             ))}
           </div>
-          <Form.Item noStyle shouldUpdate={(prev, next) => prev.startedAt !== next.startedAt || prev.endedAt !== next.endedAt}>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.startedAt !== next.startedAt || prev.endedAt !== next.endedAt || prev.activityTypeId !== next.activityTypeId}>
             {({ getFieldValue }) => {
               const startedAt = getFieldValue('startedAt');
               const endedAt = getFieldValue('endedAt');
+              const activityTypeIds = getFieldValue('activityTypeId') ?? [];
               const minutes = startedAt && endedAt ? minutesBetween(startedAt, endedAt) : 0;
-              return minutes > 0 ? <div className={styles.durationHint}>时长 {formatDuration(minutes)}</div> : null;
+              const activityCount = activityTypeIds.length;
+              const perActivityHint = activityCount > 1 ? ` · 每项 ${formatDuration(minutes / activityCount)}` : '';
+              return minutes > 0 ? <div className={styles.durationHint}>时长 {formatDuration(minutes)}{perActivityHint}</div> : null;
             }}
           </Form.Item>
           <Form.Item name="note" label="备注">

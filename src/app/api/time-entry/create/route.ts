@@ -17,29 +17,38 @@ const validateRange = (startedAt: Date, endedAt: Date) => {
   }
 };
 
+const normalizeActivityTypeIds = (activityTypeIds?: number[], activityTypeId?: number) => {
+  const ids = activityTypeIds && activityTypeIds.length > 0 ? activityTypeIds : activityTypeId != null ? [activityTypeId] : [];
+  return [...new Set(ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+};
+
 export async function POST(req: Request) {
   try {
-    const { activityTypeId, startedAt, endedAt, note } = (await req.json()) as ITimeEntryCreateReq;
+    const { activityTypeId, activityTypeIds: rawActivityTypeIds, startedAt, endedAt, note } = (await req.json()) as ITimeEntryCreateReq;
     const userId = (await getSession())?.userId;
     if (!userId) throw new Error(`User not found:${userId}`);
-    if (!activityTypeId) throw new Error('activityTypeId is required');
+    const activityTypeIds = normalizeActivityTypeIds(rawActivityTypeIds, activityTypeId);
+    if (activityTypeIds.length === 0) throw new Error('activityTypeId is required');
 
     const startDate = new Date(startedAt);
     const endDate = new Date(endedAt);
     validateRange(startDate, endDate);
 
-    const activityType = await prisma.activityType.findFirst({
-      where: { id: Number(activityTypeId), userId: Number(userId) },
+    const activityTypes = await prisma.activityType.findMany({
+      where: { id: { in: activityTypeIds }, userId: Number(userId) },
     });
-    if (!activityType) throw new Error('activity type not found');
+    if (activityTypes.length !== activityTypeIds.length) throw new Error('activity type not found');
 
     const timeEntry = await prisma.timeEntry.create({
       data: {
         userId: Number(userId),
-        activityTypeId: activityType.id,
+        activityTypeId: activityTypeIds[0],
         startedAt: startDate,
         endedAt: endDate,
         note,
+        activities: {
+          create: activityTypeIds.map((id) => ({ activityTypeId: id })),
+        },
       },
     });
 

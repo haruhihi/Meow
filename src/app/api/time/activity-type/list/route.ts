@@ -53,11 +53,23 @@ const normalizeRenamedActivityTypes = async (userId: number) => {
     }
 
     if (target) {
-      await prisma.timeEntry.updateMany({
-        where: { userId, activityTypeId: source.id },
-        data: { activityTypeId: target.id },
+      await prisma.$transaction(async (tx) => {
+        await tx.timeEntry.updateMany({
+          where: { userId, activityTypeId: source.id },
+          data: { activityTypeId: target.id },
+        });
+        await tx.timeEntryActivity.deleteMany({
+          where: {
+            activityTypeId: source.id,
+            timeEntry: { activities: { some: { activityTypeId: target.id } } },
+          },
+        });
+        await tx.timeEntryActivity.updateMany({
+          where: { activityTypeId: source.id },
+          data: { activityTypeId: target.id },
+        });
+        await tx.activityType.delete({ where: { id: source.id } });
       });
-      await prisma.activityType.delete({ where: { id: source.id } });
       await updateActivityTypeDefaults(target, { color: activityType.color, icon: activityType.icon });
       continue;
     }

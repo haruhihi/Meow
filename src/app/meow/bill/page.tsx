@@ -43,7 +43,6 @@ import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
 import { formatMoney, getCategoryColorByName } from '@styles/theme';
 import { isMoneyGreater, roundMoney } from '@utils/money';
-import { splitTimeRangeEvenly } from '@utils/time';
 import { getDefaultTimeEntryActivityTypeIds } from '@utils/time-activity';
 import { SummaryCard } from './components/summary-card';
 import { TopCategories } from './components/top-categories';
@@ -259,7 +258,7 @@ const App = observer(function App() {
   };
 
   const submitTimeEntry = async (values: TimeEntryFormValues) => {
-    let activityTypeIds = values.activityTypeId?.map((activityTypeId) => Number(activityTypeId)).filter(Boolean) ?? [];
+    let activityTypeIds = [...new Set(values.activityTypeId?.map((activityTypeId) => Number(activityTypeId)).filter(Boolean) ?? [])];
     const customActivityName = values.customActivityName?.trim();
     if (!values.startedAt || !values.endedAt) {
       Toast.show({ content: '请选择起止时间' });
@@ -282,15 +281,12 @@ const App = observer(function App() {
       return;
     }
 
-    const segments = splitTimeRangeEvenly(values.startedAt, values.endedAt, activityTypeIds.length);
-    for (const [index, segment] of segments.entries()) {
-      await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
-        activityTypeId: activityTypeIds[index],
-        startedAt: segment.startedAt.getTime(),
-        endedAt: segment.endedAt.getTime(),
-        note: values.note,
-      });
-    }
+    await post<ITimeEntryCreateReq, ITimeEntryCreateRes>('/api/time-entry/create', {
+      activityTypeIds,
+      startedAt: values.startedAt.getTime(),
+      endedAt: values.endedAt.getTime(),
+      note: values.note,
+    });
 
     setTimeVisible(false);
     await new Promise<void>((resolve) => {

@@ -9,7 +9,7 @@ import {
 import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getSession } from '@libs/session';
-import { formatDateInTimezone, getDaysInMonth, getMonthRange, minutesBetween, splitTimeRangeByDay } from '@utils/time';
+import { formatDateInTimezone, getDaysInMonth, getMonthRange, minutesBetween, splitTimeRangeByDay, splitTimeRangeEvenly } from '@utils/time';
 
 const pad = (value: number) => String(value).padStart(2, '0');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     const { activityTypeId, year, month, startedAt, endedAt, timezoneOffsetMinutes } = (await req.json()) as ITimeEntryAnalyzeReq;
     const userId = (await getSession())?.userId;
     if (!userId) throw new Error(`User not found:${userId}`);
+    const targetActivityTypeId = activityTypeId ? Number(activityTypeId) : null;
 
     const timezoneOffset = Number.isFinite(timezoneOffsetMinutes) ? Number(timezoneOffsetMinutes) : new Date().getTimezoneOffset();
     const hasCustomRange = Number.isFinite(startedAt) && Number.isFinite(endedAt);
@@ -54,11 +55,24 @@ export async function POST(req: Request) {
     const timeEntries = await prisma.timeEntry.findMany({
       where: {
         userId: Number(userId),
-        ...(activityTypeId ? { activityTypeId: Number(activityTypeId) } : {}),
+        ...(targetActivityTypeId
+          ? {
+              OR: [
+                { activityTypeId: targetActivityTypeId },
+                { activities: { some: { activityTypeId: targetActivityTypeId } } },
+              ],
+            }
+          : {}),
         endedAt: { gte: range.start, lt: range.end },
       },
       orderBy: { endedAt: 'desc' },
-      include: { activityType: true },
+      include: {
+        activityType: true,
+        activities: {
+          include: { activityType: true },
+          orderBy: { id: 'asc' },
+        },
+      },
     });
 
     const dailyMap = hasCustomRange ? buildDailyMap(range, timezoneOffset) : new Map<string, ITimeDailySummary>();
@@ -76,7 +90,14 @@ export async function POST(req: Request) {
     const sleepSamples: ISleepSample[] = [];
 
     timeEntries.forEach((entry) => {
-      const activity = entry.activityType;
+      const allActivities = entry.activities.length > 0
+        ? entry.activities.map((item) => item.activityType)
+        : [entry.activityType];
+      const activityCount = allActivities.length;
+      const visibleActivities = targetActivityTypeId
+        ? allActivities.filter((activity) => activity.id === targetActivityTypeId)
+        : allActivities;
+      if (activityCount <= 0 || visibleActivities.length === 0) return;
       const entryStartDate = formatDateInTimezone(entry.startedAt, timezoneOffset);
       const entryEndDate = formatDateInTimezone(entry.endedAt, timezoneOffset);
       const shouldAssignToEndDate = entryStartDate !== entryEndDate;
@@ -88,9 +109,14 @@ export async function POST(req: Request) {
       );
 
       let clippedMinutes = 0;
+      let visibleClippedMinutes = 0;
       const addDailyMinutes = (daily: ITimeDailySummary, minutes: number, startedAt: Date, endedAt: Date) => {
-        daily.minutes += minutes;
-        daily.byActivity[String(activity.id)] = (daily.byActivity[String(activity.id)] ?? 0) + minutes;
+        const visibleMinutes = (minutes / activityCount) * visibleActivities.length;
+        daily.minutes += visibleMinutes;
+        visibleClippedMinutes += visibleMinutes;
+        visibleActivities.forEach((activity) => {
+          daily.byActivity[String(activity.id)] = (daily.byActivity[String(activity.id)] ?? 0) + minutes / activityCount;
+        });
 
         const startedAtIso = startedAt.toISOString();
         const endedAtIso = endedAt.toISOString();
@@ -115,38 +141,47 @@ export async function POST(req: Request) {
       }
 
       splitSegments.forEach((segment) => {
-        rhythmSegments.push({
-          date: segment.date,
-          activityTypeId: activity.id,
-          name: activity.name,
-          color: activity.color,
-          startMinute: segment.startMinute,
-          endMinute: segment.endMinute,
-          minutes: segment.minutes,
+        const evenSegments = splitTimeRangeEvenly(segment.startedAt, segment.endedAt, activityCount);
+        allActivities.forEach((activity, index) => {
+          if (!visibleActivities.some((visibleActivity) => visibleActivity.id === activity.id)) return;
+          const evenSegment = evenSegments[index];
+          if (!evenSegment) return;
+          rhythmSegments.push({
+            date: segment.date,
+            activityTypeId: activity.id,
+            name: activity.name,
+            color: activity.color,
+            startMinute: Math.max(segment.startMinute, segment.startMinute + Math.round(((segment.endMinute - segment.startMinute) * index) / activityCount)),
+            endMinute: Math.max(segment.startMinute + 1, segment.startMinute + Math.round(((segment.endMinute - segment.startMinute) * (index + 1)) / activityCount)),
+            minutes: minutesBetween(evenSegment.startedAt, evenSegment.endedAt),
+          });
         });
       });
 
-      if (clippedMinutes <= 0) return;
-  entryCountByActivity.set(activity.id, (entryCountByActivity.get(activity.id) ?? 0) + 1);
+      if (clippedMinutes <= 0 || visibleClippedMinutes <= 0) return;
+      visibleActivities.forEach((activity) => {
+        entryCountByActivity.set(activity.id, (entryCountByActivity.get(activity.id) ?? 0) + 1);
 
-      const current = activityMap.get(activity.id) ?? {
-        activityTypeId: activity.id,
-        name: activity.name,
-        color: activity.color,
-        icon: activity.icon,
-        minutes: 0,
-        count: 0,
-      };
-      current.minutes += clippedMinutes;
-      current.count = entryCountByActivity.get(activity.id) ?? 0;
-      activityMap.set(activity.id, current);
+        const current = activityMap.get(activity.id) ?? {
+          activityTypeId: activity.id,
+          name: activity.name,
+          color: activity.color,
+          icon: activity.icon,
+          minutes: 0,
+          count: 0,
+        };
+        current.minutes += clippedMinutes / activityCount;
+        current.count = entryCountByActivity.get(activity.id) ?? 0;
+        activityMap.set(activity.id, current);
+      });
 
-      if (activity.name === '睡眠' && clippedMinutes > 0) {
+      const sleepActivity = visibleActivities.find((activity) => activity.name === '睡眠');
+      if (sleepActivity && clippedMinutes > 0) {
         sleepSamples.push({
           date: shouldAssignToEndDate ? entryEndDate : entryStartDate,
           startedAt: entry.startedAt.toISOString(),
           endedAt: entry.endedAt.toISOString(),
-          minutes: clippedMinutes,
+          minutes: clippedMinutes / activityCount,
         });
       }
     });
