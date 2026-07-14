@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeActivityGroup, TimeActivityGroupTargetDirection, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, PregnancyCaution, PregnancyDailyRecord, PregnancyProfile, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeActivityGroup, TimeActivityGroupTargetDirection, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -219,6 +219,72 @@ export interface ITimeEntryAnalyzeRes {
   recordedDays: number;
   dailySummaries: ITimeGroupDailySummary[];
   hourlySummaries: ITimeGroupHourlySummary[];
+}
+
+export type PregnancyProfileItem = Omit<PregnancyProfile, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PregnancyCautionItem = Omit<PregnancyCaution, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PregnancyDailyRecordItem = Omit<PregnancyDailyRecord, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface IPregnancyOverviewRes {
+  profile: PregnancyProfileItem;
+  cautions: PregnancyCautionItem[];
+  records: PregnancyDailyRecordItem[];
+}
+
+export interface IPregnancyProfileUpdateReq {
+  startDate: PregnancyProfile['startDate'];
+  timezoneOffsetMinutes?: number;
+}
+
+export interface IPregnancyProfileUpdateRes {
+  profile: PregnancyProfileItem;
+}
+
+export interface IPregnancyCautionSaveReq {
+  id?: PregnancyCaution['id'];
+  startDate: PregnancyCaution['startDate'];
+  endDate: PregnancyCaution['endDate'];
+  content: PregnancyCaution['content'];
+}
+
+export interface IPregnancyCautionSaveRes {
+  caution: PregnancyCautionItem;
+}
+
+export interface IPregnancyCautionDeleteReq {
+  id: PregnancyCaution['id'];
+}
+
+export interface IPregnancyCautionDeleteRes {
+  id: PregnancyCaution['id'];
+}
+
+export interface IPregnancyRecordUpsertReq {
+  recordDate: PregnancyDailyRecord['recordDate'];
+  content: PregnancyDailyRecord['content'];
+}
+
+export interface IPregnancyRecordUpsertRes {
+  record: PregnancyDailyRecordItem;
+}
+
+export interface IPregnancyRecordDeleteReq {
+  id: PregnancyDailyRecord['id'];
+}
+
+export interface IPregnancyRecordDeleteRes {
+  id: PregnancyDailyRecord['id'];
 }
 
 export interface UserLifeAnalysisProfileItem {

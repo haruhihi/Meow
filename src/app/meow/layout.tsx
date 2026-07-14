@@ -3,7 +3,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import React, { useEffect } from 'react';
 import type { FC } from 'react';
 import { TabBar } from 'antd-mobile';
-import { ClockCircleOutline, HistogramOutline, PayCircleOutline, UserOutline } from 'antd-mobile-icons';
+import { ClockCircleOutline, HeartOutline, HistogramOutline, PayCircleOutline, UserOutline } from 'antd-mobile-icons';
 import { MeowStoreProvider } from '@stores/meow-store-context';
 import styles from './index.module.scss';
 
@@ -25,6 +25,11 @@ const Bottom: FC = () => {
       key: '/meow/time',
       title: '时间',
       icon: <ClockCircleOutline />,
+    },
+    {
+      key: '/meow/pregnancy',
+      title: '孕期',
+      icon: <HeartOutline />,
     },
     {
       key: '/meow/me',
@@ -55,6 +60,7 @@ const App: React.FC<{ children: React.ReactNode }> = (props) => {
   const isDocumentScrollRoute =
     pathname === '/meow/bill' ||
     pathname === '/meow/time' ||
+    pathname === '/meow/pregnancy' ||
     pathname === '/meow/me' ||
     pathname === '/meow/stocks' ||
     /^\/meow\/stocks\/(?!snapshots$)[^/]+$/.test(pathname) ||

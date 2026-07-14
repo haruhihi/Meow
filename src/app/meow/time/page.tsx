@@ -99,7 +99,7 @@ export default function TimePage() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntryWithActivityType | null>(null);
   const [selectedDate, setSelectedDate] = useState(dayjs());
-  const [viewMode, setViewMode] = useState<TimeViewMode>('day');
+  const [viewMode, setViewMode] = useState<TimeViewMode>('week');
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [analysisRefreshKey, setAnalysisRefreshKey] = useState(0);
 

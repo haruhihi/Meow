@@ -1,0 +1,443 @@
+.page {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--meow-warning) 14%, transparent), transparent 30%),
+    radial-gradient(circle at 96% 12%, color-mix(in srgb, var(--meow-primary) 10%, transparent), transparent 28%),
+    var(--meow-bg);
+  color: var(--meow-text);
+}
+
+.pageLoading {
+  min-height: 260px;
+  margin: 12px;
+  border-radius: 16px;
+  background: var(--meow-surface);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--meow-text) 6%, transparent);
+}
+
+.loadError {
+  display: flex;
+  min-height: 60dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+}
+
+.stickyHeader {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  padding: 10px 12px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--meow-border) 82%, transparent);
+  background: color-mix(in srgb, var(--meow-bg) 90%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.cycleNavigation {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+
+.iconButton,
+.cycleButton,
+.startDateButton,
+.cautionItem,
+.recordActions button {
+  border: 0;
+  font: inherit;
+}
+
+.iconButton {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--meow-border);
+  border-radius: 12px;
+  background: var(--meow-surface);
+  color: var(--meow-text-sub);
+  font-size: 17px;
+}
+
+.iconButton:disabled {
+  opacity: 0.35;
+}
+
+.cycleButton {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--meow-surface);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--meow-text) 6%, transparent);
+  color: var(--meow-text);
+}
+
+.cycleButton small {
+  margin-top: 2px;
+  color: var(--meow-text-muted);
+  font-size: 10px;
+}
+
+.startDateButton {
+  display: flex;
+  min-height: 32px;
+  margin: 7px auto 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  color: var(--meow-text-muted);
+  font-size: 11px;
+}
+
+.buttonContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.calendarCard,
+.selectedDayCard,
+.detailSection {
+  margin: 12px;
+  border: 1px solid var(--meow-border);
+  border-radius: 16px;
+  background: var(--meow-surface);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--meow-text) 6%, transparent);
+}
+
+.calendarCard {
+  padding: 10px 8px 9px;
+}
+
+.weekHeader,
+.weekRow {
+  display: grid;
+  grid-template-columns: 34px repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+
+.weekHeader {
+  padding-bottom: 5px;
+  color: var(--meow-text-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+.weekRows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.weekLabel {
+  color: var(--meow-text-muted);
+  font-size: 9px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dateCell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 45px;
+  padding: 3px 1px;
+  border: 1px solid var(--meow-border);
+  border-radius: 10px;
+  background: var(--meow-surface-alt);
+  color: var(--meow-text-sub);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-size: clamp(9px, 2.8vw, 11px);
+  font-variant-numeric: tabular-nums;
+}
+
+.dateCell small {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--meow-primary);
+  color: var(--meow-surface);
+  font-size: 8px;
+  line-height: 13px;
+  text-align: center;
+}
+
+.dateCaution {
+  background: color-mix(in srgb, var(--meow-warning) 34%, var(--meow-surface));
+}
+
+.dateRecord {
+  background: color-mix(in srgb, var(--meow-text-muted) 28%, var(--meow-surface));
+}
+
+.dateBoth {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--meow-warning) 34%, var(--meow-surface)) 0 50%,
+    color-mix(in srgb, var(--meow-text-muted) 28%, var(--meow-surface)) 50% 100%
+  );
+}
+
+.dateSelected {
+  border-color: var(--meow-primary);
+  box-shadow: inset 0 0 0 1px var(--meow-primary);
+  color: var(--meow-primary-dim);
+}
+
+.dateToday:not(.dateSelected) {
+  border-color: color-mix(in srgb, var(--meow-primary) 58%, var(--meow-border));
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 9px;
+  color: var(--meow-text-muted);
+  font-size: 9px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.legend i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--meow-border);
+  border-radius: 3px;
+}
+
+.legendCaution {
+  background: color-mix(in srgb, var(--meow-warning) 34%, var(--meow-surface));
+}
+
+.legendRecord {
+  background: color-mix(in srgb, var(--meow-text-muted) 28%, var(--meow-surface));
+}
+
+.legendBoth {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--meow-warning) 34%, var(--meow-surface)) 0 50%,
+    color-mix(in srgb, var(--meow-text-muted) 28%, var(--meow-surface)) 50% 100%
+  );
+}
+
+.selectedDayCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.selectedDateTitle {
+  color: var(--meow-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.selectedDateMeta {
+  margin-top: 4px;
+  color: var(--meow-primary-dim);
+  font-size: 12px;
+}
+
+.detailSection {
+  overflow: hidden;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--meow-border);
+  background: var(--meow-surface-alt);
+}
+
+.sectionHeader > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+  color: var(--meow-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sectionHeader > div:first-child > span {
+  color: var(--meow-text-muted);
+  font-size: 10px;
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+}
+
+.itemList > :not(:last-child) {
+  border-bottom: 1px solid var(--meow-border);
+}
+
+.cautionItem {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 9px;
+  padding: 12px;
+  background: var(--meow-surface);
+  color: var(--meow-text);
+  text-align: left;
+}
+
+.itemRange {
+  align-self: start;
+  padding: 3px 5px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--meow-warning) 24%, var(--meow-surface));
+  color: color-mix(in srgb, var(--meow-warning) 66%, var(--meow-text));
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.itemContent {
+  color: var(--meow-text-sub);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.recordItem {
+  padding: 13px;
+}
+
+.recordItem p {
+  margin: 0;
+  color: var(--meow-text-sub);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.recordActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.recordActions button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 4px;
+  background: transparent;
+  color: var(--meow-primary-dim);
+  font-size: 11px;
+}
+
+.recordActions .deleteTextButton {
+  color: var(--meow-danger);
+}
+
+.compactEmpty {
+  padding: 22px 14px;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.formModal {
+  :global(.adm-modal-body) {
+    max-width: 620px;
+  }
+}
+
+.entryForm {
+  margin-top: 16px;
+}
+
+.modalTitle {
+  margin-bottom: 16px;
+  color: var(--meow-text);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.endSpacer {
+  height: var(--meow-tabbar-page-space);
+}
+
+.refreshHint {
+  position: fixed;
+  right: 50%;
+  bottom: calc(var(--meow-tabbar-height) + var(--meow-tabbar-safe-bottom) + 12px);
+  z-index: 30;
+  transform: translateX(50%);
+  padding: 7px 12px;
+  border: 1px solid var(--meow-border);
+  border-radius: 999px;
+  background: var(--meow-surface);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--meow-text) 12%, transparent);
+  color: var(--meow-text-sub);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .calendarCard {
+    margin-right: 8px;
+    margin-left: 8px;
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+
+  .weekHeader,
+  .weekRow {
+    grid-template-columns: 30px repeat(7, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .dateCell {
+    min-height: 42px;
+    border-radius: 8px;
+    font-size: 9px;
+  }
+
+  .weekLabel {
+    font-size: 8px;
+  }
+}
