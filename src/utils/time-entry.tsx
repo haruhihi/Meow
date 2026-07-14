@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { post } from '@libs/fetch';
 import {
   IActivityTypeListRes,
+  ITimeActivityGroupListRes,
   ITimeEntryAnalyzeReq,
   ITimeEntryAnalyzeRes,
   ITimeEntrySearchReq,
@@ -11,6 +12,13 @@ import {
 
 const DEFAULT_PAGE = 0;
 const DEFAULT_PAGE_SIZE = 15;
+
+const EMPTY_ANALYZE_DATA: ITimeEntryAnalyzeRes = {
+  groupSummaries: [],
+  recordedDays: 0,
+  dailySummaries: [],
+  hourlySummaries: [],
+};
 
 export const useActivityTypes = (refreshKey = 0) => {
   const [activityTypes, setActivityTypes] = useState<IActivityTypeListRes['activityTypes']>();
@@ -21,12 +29,31 @@ export const useActivityTypes = (refreshKey = 0) => {
   };
 
   useEffect(() => {
-    fetchActivityTypes();
+    void fetchActivityTypes();
   }, [refreshKey]);
 
   return {
     activityTypes,
     reQuery: fetchActivityTypes,
+  };
+};
+
+export const useTimeActivityGroups = (enabled: boolean) => {
+  const [groups, setGroups] = useState<ITimeActivityGroupListRes['groups']>();
+
+  const fetchGroups = async () => {
+    const res = await post<null, ITimeActivityGroupListRes>('/api/time/activity-group/list', null);
+    setGroups(res.groups);
+  };
+
+  useEffect(() => {
+    if (!enabled) return;
+    void fetchGroups();
+  }, [enabled]);
+
+  return {
+    groups,
+    reQuery: fetchGroups,
   };
 };
 
@@ -55,7 +82,7 @@ export const useTimeEntries = () => {
   };
 
   useEffect(() => {
-    fetchTimeEntries(DEFAULT_PAGE);
+    void fetchTimeEntries(DEFAULT_PAGE);
   }, []);
 
   return {
@@ -70,51 +97,13 @@ export const useTimeEntries = () => {
   };
 };
 
-export const useTimeMonthAnalyze = (month: dayjs.Dayjs, refreshKey = 0, activityTypeId?: number) => {
-  const [data, setData] = useState<ITimeEntryAnalyzeRes | null>(null);
-  const [loading, setLoading] = useState(false);
-  const year = month.year();
-  const monthNumber = month.month() + 1;
-  const timezoneOffsetMinutes = new Date().getTimezoneOffset();
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    post<ITimeEntryAnalyzeReq, ITimeEntryAnalyzeRes>('/api/time-entry/analyze', {
-      year,
-      month: monthNumber,
-      activityTypeId,
-      timezoneOffsetMinutes,
-    })
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setData({
-            timeEntries: [],
-            totalMinutes: 0,
-            recordedDays: 0,
-            activitySummaries: [],
-            dailySummaries: [],
-            rhythmSegments: [],
-            sleepSamples: [],
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [year, monthNumber, refreshKey, activityTypeId, timezoneOffsetMinutes]);
-
-  return { data, loading };
-};
-
-export const useTimeRangeAnalyze = (startedAt: dayjs.Dayjs, endedAt: dayjs.Dayjs, refreshKey = 0, activityTypeId?: number) => {
+export const useTimeRangeAnalyze = (
+  startedAt: dayjs.Dayjs,
+  endedAt: dayjs.Dayjs,
+  refreshKey = 0,
+  includeHourly = false,
+  enabled = true
+) => {
   const [data, setData] = useState<ITimeEntryAnalyzeRes | null>(null);
   const [loading, setLoading] = useState(false);
   const startedAtMs = startedAt.valueOf();
@@ -122,29 +111,20 @@ export const useTimeRangeAnalyze = (startedAt: dayjs.Dayjs, endedAt: dayjs.Dayjs
   const timezoneOffsetMinutes = new Date().getTimezoneOffset();
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     setLoading(true);
     post<ITimeEntryAnalyzeReq, ITimeEntryAnalyzeRes>('/api/time-entry/analyze', {
       startedAt: startedAtMs,
       endedAt: endedAtMs,
-      activityTypeId,
       timezoneOffsetMinutes,
+      includeHourly,
     })
       .then((res) => {
         if (!cancelled) setData(res);
       })
       .catch(() => {
-        if (!cancelled) {
-          setData({
-            timeEntries: [],
-            totalMinutes: 0,
-            recordedDays: 0,
-            activitySummaries: [],
-            dailySummaries: [],
-            rhythmSegments: [],
-            sleepSamples: [],
-          });
-        }
+        if (!cancelled) setData(EMPTY_ANALYZE_DATA);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -153,7 +133,7 @@ export const useTimeRangeAnalyze = (startedAt: dayjs.Dayjs, endedAt: dayjs.Dayjs
     return () => {
       cancelled = true;
     };
-  }, [startedAtMs, endedAtMs, refreshKey, activityTypeId, timezoneOffsetMinutes]);
+  }, [startedAtMs, endedAtMs, refreshKey, includeHourly, timezoneOffsetMinutes, enabled]);
 
   return { data, loading };
 };

@@ -38,14 +38,30 @@ export const CHART_COLORS = [
 export const TIME_ACTIVITY_COLOR_BY_NAME: Record<string, string> = {
   '占位': '#8A93A8',
   '睡眠': '#6D5DF6',
+  '闭目': '#8E7CFF',
   '工作': '#008FF5',
   '手机': '#FF3D71',
   '电视': '#38BDF8',
   '钢琴': '#9C27B0',
   '运动': '#00B86B',
+  '步行': '#20C997',
   '阅读': '#FF8A00',
   '学习': '#00A7A7',
 };
+
+export const TIME_ACTIVITY_GROUP_COLOR_BY_NAME: Record<string, string> = {
+  '屏幕': '#FF3D71',
+  '休息': '#6D5DF6',
+  '运动': '#00B86B',
+  '学习': '#00A7A7',
+};
+
+// Ordered data colors for user-created Time groups. These are intentionally
+// separate from activity colors so the dashboard can evolve independently.
+export const TIME_ACTIVITY_GROUP_COLORS = [
+  '#FF3D71', '#6D5DF6', '#00B86B', '#00A7A7', '#9C27B0', '#FF8A00', '#008FF5',
+  '#20C997', '#B15CFF', '#FF7AB6', '#3D7DFF', '#C6D500', '#FFB000', '#00C2FF',
+];
 
 export const TIME_ACTIVITY_COLORS = [
   '#6D5DF6', '#008FF5', '#FF3D71', '#9C27B0', '#00B86B', '#FF8A00', '#00A7A7',

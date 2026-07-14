@@ -1,4 +1,4 @@
-import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeEntry, Transaction, User } from '@prisma/client';
+import { ActivityType, Category, Coupon, StockAccount, StockAiReport, StockDividendEvent, StockDividendMarking, StockHolding, StockQuote, StockRemark, StockSnapshot, TimeActivityGroup, TimeActivityGroupTargetDirection, TimeEntry, Transaction, User } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
@@ -107,6 +107,32 @@ export interface IActivityTypeCreateRes {
   activityType: ActivityType;
 }
 
+export type TimeActivityGroupWithActivityTypes = Prisma.TimeActivityGroupGetPayload<{
+  include: {
+    activityTypes: true;
+  };
+}>;
+
+export interface ITimeActivityGroupListRes {
+  groups: TimeActivityGroupWithActivityTypes[];
+}
+
+export interface ITimeActivityGroupDraft {
+  id?: TimeActivityGroup['id'];
+  name: TimeActivityGroup['name'];
+  targetMinutes: TimeActivityGroup['targetMinutes'];
+  targetDirection: TimeActivityGroupTargetDirection;
+  activityTypeIds: ActivityType['id'][];
+}
+
+export interface ITimeActivityGroupSaveReq {
+  groups: ITimeActivityGroupDraft[];
+}
+
+export interface ITimeActivityGroupSaveRes {
+  groups: TimeActivityGroupWithActivityTypes[];
+}
+
 export interface ITimeEntryCreateReq {
   activityTypeId?: TimeEntry['activityTypeId'];
   activityTypeIds?: ActivityType['id'][];
@@ -141,14 +167,25 @@ export interface ITimeEntryDeleteReq {
 }
 
 export interface ITimeEntryAnalyzeReq {
-  activityTypeId?: TimeEntry['activityTypeId'];
-  year?: number;
-  month?: number;
-  startedAt?: number;
-  endedAt?: number;
+  startedAt: number;
+  endedAt: number;
   timezoneOffsetMinutes?: number;
+  includeHourly?: boolean;
 }
 
+export interface ITimeActivityGroupSummary {
+  groupId: TimeActivityGroup['id'];
+  name: TimeActivityGroup['name'];
+  color: TimeActivityGroup['color'];
+  targetMinutes: TimeActivityGroup['targetMinutes'];
+  targetDirection: TimeActivityGroupTargetDirection;
+  minutes: number;
+  recordedDays: number;
+  targetMetDays: number;
+}
+
+// The life-analysis report generator uses these activity-level snapshots
+// independently from the Time dashboard's group-based analytics.
 export interface ITimeActivitySummary {
   activityTypeId: ActivityType['id'];
   name: ActivityType['name'];
@@ -166,31 +203,22 @@ export interface ITimeDailySummary {
   lastEndedAt?: string;
 }
 
-export interface ITimeSegment {
+export interface ITimeGroupDailySummary {
   date: string;
-  activityTypeId: ActivityType['id'];
-  name: ActivityType['name'];
-  color: ActivityType['color'];
-  startMinute: number;
-  endMinute: number;
-  minutes: number;
+  hasRecords: boolean;
+  byGroup: Record<string, number>;
 }
 
-export interface ISleepSample {
-  date: string;
-  startedAt: string;
-  endedAt: string;
-  minutes: number;
+export interface ITimeGroupHourlySummary {
+  hour: number;
+  byGroup: Record<string, number>;
 }
 
 export interface ITimeEntryAnalyzeRes {
-  timeEntries: TimeEntryWithActivityType[];
-  totalMinutes: number;
+  groupSummaries: ITimeActivityGroupSummary[];
   recordedDays: number;
-  activitySummaries: ITimeActivitySummary[];
-  dailySummaries: ITimeDailySummary[];
-  rhythmSegments: ITimeSegment[];
-  sleepSamples: ISleepSample[];
+  dailySummaries: ITimeGroupDailySummary[];
+  hourlySummaries: ITimeGroupHourlySummary[];
 }
 
 export interface UserLifeAnalysisProfileItem {

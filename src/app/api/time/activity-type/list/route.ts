@@ -3,7 +3,7 @@ import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getSession } from '@libs/session';
 import { TIME_ACTIVITY_COLOR_BY_NAME } from '@styles/theme';
-import { PLACEHOLDER_ACTIVITY_NAME } from '@utils/time-activity';
+import { DEFAULT_TIME_ACTIVITY_GROUPS, PLACEHOLDER_ACTIVITY_NAME } from '@utils/time-activity';
 
 const DEPRECATED_ACTIVITY_NAMES = ['吃饭', '通勤', '其他'];
 
@@ -15,14 +15,55 @@ const RENAMED_ACTIVITY_TYPES = [
 const DEFAULT_ACTIVITY_TYPES = [
   { name: PLACEHOLDER_ACTIVITY_NAME, color: TIME_ACTIVITY_COLOR_BY_NAME[PLACEHOLDER_ACTIVITY_NAME], icon: 'placeholder' },
   { name: '睡眠', color: TIME_ACTIVITY_COLOR_BY_NAME['睡眠'], icon: 'moon' },
+  { name: '闭目', color: TIME_ACTIVITY_COLOR_BY_NAME['闭目'], icon: 'rest' },
   { name: '工作', color: TIME_ACTIVITY_COLOR_BY_NAME['工作'], icon: 'work' },
   { name: '手机', color: TIME_ACTIVITY_COLOR_BY_NAME['手机'], icon: 'phone' },
   { name: '电视', color: TIME_ACTIVITY_COLOR_BY_NAME['电视'], icon: 'tv' },
   { name: '钢琴', color: TIME_ACTIVITY_COLOR_BY_NAME['钢琴'], icon: 'piano' },
   { name: '运动', color: TIME_ACTIVITY_COLOR_BY_NAME['运动'], icon: 'sport' },
+  { name: '步行', color: TIME_ACTIVITY_COLOR_BY_NAME['步行'], icon: 'walk' },
   { name: '阅读', color: TIME_ACTIVITY_COLOR_BY_NAME['阅读'], icon: 'book' },
   { name: '学习', color: TIME_ACTIVITY_COLOR_BY_NAME['学习'], icon: 'study' },
 ];
+
+const ensureInitialActivityGroups = async (userId: number) => {
+  const groupCount = await prisma.timeActivityGroup.count({ where: { userId } });
+  if (groupCount === 0) {
+    await prisma.timeActivityGroup.createMany({
+      data: DEFAULT_TIME_ACTIVITY_GROUPS.map((group, index) => ({
+        userId,
+        name: group.name,
+        color: group.color,
+        sortOrder: index,
+        targetMinutes: group.targetMinutes,
+        targetDirection: group.targetDirection,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const groups = await prisma.timeActivityGroup.findMany({
+    where: {
+      userId,
+      name: { in: DEFAULT_TIME_ACTIVITY_GROUPS.map((group) => group.name) },
+    },
+    select: { id: true, name: true },
+  });
+  const groupIdByName = new Map(groups.map((group) => [group.name, group.id]));
+
+  await Promise.all(DEFAULT_TIME_ACTIVITY_GROUPS.map(async (group) => {
+    const groupId = groupIdByName.get(group.name);
+    if (!groupId) return;
+    await prisma.activityType.updateMany({
+      where: {
+        userId,
+        groupId: null,
+        name: { in: [...group.activityNames] },
+      },
+      data: { groupId },
+    });
+  }));
+};
 
 const updateActivityTypeDefaults = async (
   activityType: { id: number; color: string; icon: string | null },
@@ -141,6 +182,9 @@ export async function POST() {
 
     await normalizeRenamedActivityTypes(userIdNumber);
     await ensurePlaceholderActivityType(userIdNumber);
+    if (existingCount === 0) {
+      await ensureInitialActivityGroups(userIdNumber);
+    }
 
     const activityTypes = await prisma.activityType.findMany({
       where: {

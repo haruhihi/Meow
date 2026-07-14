@@ -1,0 +1,199 @@
+.settingsModal {
+  :global(.adm-modal-body) {
+    max-width: 620px;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(78dvh, 720px);
+  margin-top: 18px;
+}
+
+.heading {
+  color: var(--meow-text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.hint {
+  margin-top: 6px;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.groupList {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  margin: 16px -4px 0;
+  padding: 0 4px 8px;
+}
+
+.groupCard {
+  border: 1px solid var(--meow-border);
+  border-radius: 16px;
+  background: var(--meow-surface-alt);
+  padding: 12px;
+}
+
+.groupCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.groupIndex {
+  flex: 0 0 auto;
+  color: var(--meow-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.groupNameInput {
+  flex: 1;
+  min-width: 0;
+  --font-size: 15px;
+  --color: var(--meow-text);
+}
+
+.reorderActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.smallAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--meow-primary-dim);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.smallAction:disabled {
+  opacity: 0.35;
+}
+
+.deleteAction {
+  color: var(--meow-danger);
+}
+
+.fieldLabel {
+  display: block;
+  margin: 14px 0 7px;
+  color: var(--meow-text-sub);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.targetRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+}
+
+.targetInput {
+  --font-size: 14px;
+  --color: var(--meow-text);
+}
+
+.directionSelector {
+  :global(.adm-selector-item) {
+    min-width: 0;
+    padding: 8px 4px;
+    border-radius: 9px;
+    color: var(--meow-text-sub);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  :global(.adm-selector-item-active) {
+    border-color: var(--meow-primary);
+    background: color-mix(in srgb, var(--meow-primary) 10%, var(--meow-surface));
+    color: var(--meow-primary-dim);
+  }
+}
+
+.activityGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.activityButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid var(--meow-border);
+  border-radius: 999px;
+  background: var(--meow-surface);
+  color: var(--meow-text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.activityButtonActive {
+  border-color: color-mix(in srgb, var(--group-color) 58%, var(--meow-border));
+  background: color-mix(in srgb, var(--group-color) 12%, var(--meow-surface));
+  color: var(--meow-text);
+}
+
+.activityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.emptyActivities {
+  color: var(--meow-text-muted);
+  font-size: 12px;
+}
+
+.addButton {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin: 2px 0 4px;
+}
+
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  padding: 12px 0 max(4px, env(safe-area-inset-bottom));
+  background: var(--meow-surface);
+}
+
+.footer > :global(.adm-button) {
+  flex: 1;
+}
+
+@media (max-width: 360px) {
+  .targetRow {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .smallAction {
+    min-width: 32px;
+    padding: 4px 5px;
+  }
+}

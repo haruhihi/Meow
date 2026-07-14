@@ -14,6 +14,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum TimeActivityGroupTargetDirection {
+  AT_LEAST
+  AT_MOST
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   account   String   @unique
@@ -24,6 +29,7 @@ model User {
 
   Transaction           Transaction[]            @relation
   ActivityType          ActivityType[]           @relation
+  TimeActivityGroup     TimeActivityGroup[]      @relation
   TimeEntry             TimeEntry[]              @relation
   StockAccount          StockAccount[]           @relation
   StockHolding          StockHolding[]           @relation
@@ -372,6 +378,7 @@ model StockQuote {
 model ActivityType {
   id        Int      @id @default(autoincrement())
   userId    Int
+  groupId   Int?
   name      String   @db.VarChar(80)
   color     String   @db.VarChar(16)
   icon      String?  @db.VarChar(80)
@@ -380,8 +387,28 @@ model ActivityType {
   updatedAt DateTime @updatedAt
 
   user                User                @relation(fields: [userId], references: [id])
+  group               TimeActivityGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
   timeEntries         TimeEntry[]         @relation
   timeEntryActivities TimeEntryActivity[] @relation
+
+  @@unique([userId, name])
+  @@index([userId, sortOrder])
+  @@index([groupId])
+}
+
+model TimeActivityGroup {
+  id              Int                              @id @default(autoincrement())
+  userId          Int
+  name            String                           @db.VarChar(80)
+  color           String                           @db.VarChar(16)
+  sortOrder       Int                              @default(0)
+  targetMinutes   Int
+  targetDirection TimeActivityGroupTargetDirection @default(AT_LEAST)
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityTypes ActivityType[]
 
   @@unique([userId, name])
   @@index([userId, sortOrder])
@@ -397,8 +424,8 @@ model TimeEntry {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user         User         @relation(fields: [userId], references: [id])
-  activityType ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  user         User                @relation(fields: [userId], references: [id])
+  activityType ActivityType        @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
   activities   TimeEntryActivity[] @relation
 
   @@index([userId, startedAt])
