@@ -3,7 +3,7 @@ import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getUID } from '@libs/session';
 import { normalizePregnancyDate } from '@utils/pregnancy';
-import { normalizePregnancyContent, pregnancyRecordToItem } from '../../helpers';
+import { ensurePregnancyProfile, normalizePregnancyContent, pregnancyRecordToItem } from '../../helpers';
 
 export async function POST(req: Request) {
   try {
@@ -13,11 +13,15 @@ export async function POST(req: Request) {
     const body = (await req.json()) as IPregnancyRecordUpsertReq;
     const recordDate = normalizePregnancyDate(body.recordDate, '记录日期');
     const content = normalizePregnancyContent(body.content, '个人记录');
-    const record = await prisma.pregnancyDailyRecord.upsert({
-      where: { userId_recordDate: { userId, recordDate } },
-      create: { userId, recordDate, content },
-      update: { content },
+    const existing = await prisma.pregnancyDailyRecord.findFirst({
+      where: { recordDate },
+      orderBy: [{ id: 'asc' }],
     });
+    const record = existing
+      ? await prisma.pregnancyDailyRecord.update({ where: { id: existing.id }, data: { content } })
+      : await prisma.pregnancyDailyRecord.create({
+        data: { userId: (await ensurePregnancyProfile(userId)).userId, recordDate, content },
+      });
 
     return success<IPregnancyRecordUpsertRes>({ record: pregnancyRecordToItem(record) });
   } catch (error) {

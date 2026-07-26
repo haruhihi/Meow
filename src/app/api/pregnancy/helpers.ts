@@ -34,11 +34,16 @@ export const getTodayForTimezone = (timezoneOffsetMinutes: unknown) => {
   return new Date(Date.now() - safeOffset * 60 * 1000).toISOString().slice(0, 10);
 };
 
-export const ensurePregnancyProfile = (userId: number) => prisma.pregnancyProfile.upsert({
-  where: { userId },
-  create: { userId, startDate: DEFAULT_PREGNANCY_START_DATE },
-  update: {},
-});
+export const ensurePregnancyProfile = async (fallbackUserId: number) => {
+  const existing = await prisma.pregnancyProfile.findFirst({
+    orderBy: [{ id: 'asc' }],
+  });
+  if (existing) return existing;
+
+  return prisma.pregnancyProfile.create({
+    data: { userId: fallbackUserId, startDate: DEFAULT_PREGNANCY_START_DATE },
+  });
+};
 
 export const getPregnancyBounds = (startDate: string) => ({
   startDate,

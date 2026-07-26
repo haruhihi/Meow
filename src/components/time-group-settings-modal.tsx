@@ -146,6 +146,10 @@ export const TimeGroupSettingsModal = ({
       visible={visible}
       closeOnMaskClick={!saving}
       showCloseButton
+      actions={[
+        { key: 'cancel', text: '取消', disabled: saving, onClick: onClose },
+        { key: 'save', text: saving ? '保存中...' : '保存配置', primary: true, disabled: saving, onClick: save },
+      ]}
       onClose={() => {
         if (!saving) onClose();
       }}
@@ -261,11 +265,6 @@ export const TimeGroupSettingsModal = ({
             >
               新增分组
             </Button>
-          </div>
-
-          <div className={styles.footer}>
-            <Button disabled={saving} onClick={onClose}>取消</Button>
-            <Button color="primary" loading={saving} disabled={saving} onClick={() => void save()}>保存配置</Button>
           </div>
         </div>
       }

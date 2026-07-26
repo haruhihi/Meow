@@ -276,7 +276,7 @@ const App = observer(function App() {
     }
 
     if (activityTypeIds.length <= 0) {
-      Toast.show({ content: '请选择活动或输入新项目' });
+      Toast.show({ content: '请选择活动或输入新项' });
       return;
     }
 
@@ -530,7 +530,7 @@ const App = observer(function App() {
               <Input placeholder="请输入金额" type="number" />
             </Form.Item>
 
-            <Form.Item name="useCoupon" label="使用券" valuePropName="checked">
+            <Form.Item name="useCoupon" label="券" valuePropName="checked">
               <Switch />
             </Form.Item>
 

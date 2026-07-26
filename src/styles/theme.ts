@@ -42,6 +42,7 @@ export const TIME_ACTIVITY_COLOR_BY_NAME: Record<string, string> = {
   '工作': '#008FF5',
   '手机': '#FF3D71',
   '电视': '#38BDF8',
+  '家务': '#F97316',
   '钢琴': '#9C27B0',
   '运动': '#00B86B',
   '步行': '#20C997',

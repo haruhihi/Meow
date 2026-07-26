@@ -3,6 +3,7 @@ import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getUID } from '@libs/session';
 import {
+  ensurePregnancyProfile,
   normalizePregnancyContent,
   normalizePregnancyRange,
   pregnancyCautionToItem,
@@ -21,15 +22,16 @@ export async function POST(req: Request) {
     let caution;
     if (id != null) {
       if (!Number.isInteger(id) || id <= 0) throw new Error('事项 ID 无效');
-      const existing = await prisma.pregnancyCaution.findFirst({ where: { id, userId } });
+      const existing = await prisma.pregnancyCaution.findFirst({ where: { id } });
       if (!existing) throw new Error('注意事项不存在');
       caution = await prisma.pregnancyCaution.update({
         where: { id },
         data: { startDate, endDate, content },
       });
     } else {
+      const sharedProfile = await ensurePregnancyProfile(userId);
       caution = await prisma.pregnancyCaution.create({
-        data: { userId, startDate, endDate, content },
+        data: { userId: sharedProfile.userId, startDate, endDate, content },
       });
     }
 

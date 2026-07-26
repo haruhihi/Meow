@@ -203,7 +203,7 @@ export default function TimePage() {
     }
 
     if (activityTypeIds.length === 0) {
-      Toast.show({ content: '请选择活动或输入新项目' });
+      Toast.show({ content: '请选择活动或输入新项' });
       return;
     }
 
@@ -815,7 +815,7 @@ const QuickBillEntryModal = ({ visible, onClose }: { visible: boolean; onClose: 
           <Form.Item name="amount" label="金额" rules={[{ required: true, message: '金额不能为空' }]}>
             <Input placeholder="请输入金额" type="number" />
           </Form.Item>
-          <Form.Item name="useCoupon" label="使用券" valuePropName="checked">
+          <Form.Item name="useCoupon" label="券" valuePropName="checked">
             <Switch />
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prev, next) => prev.useCoupon !== next.useCoupon}>

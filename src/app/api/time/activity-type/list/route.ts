@@ -10,6 +10,7 @@ const DEPRECATED_ACTIVITY_NAMES = ['吃饭', '通勤', '其他'];
 const RENAMED_ACTIVITY_TYPES = [
   { from: '短视频', to: '手机', color: TIME_ACTIVITY_COLOR_BY_NAME['手机'], icon: 'phone' },
   { from: '看电视', to: '电视', color: TIME_ACTIVITY_COLOR_BY_NAME['电视'], icon: 'tv' },
+  { from: '做饭', to: '家务', color: TIME_ACTIVITY_COLOR_BY_NAME['家务'], icon: 'home' },
 ];
 
 const DEFAULT_ACTIVITY_TYPES = [

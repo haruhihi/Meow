@@ -3,7 +3,7 @@ import { success, fail } from '@libs/fetch';
 import { prisma } from '@libs/prisma';
 import { getUID } from '@libs/session';
 import { normalizePregnancyDate } from '@utils/pregnancy';
-import { getTodayForTimezone, pregnancyProfileToItem } from '../../helpers';
+import { ensurePregnancyProfile, getTodayForTimezone, pregnancyProfileToItem } from '../../helpers';
 
 export async function POST(req: Request) {
   try {
@@ -16,10 +16,10 @@ export async function POST(req: Request) {
       throw new Error('末次月经日期不能晚于今天');
     }
 
-    const profile = await prisma.pregnancyProfile.upsert({
-      where: { userId },
-      create: { userId, startDate },
-      update: { startDate },
+    const sharedProfile = await ensurePregnancyProfile(userId);
+    const profile = await prisma.pregnancyProfile.update({
+      where: { id: sharedProfile.id },
+      data: { startDate },
     });
 
     return success<IPregnancyProfileUpdateRes>({ profile: pregnancyProfileToItem(profile) });

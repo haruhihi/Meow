@@ -175,18 +175,6 @@
   margin: 2px 0 4px;
 }
 
-.footer {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 10px;
-  padding: 12px 0 max(4px, env(safe-area-inset-bottom));
-  background: var(--meow-surface);
-}
-
-.footer > :global(.adm-button) {
-  flex: 1;
-}
-
 @media (max-width: 360px) {
   .targetRow {
     grid-template-columns: minmax(0, 1fr) 96px;

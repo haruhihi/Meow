@@ -4,6 +4,11 @@ import { prisma } from '@libs/prisma';
 import { getSession } from '@libs/session';
 import { TIME_ACTIVITY_COLORS } from '@styles/theme';
 
+const normalizeActivityName = (name?: string) => {
+  const trimmedName = name?.trim();
+  return trimmedName === '做饭' ? '家务' : trimmedName;
+};
+
 const pickActivityColor = (usedColors: string[]) => {
   const used = new Set(usedColors.map((color) => color.toUpperCase()));
   return TIME_ACTIVITY_COLORS.find((color) => !used.has(color.toUpperCase()))
@@ -16,7 +21,7 @@ export async function POST(req: Request) {
     const userId = (await getSession())?.userId;
     if (!userId) throw new Error(`User not found:${userId}`);
 
-    const trimmedName = name?.trim();
+    const trimmedName = normalizeActivityName(name);
     if (!trimmedName) throw new Error('name is required');
     if (trimmedName.length > 20) throw new Error('name is too long');
 

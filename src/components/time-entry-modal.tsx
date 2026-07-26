@@ -158,8 +158,8 @@ export const TimeEntryModal = ({
               }}
             </Form.Item>
           )}
-          <Form.Item name="customActivityName" label="新项目">
-            <Input placeholder="例如：冥想、做饭、画画" />
+          <Form.Item name="customActivityName" label="新项">
+            <Input placeholder="例如：冥想、家务、画画" />
           </Form.Item>
           <Form.Item
             name="startedAt"
