@@ -666,9 +666,9 @@ const QuickBillEntryModal = ({ visible, onClose }: { visible: boolean; onClose: 
   const [payTime, setPayTime] = useState(dayjs());
   const [refreshKey, setRefreshKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const categoryRes = useCategories();
+  const categoryRes = useCategories(visible || categoryVisible);
   const { createTransaction } = useTransactions();
-  const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
+  const paymentCoupons = usePaymentCoupons(payTime, refreshKey, visible);
   const categories = categoryRes?.categories ?? [];
   const cascaderOptions = useMemo(() => getCategoryOptions(categories), [categories]);
   const couponOptions = useMemo(

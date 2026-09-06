@@ -8,6 +8,11 @@ export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
   };
 }>;
 
+export type TransactionListItem = Pick<Transaction, 'id' | 'amount' | 'couponId' | 'couponName' | 'couponDiscount' | 'date' | 'description'> & {
+  category: Pick<Category, 'id' | 'name' | 'parentId'>;
+  coupon: Pick<Coupon, 'id' | 'name' | 'validYear' | 'validMonth' | 'amount' | 'remainingAmount'> | null;
+};
+
 export interface ICategoryRes {
   categories: (Prisma.CategoryGetPayload<{
     include: {
@@ -48,7 +53,7 @@ export interface ITransactionUpdateRes {
 }
 
 export interface ITransactionSearchRes {
-  transactions: TransactionWithCoupon[];
+  transactions: TransactionListItem[];
 }
 
 export interface ITransactionSearchReq {

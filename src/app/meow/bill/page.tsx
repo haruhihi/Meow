@@ -36,7 +36,7 @@ import {
   IActivityTypeCreateRes,
   ITimeEntryCreateReq,
   ITimeEntryCreateRes,
-  TransactionWithCoupon,
+  TransactionListItem,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
 import { FormCascader } from '@components/form-cascader';
@@ -63,19 +63,21 @@ const App = observer(function App() {
   const [showTrend, setShowTrend] = useState(true);
   const [includeCouponDiscount, setIncludeCouponDiscount] = useState(true);
   const [payTime, setPayTime] = useState(dayjs());
-  const [editingTransaction, setEditingTransaction] = useState<TransactionWithCoupon | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<TransactionListItem | null>(null);
   const [transactionSubmitting, setTransactionSubmitting] = useState(false);
+  const [categoryDistributionExpanded, setCategoryDistributionExpanded] = useState(false);
+  const [extraInfoRequested, setExtraInfoRequested] = useState(false);
 
-  const categoryRes = useCategories();
+  const categoryRes = useCategories(visible || categoryVisible || categoryDistributionExpanded);
   const { transactions, reQuery, loadMore, hasMore, createTransaction, updateTransaction, deleteTransactions } = useTransactions();
   const { data: monthData } = useMonthAnalyze(month, refreshKey, includeCouponDiscount);
-  const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount);
-  const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
-  const activityRes = useActivityTypes(refreshKey);
+  const { data: prevMonthData } = useMonthAnalyze(month.subtract(1, 'month'), refreshKey, includeCouponDiscount, extraInfoRequested);
+  const paymentCoupons = usePaymentCoupons(payTime, refreshKey, extraInfoRequested || visible);
+  const activityRes = useActivityTypes(timeVisible, refreshKey);
   const activityTypes = activityRes.activityTypes ?? [];
   const categories = categoryRes?.categories ?? [];
   const recentTransactions = transactions ?? [];
-  const initialLoading = !categoryRes || transactions === undefined || monthData === null;
+  const initialLoading = transactions === undefined || monthData === null;
 
   useEffect(() => {
     const saved = window.localStorage.getItem(BILL_TREND_STORAGE_KEY);
@@ -196,7 +198,7 @@ const App = observer(function App() {
     setCategoryVisible(true);
   };
 
-  const openEditTransaction = (transaction: TransactionWithCoupon) => {
+  const openEditTransaction = (transaction: TransactionListItem) => {
     const time = new Date(transaction.date);
     const category = flatCategoryOptions.find((option) => option.value.at(-1) === String(transaction.category.id))?.value;
     setEditingTransaction(transaction);
@@ -289,6 +291,7 @@ const App = observer(function App() {
           includeCouponDiscount={includeCouponDiscount}
           onIncludeCouponDiscountChange={setIncludeCouponDiscount}
           onAnalyzeClick={openAnalyze}
+          onExtraInfoClick={() => setExtraInfoRequested(true)}
         />
 
         {initialLoading ? (
@@ -297,13 +300,21 @@ const App = observer(function App() {
           <>
             {monthData && monthData.transactions.length > 0 && (
               <>
-                <TopCategories
-                  month={month}
-                  transactions={monthData.transactions}
-                  categories={categories}
-                  selected={selectedTop}
-                  onSelect={setSelectedTop}
-                />
+                <div className={styles.sectionHeader}>
+                  <span>类目分布</span>
+                  <button type="button" className={styles.linkBtn} onClick={() => setCategoryDistributionExpanded((expanded) => !expanded)}>
+                    {categoryDistributionExpanded ? '收起' : '展开'}
+                  </button>
+                </div>
+                {categoryDistributionExpanded && categoryRes && (
+                  <TopCategories
+                    month={month}
+                    transactions={monthData.transactions}
+                    categories={categories}
+                    selected={selectedTop}
+                    onSelect={setSelectedTop}
+                  />
+                )}
 
                 <div className={styles.sectionHeader}>
                   <span>本月趋势</span>
@@ -356,7 +367,7 @@ const App = observer(function App() {
 
       <TimeEntryFloatingButton
         initialPositionBottom="calc(168px + max(env(safe-area-inset-bottom), 0px))"
-        activityTypes={activityTypes}
+          activityTypes={activityTypes}
         onClick={openTimeCreate}
         onQuickCreateSuccess={activityRes.reQuery}
       />

@@ -25,8 +25,8 @@ export async function POST(req: Request) {
       skip: page * pageSize,
       take: pageSize,
       include: {
-        category: true,
-        coupon: true,
+        category: { select: { id: true, name: true, parentId: true } },
+        coupon: { select: { id: true, name: true, validYear: true, validMonth: true, amount: true, remainingAmount: true } },
       },
     });
 

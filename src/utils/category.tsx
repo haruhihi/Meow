@@ -29,17 +29,18 @@ export interface FlatCategoryOption {
   groupLabel: string;
 }
 
-export const useCategories = () => {
+export const useCategories = (enabled = true) => {
   const [res, setRes] = useState<ICategoryRes>();
   const { refreshSignal, refresh } = useRefresh();
 
   useEffect(() => {
+    if (!enabled) return;
     async function fetchCategory() {
       const res = await post<null, ICategoryRes>('/api/category/search');
       setRes(res);
     }
     fetchCategory();
-  }, [refreshSignal]);
+  }, [enabled, refreshSignal]);
 
   return res
     ? {

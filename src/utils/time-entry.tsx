@@ -20,7 +20,7 @@ const EMPTY_ANALYZE_DATA: ITimeEntryAnalyzeRes = {
   hourlySummaries: [],
 };
 
-export const useActivityTypes = (refreshKey = 0) => {
+export const useActivityTypes = (enabled = true, refreshKey = 0) => {
   const [activityTypes, setActivityTypes] = useState<IActivityTypeListRes['activityTypes']>();
 
   const fetchActivityTypes = async () => {
@@ -29,8 +29,9 @@ export const useActivityTypes = (refreshKey = 0) => {
   };
 
   useEffect(() => {
+    if (!enabled) return;
     void fetchActivityTypes();
-  }, [refreshKey]);
+  }, [enabled, refreshKey]);
 
   return {
     activityTypes,

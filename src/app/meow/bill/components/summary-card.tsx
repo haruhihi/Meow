@@ -17,6 +17,7 @@ interface Props {
   includeCouponDiscount?: boolean;
   onIncludeCouponDiscountChange?: (checked: boolean) => void;
   onAnalyzeClick?: () => void;
+  onExtraInfoClick?: () => void;
 }
 
 export const SummaryCard: FC<Props> = ({
@@ -28,6 +29,7 @@ export const SummaryCard: FC<Props> = ({
   includeCouponDiscount = false,
   onIncludeCouponDiscountChange,
   onAnalyzeClick,
+  onExtraInfoClick,
 }) => {
   const stats = useMemo(() => {
     const start = month.startOf('month');
@@ -111,7 +113,13 @@ export const SummaryCard: FC<Props> = ({
       <div className={styles.statsRow}>
         <Stat label="笔数" value={`${stats.count}`} />
         <Stat label="日均" value={formatMoney(stats.daily)} />
-        <Stat label="上月" value={prevMonthTotal != null ? formatMoney(prevMonthTotal) : '—'} />
+        {prevMonthTotal != null ? (
+          <Stat label="上月" value={formatMoney(prevMonthTotal)} />
+        ) : (
+          <button type="button" className={styles.statButton} onClick={onExtraInfoClick}>
+            <Stat label="上月" value="—" />
+          </button>
+        )}
       </div>
 
       <div className={styles.couponHint}>

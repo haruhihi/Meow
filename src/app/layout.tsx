@@ -62,11 +62,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
                 // 这段 JavaScript 会在页面加载之前执行
+                const pathname = window.location.pathname;
                 const isMeowDocumentScrollRoute =
-                  /^\/meow\/(?:bill|time|me)$/.test(window.location.pathname) ||
-                  /^\/meow\/stocks(?:\/(?!snapshots$)[^/]+)?$/.test(window.location.pathname) ||
-                  /^\/meow\/articles(?:\/[^/]+)?$/.test(window.location.pathname) ||
-                  /^\/meow\/ai-reports(?:\/[^/]+)?$/.test(window.location.pathname);
+                  ['/meow/bill', '/meow/time', '/meow/me'].includes(pathname) ||
+                  (pathname.startsWith('/meow/stocks') && !pathname.endsWith('/snapshots')) ||
+                  (pathname === '/meow/articles' || pathname.startsWith('/meow/articles/')) ||
+                  (pathname === '/meow/ai-reports' || pathname.startsWith('/meow/ai-reports/'));
 
                 if (!isMeowDocumentScrollRoute) {
                   console.log('Setting body height: ' + document.documentElement.clientHeight + 'px')

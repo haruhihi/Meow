@@ -32,18 +32,19 @@ export const useTransactions = () => {
 };
 
 // Fetch analyze data (full month dump). Bumps on refreshKey change.
-export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0, includeCouponDiscount = false) => {
+export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0, includeCouponDiscount = false, enabled = true) => {
   const { transactionStore } = useMeowStores();
   const year = month.year();
   const m = month.month() + 1;
 
   useEffect(() => {
+    if (!enabled) return;
     void transactionStore.loadMonthAnalyze({
       year,
       month: m,
       includeCouponDiscount,
     }, { force: refreshKey > 0 });
-  }, [year, m, refreshKey, includeCouponDiscount, transactionStore]);
+  }, [enabled, year, m, refreshKey, includeCouponDiscount, transactionStore]);
 
   const status = transactionStore.getMonthAnalyzeStatus(year, m, includeCouponDiscount);
 
@@ -55,14 +56,15 @@ export const useMonthAnalyze = (month: dayjs.Dayjs, refreshKey: number = 0, incl
   };
 };
 
-export const usePaymentCoupons = (month: dayjs.Dayjs, refreshKey: number = 0) => {
+export const usePaymentCoupons = (month: dayjs.Dayjs, refreshKey: number = 0, enabled = true) => {
   const { couponStore } = useMeowStores();
   const year = month.year();
   const m = month.month() + 1;
 
   useEffect(() => {
+    if (!enabled) return;
     void couponStore.loadPaymentCoupons(year, m, { force: refreshKey > 0 });
-  }, [year, m, refreshKey, couponStore]);
+  }, [enabled, year, m, refreshKey, couponStore]);
 
   return couponStore.getPaymentCoupons(year, m);
 };
