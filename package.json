@@ -20,7 +20,11 @@
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
     "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply",
     "migrate:leisure-categories": "node scripts/migrate-leisure-categories.mjs",
-    "migrate:leisure-categories:apply": "node scripts/migrate-leisure-categories.mjs --apply"
+    "migrate:leisure-categories:apply": "node scripts/migrate-leisure-categories.mjs --apply",
+    "migrate:household-medical-categories": "node scripts/migrate-household-medical-categories.mjs",
+    "migrate:household-medical-categories:apply": "node scripts/migrate-household-medical-categories.mjs --apply",
+    "migrate:payment-categories": "node scripts/migrate-payment-categories.mjs",
+    "migrate:payment-categories:apply": "node scripts/migrate-payment-categories.mjs --apply"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.2",

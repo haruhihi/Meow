@@ -57,13 +57,30 @@ export const getCategoryFromValue = (value: string, categories?: ICategoryRes['c
 };
 
 export const getCategoryOptions = (categories: ICategoryRes['categories']) => {
-  // 转换成 options
+  const childrenByParent = new Map<number | null, ICategoryRes['categories'][number][]>();
+  categories.forEach((category) => {
+    const children = childrenByParent.get(category.parentId) ?? [];
+    children.push(category);
+    childrenByParent.set(category.parentId, children);
+  });
+  const usageTotals = new Map<number, number>();
+  const getUsageTotal = (categoryId: number): number => {
+    const cached = usageTotals.get(categoryId);
+    if (cached !== undefined) return cached;
+    const category = categories.find((item) => item.id === categoryId);
+    const total = (category?.usageCount ?? 0)
+      + (childrenByParent.get(categoryId) ?? []).reduce((sum, child) => sum + getUsageTotal(child.id), 0);
+    usageTotals.set(categoryId, total);
+    return total;
+  };
+
   const buildCategoryTree = (
     categories: ICategoryRes['categories'],
     parentId: number | null = null
   ): CascaderOption[] => {
     return categories
       .filter((category) => category.parentId === parentId)
+      .sort((left, right) => getUsageTotal(right.id) - getUsageTotal(left.id))
       .map((category) => {
         const children = buildCategoryTree(categories, category.id);
         const hasChildren = children.length > 0;
@@ -121,6 +138,7 @@ const ICON_BY_TOP_NAME: Record<string, any> = {
   '酒店旅游': RocketOutlined,
   '日用百货': ShopOutlined,
   '缴费/日用/百货': ShopOutlined,
+  '缴费': AccountBookOutlined,
   '交通出行': CarOutlined,
   '社交':     TeamOutlined,
   '居家缴费': HomeOutlined,

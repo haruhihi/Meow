@@ -31,7 +31,7 @@ import { LoadingState } from '@components/loading';
 import { TimeEntryFloatingButton } from '@components/time-entry-floating-button';
 import { TimeEntryModal, type TimeEntryFormValues } from '@components/time-entry-modal';
 import { TimeGroupSettingsModal } from '@components/time-group-settings-modal';
-import { useCategories, getCategoryOptions, flattenCategoryOptions } from '@utils/category';
+import { useCategories, getCategoryOptions } from '@utils/category';
 import { isMoneyGreater, roundMoney } from '@utils/money';
 import { usePaymentCoupons, useTransactions } from '@utils/transaction';
 import {
@@ -671,8 +671,6 @@ const QuickBillEntryModal = ({ visible, onClose }: { visible: boolean; onClose: 
   const paymentCoupons = usePaymentCoupons(payTime, refreshKey);
   const categories = categoryRes?.categories ?? [];
   const cascaderOptions = useMemo(() => getCategoryOptions(categories), [categories]);
-  const flatCategoryOptions = useMemo(() => flattenCategoryOptions(cascaderOptions), [cascaderOptions]);
-  const frequentCategoryOptions = useMemo(() => flatCategoryOptions.slice(0, 6), [flatCategoryOptions]);
   const couponOptions = useMemo(
     () => paymentCoupons.map((coupon) => ({
       label: `${coupon.name} · 剩余 ${formatMoney(coupon.remainingAmount)}`,
@@ -798,7 +796,6 @@ const QuickBillEntryModal = ({ visible, onClose }: { visible: boolean; onClose: 
               options={cascaderOptions ?? []}
               categoryVisible={categoryVisible}
               setCategoryVisible={setCategoryVisible}
-              frequentOptions={frequentCategoryOptions}
               loading={!categoryRes}
             />
           </Form.Item>

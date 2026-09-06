@@ -9,12 +9,12 @@ export type TransactionWithCoupon = Prisma.TransactionGetPayload<{
 }>;
 
 export interface ICategoryRes {
-  categories: Prisma.CategoryGetPayload<{
+  categories: (Prisma.CategoryGetPayload<{
     include: {
       parent: true;
       children: true;
     };
-  }>[];
+  }> & { usageCount: number })[];
 }
 
 export interface ICategoryCreateReq {

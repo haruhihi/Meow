@@ -10,7 +10,6 @@ export const FormCascader: React.FC<{
   options: CascaderOption[];
   categoryVisible: boolean;
   setCategoryVisible: (visiable: boolean) => void;
-  frequentOptions?: FlatCategoryOption[];
   loading?: boolean;
 }> = (props) => {
   const {
@@ -19,7 +18,6 @@ export const FormCascader: React.FC<{
     options,
     categoryVisible,
     setCategoryVisible,
-    frequentOptions = [],
     loading = false,
   } = props;
   const [keyword, setKeyword] = useState('');
@@ -74,27 +72,6 @@ export const FormCascader: React.FC<{
             onChange={setKeyword}
             className={styles.search}
           />
-
-          {!keyword && frequentOptions.length > 0 && (
-            <section className={styles.section}>
-              <div className={styles.sectionTitle}>常用类目</div>
-              <div className={styles.chips}>
-                {frequentOptions.map((option) => {
-                  const selected = isSameValue(option.value, value);
-                  return (
-                    <button
-                      key={option.value.join('/')}
-                      type="button"
-                      className={selected ? styles.chipActive : styles.chip}
-                      onClick={() => handleSelect(option.value)}
-                    >
-                      {option.pathLabels.join(' / ')}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {keyword ? (
             <section className={styles.section}>

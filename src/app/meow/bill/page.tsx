@@ -146,33 +146,6 @@ const App = observer(function App() {
     () => flattenCategoryOptions(cascaderOptions),
     [cascaderOptions]
   );
-  const frequentCategoryOptions = useMemo(() => {
-    const ranking = new Map<string, { count: number; lastUsedAt: number }>();
-    const optionsByLeafId = new Map(
-      flatCategoryOptions.map((option) => [option.value[option.value.length - 1], option])
-    );
-
-    [...(monthData?.transactions ?? []), ...recentTransactions].forEach((transaction) => {
-      const key = String(transaction.category.id);
-      const current = ranking.get(key) ?? { count: 0, lastUsedAt: 0 };
-      current.count += 1;
-      current.lastUsedAt = Math.max(current.lastUsedAt, new Date(transaction.date).getTime());
-      ranking.set(key, current);
-    });
-
-    const rankedOptions = [...ranking.entries()]
-      .sort((left, right) => {
-        if (right[1].count !== left[1].count) {
-          return right[1].count - left[1].count;
-        }
-        return right[1].lastUsedAt - left[1].lastUsedAt;
-      })
-      .map(([key]) => optionsByLeafId.get(key))
-      .filter((option): option is NonNullable<typeof option> => Boolean(option));
-
-    return (rankedOptions.length > 0 ? rankedOptions : flatCategoryOptions).slice(0, 6);
-  }, [flatCategoryOptions, monthData?.transactions, recentTransactions]);
-
   const availablePaymentCoupons = useMemo(() => {
     const currentCoupon = editingTransaction?.coupon;
     if (!currentCoupon || editingTransaction.couponDiscount <= 0 || paymentCoupons.some((coupon) => coupon.id === currentCoupon.id)) {
@@ -508,7 +481,6 @@ const App = observer(function App() {
                 options={cascaderOptions ?? []}
                 categoryVisible={categoryVisible}
                 setCategoryVisible={(v: boolean) => setCategoryVisible(v)}
-                frequentOptions={frequentCategoryOptions}
                 loading={!categoryRes}
               />
             </Form.Item>
