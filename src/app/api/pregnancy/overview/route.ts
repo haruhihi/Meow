@@ -20,6 +20,7 @@ export async function POST() {
     const [cautions, records] = await Promise.all([
       prisma.pregnancyCaution.findMany({
         where: {
+          userId,
           startDate: { lte: bounds.endDate },
           endDate: { gte: bounds.startDate },
         },
@@ -27,6 +28,7 @@ export async function POST() {
       }),
       prisma.pregnancyDailyRecord.findMany({
         where: {
+          userId,
           recordDate: { gte: bounds.startDate, lte: bounds.endDate },
         },
         orderBy: [{ recordDate: 'asc' }, { id: 'asc' }],

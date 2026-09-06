@@ -7,10 +7,6 @@ import type {
   IPregnancyOverviewRes,
   IPregnancyProfileUpdateReq,
   IPregnancyProfileUpdateRes,
-  IPregnancyRecordDeleteReq,
-  IPregnancyRecordDeleteRes,
-  IPregnancyRecordUpsertReq,
-  IPregnancyRecordUpsertRes,
 } from '@dtos/meow';
 import { post } from '@libs/fetch';
 
@@ -32,7 +28,7 @@ export const usePregnancyOverview = () => {
       hasDataRef.current = true;
       return response;
     } catch (requestError) {
-      setError((requestError as { result?: string })?.result ?? '孕期数据加载失败');
+      setError((requestError as { result?: string })?.result ?? '日历数据加载失败');
       throw requestError;
     } finally {
       setLoading(false);
@@ -70,23 +66,6 @@ export const usePregnancyOverview = () => {
     await reQuery();
   };
 
-  const upsertRecord = async (params: IPregnancyRecordUpsertReq) => {
-    const response = await post<IPregnancyRecordUpsertReq, IPregnancyRecordUpsertRes>(
-      '/api/pregnancy/record/upsert',
-      params
-    );
-    await reQuery();
-    return response.record;
-  };
-
-  const deleteRecord = async (params: IPregnancyRecordDeleteReq) => {
-    await post<IPregnancyRecordDeleteReq, IPregnancyRecordDeleteRes>(
-      '/api/pregnancy/record/delete',
-      params
-    );
-    await reQuery();
-  };
-
   return {
     data,
     loading,
@@ -96,7 +75,5 @@ export const usePregnancyOverview = () => {
     updateProfile,
     saveCaution,
     deleteCaution,
-    upsertRecord,
-    deleteRecord,
   };
 };

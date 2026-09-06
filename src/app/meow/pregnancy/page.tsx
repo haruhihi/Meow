@@ -16,7 +16,6 @@ import {
 import type { DatePickerRef } from 'antd-mobile';
 import {
   AddCircleOutline,
-  DeleteOutline,
   EditSOutline,
   LeftOutline,
   RightOutline,
@@ -24,7 +23,7 @@ import {
 import dayjs from 'dayjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import type { PregnancyCautionItem, PregnancyDailyRecordItem } from '@dtos/meow';
+import type { PregnancyCautionItem } from '@dtos/meow';
 import { LoadingState } from '@components/loading';
 import { usePregnancyOverview } from '@utils/pregnancy-data';
 import {
@@ -50,10 +49,6 @@ type CautionFormValues = {
   content: string;
 };
 
-type RecordFormValues = {
-  content: string;
-};
-
 const CYCLE_OPTIONS = Array.from({ length: PREGNANCY_CYCLE_COUNT }, (_, cycleIndex) => ({
   label: getPregnancyCycleLabel(cycleIndex),
   value: String(cycleIndex),
@@ -68,22 +63,18 @@ const formatFullDate = (dateKey: string) => dayjs(pregnancyDateToLocalDate(dateK
 export default function PregnancyPage() {
   const pregnancy = usePregnancyOverview();
   const [cautionForm] = Form.useForm<CautionFormValues>();
-  const [recordForm] = Form.useForm<RecordFormValues>();
   const [cycleIndex, setCycleIndex] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [cyclePickerVisible, setCyclePickerVisible] = useState(false);
   const [profilePickerVisible, setProfilePickerVisible] = useState(false);
   const [cautionVisible, setCautionVisible] = useState(false);
-  const [recordVisible, setRecordVisible] = useState(false);
   const [editingCaution, setEditingCaution] = useState<PregnancyCautionItem | null>(null);
   const [cautionSaving, setCautionSaving] = useState(false);
-  const [recordSaving, setRecordSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const initializedStartDateRef = useRef<string | null>(null);
 
   const profile = pregnancy.data?.profile;
   const cautions = pregnancy.data?.cautions ?? [];
-  const records = pregnancy.data?.records ?? [];
   const today = pregnancyDateFromLocalDate(new Date());
 
   useEffect(() => {
@@ -108,17 +99,12 @@ export default function PregnancyPage() {
     () => cycleDates[0] ? getPregnancyWeekdayHeaders(cycleDates[0]) : [],
     [cycleDates]
   );
-  const recordByDate = useMemo(
-    () => new Map(records.map((record) => [record.recordDate, record])),
-    [records]
-  );
   const selectedCautions = useMemo(
     () => selectedDate
       ? cautions.filter((caution) => caution.startDate <= selectedDate && caution.endDate >= selectedDate)
       : [],
     [cautions, selectedDate]
   );
-  const selectedRecord = selectedDate ? recordByDate.get(selectedDate) ?? null : null;
   const selectedAge = startDate && selectedDate ? getPregnancyAge(startDate, selectedDate) : null;
 
   const changeCycle = (nextCycleIndex: number) => {
@@ -199,50 +185,14 @@ export default function PregnancyPage() {
     }
   };
 
-  const openRecord = () => {
-    if (!selectedDate) return;
-    recordForm.resetFields();
-    recordForm.setFieldsValue({ content: selectedRecord?.content ?? '' });
-    setRecordVisible(true);
-  };
-
-  const saveRecord = async (values: RecordFormValues) => {
-    if (!selectedDate) return;
-    try {
-      setRecordSaving(true);
-      await pregnancy.upsertRecord({ recordDate: selectedDate, content: values.content });
-      setRecordVisible(false);
-      Toast.show({ content: selectedRecord ? '个人记录已更新' : '个人记录已保存' });
-    } catch (error) {
-      Toast.show({ content: getRequestError(error) });
-    } finally {
-      setRecordSaving(false);
-    }
-  };
-
-  const deleteRecord = async (record: PregnancyDailyRecordItem) => {
-    const confirmed = await Dialog.confirm({
-      title: '删除个人记录',
-      content: '删除后无法恢复，确定继续吗？',
-    });
-    if (!confirmed) return;
-
-    try {
-      await pregnancy.deleteRecord({ id: record.id });
-      Toast.show({ content: '个人记录已删除' });
-    } catch (error) {
-      Toast.show({ content: getRequestError(error) });
-    }
-  };
-
   const updateStartDate = async (date: Date) => {
     if (!profile) return;
     const nextStartDate = pregnancyDateFromLocalDate(date);
     setProfilePickerVisible(false);
     if (nextStartDate === profile.startDate) return;
     const confirmed = await Dialog.confirm({
-      title: '修改末次月经日期',
-      content: '历史注意事项和个人记录仍保留在原自然日期，只会重新计算孕周和所属周期。',
+      title: '修改起始日期',
+      content: '历史注意事项仍保留在原自然日期，只会重新计算所属周期。',
       confirmText: '确认修改',
     });
     if (!confirmed) return;
@@ -254,7 +204,7 @@ export default function PregnancyPage() {
         startDate: nextStartDate,
         timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       });
-      Toast.show({ content: '末次月经日期已更新' });
+      Toast.show({ content: '起始日期已更新' });
     } catch (error) {
       initializedStartDateRef.current = profile.startDate;
       Toast.show({ content: getRequestError(error) });
@@ -266,7 +216,7 @@ export default function PregnancyPage() {
   if (pregnancy.loading && !pregnancy.data) {
     return (
       <div className={styles.page}>
-        <LoadingState className={styles.pageLoading} label="孕期数据加载中" />
+        <LoadingState className={styles.pageLoading} label="日历数据加载中" />
       </div>
     );
   }
@@ -275,7 +225,7 @@ export default function PregnancyPage() {
     return (
       <div className={styles.page}>
         <div className={styles.loadError}>
-          <Empty description={pregnancy.error ?? '孕期数据暂时无法加载'} />
+          <Empty description={pregnancy.error ?? '日历数据暂时无法加载'} />
           <Button color="primary" onClick={() => void refresh()}>重新加载</Button>
         </div>
         <div className={styles.endSpacer} />
@@ -317,7 +267,7 @@ export default function PregnancyPage() {
             disabled={profileSaving}
             onClick={() => setProfilePickerVisible(true)}
           >
-            <span className={styles.buttonContent}>末次月经 {profile.startDate.replaceAll('-', '/')}</span>
+            <span className={styles.buttonContent}>起始日期 {profile.startDate.replaceAll('-', '/')}</span>
             <EditSOutline />
           </button>
         </header>
@@ -333,14 +283,7 @@ export default function PregnancyPage() {
                 <span className={styles.weekLabel}>{row.displayWeek}周</span>
                 {row.dates.map((date) => {
                   const hasCaution = cautions.some((caution) => caution.startDate <= date && caution.endDate >= date);
-                  const hasRecord = recordByDate.has(date);
-                  const stateClass = hasCaution && hasRecord
-                    ? styles.dateBoth
-                    : hasCaution
-                      ? styles.dateCaution
-                      : hasRecord
-                        ? styles.dateRecord
-                        : '';
+                  const stateClass = hasCaution ? styles.dateCaution : '';
                   return (
                     <button
                       key={date}
@@ -352,7 +295,7 @@ export default function PregnancyPage() {
                         date === today ? styles.dateToday : '',
                       ].filter(Boolean).join(' ')}
                       aria-pressed={date === selectedDate}
-                      aria-label={`${formatFullDate(date)}${hasCaution ? '，有注意事项' : ''}${hasRecord ? '，有个人记录' : ''}`}
+                      aria-label={`${formatFullDate(date)}${hasCaution ? '，有注意事项' : ''}`}
                       onClick={() => setSelectedDate(date)}
                     >
                       <span>{formatPregnancyMonthDay(date)}</span>
@@ -365,15 +308,13 @@ export default function PregnancyPage() {
           </div>
           <div className={styles.legend}>
             <span><i className={styles.legendCaution} />注意事项</span>
-            <span><i className={styles.legendRecord} />个人记录</span>
-            <span><i className={styles.legendBoth} />两者都有</span>
           </div>
         </section>
 
         <section className={styles.selectedDayCard}>
           <div>
             <div className={styles.selectedDateTitle}>{formatFullDate(selectedDate)} · {getPregnancyWeekdayLabel(selectedDate)}</div>
-            <div className={styles.selectedDateMeta}>{selectedAge?.label} · 第{selectedAge?.displayWeek}孕周</div>
+            <div className={styles.selectedDateMeta}>{selectedAge?.label} · 第{selectedAge?.displayWeek}周</div>
           </div>
         </section>
 
@@ -409,36 +350,11 @@ export default function PregnancyPage() {
           )}
         </section>
 
-        <section className={styles.detailSection}>
-          <div className={styles.sectionHeader}>
-            <div>
-              <h2>个人记录</h2>
-              <span>{selectedRecord ? '已记录' : '未记录'}</span>
-            </div>
-            <Button size="small" fill="outline" color="primary" onClick={openRecord}>
-              <span className={styles.buttonContent}>{selectedRecord ? <EditSOutline /> : <AddCircleOutline />}{selectedRecord ? '编辑' : '录入'}</span>
-            </Button>
-          </div>
-          {selectedRecord ? (
-            <div className={styles.recordItem}>
-              <p>{selectedRecord.content}</p>
-              <div className={styles.recordActions}>
-                <button type="button" onClick={openRecord}><span className={styles.buttonContent}><EditSOutline />编辑</span></button>
-                <button type="button" className={styles.deleteTextButton} onClick={() => void deleteRecord(selectedRecord)}>
-                  <span className={styles.buttonContent}><DeleteOutline />删除</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.compactEmpty}>当天还没有个人记录，可记录饮食、症状或日常感受</div>
-          )}
-        </section>
-
         <div className={styles.endSpacer} />
       </PullToRefresh>
 
       <Picker
-        title="切换孕期周期"
+        title="切换周期"
         columns={[CYCLE_OPTIONS]}
         visible={cyclePickerVisible}
         value={[String(cycleIndex)]}
@@ -451,7 +367,7 @@ export default function PregnancyPage() {
       />
 
       <DatePicker
-        title="修改末次月经日期"
+        title="修改起始日期"
         precision="day"
         visible={profilePickerVisible}
         value={pregnancyDateToLocalDate(profile.startDate)}
@@ -505,34 +421,6 @@ export default function PregnancyPage() {
             </Form.Item>
             <Form.Item name="content" label="注意" rules={[{ required: true, message: '请填写注意事项' }]}>
               <TextArea rows={5} maxLength={20000} showCount placeholder="例如：避免生食，按时补充叶酸，预约产检……" />
-            </Form.Item>
-          </Form>
-        }
-      />
-
-      <Modal
-        className={styles.formModal}
-        visible={recordVisible}
-        closeOnMaskClick={!recordSaving}
-        showCloseButton
-        onClose={() => {
-          if (!recordSaving) setRecordVisible(false);
-        }}
-        content={
-          <Form
-            form={recordForm}
-            layout="vertical"
-            className={styles.entryForm}
-            footer={
-              <Button block type="submit" color="primary" size="large" loading={recordSaving} disabled={recordSaving}>
-                保存记录
-              </Button>
-            }
-            onFinish={saveRecord}
-          >
-            <div className={styles.modalTitle}>{formatFullDate(selectedDate)}个人记录</div>
-            <Form.Item name="content" rules={[{ required: true, message: '请填写个人记录' }]}>
-              <TextArea rows={8} maxLength={20000} showCount placeholder="记录饮食、身体感受、产检情况或其他日常内容" />
             </Form.Item>
           </Form>
         }

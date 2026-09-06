@@ -28,7 +28,7 @@ const Bottom: FC = () => {
     },
     {
       key: '/meow/pregnancy',
-      title: '孕期',
+      title: '日历',
       icon: <HeartOutline />,
     },
     {

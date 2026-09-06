@@ -77,7 +77,7 @@ export const getPregnancyCycleIndex = (startDate: string, dateKey: string) => {
 export const getPregnancyCycleLabel = (cycleIndex: number) => {
   const safeIndex = Math.min(PREGNANCY_CYCLE_COUNT - 1, Math.max(0, Math.round(cycleIndex)));
   const firstWeek = safeIndex * 4 + 1;
-  return `孕${firstWeek}–${firstWeek + 3}周`;
+  return `第${firstWeek}–${firstWeek + 3}周`;
 };
 
 export const getPregnancyCycleDates = (startDate: string, cycleIndex: number) => {
@@ -106,7 +106,7 @@ export const getPregnancyAge = (startDate: string, dateKey: string) => {
     completedWeeks,
     dayOfWeek,
     displayWeek: completedWeeks + 1,
-    label: `孕${completedWeeks}周${dayOfWeek}天`,
+    label: `${completedWeeks}周${dayOfWeek}天`,
   };
 };
 

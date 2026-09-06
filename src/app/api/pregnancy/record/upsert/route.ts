@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const recordDate = normalizePregnancyDate(body.recordDate, '记录日期');
     const content = normalizePregnancyContent(body.content, '个人记录');
     const existing = await prisma.pregnancyDailyRecord.findFirst({
-      where: { recordDate },
+      where: { userId, recordDate },
       orderBy: [{ id: 'asc' }],
     });
     const record = existing

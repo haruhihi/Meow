@@ -18,7 +18,9 @@
     "refresh:stock-metric-cache": "node scripts/refresh-stock-metric-cache.mjs",
     "prepare:stock-ai-report-evidence": "node scripts/prepare-stock-ai-report-evidence.mjs",
     "migrate:categories": "node scripts/archive/migrate-categories.mjs",
-    "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply"
+    "migrate:categories:apply": "node scripts/archive/migrate-categories.mjs --apply",
+    "migrate:leisure-categories": "node scripts/migrate-leisure-categories.mjs",
+    "migrate:leisure-categories:apply": "node scripts/migrate-leisure-categories.mjs --apply"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.2",

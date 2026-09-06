@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     let caution;
     if (id != null) {
       if (!Number.isInteger(id) || id <= 0) throw new Error('事项 ID 无效');
-      const existing = await prisma.pregnancyCaution.findFirst({ where: { id } });
+      const existing = await prisma.pregnancyCaution.findFirst({ where: { id, userId } });
       if (!existing) throw new Error('注意事项不存在');
       caution = await prisma.pregnancyCaution.update({
         where: { id },
